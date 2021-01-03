@@ -1,0 +1,1044 @@
+v. 2021.04.18
+
+Combined patch for vpopmail-5.4.33 by Roberto Puzzanghera
+
+More info here:
+https://notes.sagredo.eu/en/qmail-notes-185/installing-and-configuring-vpopmail-81.html
+https://notes.sagredo.eu/en/qmail-notes-185/dovecot-vpopmail-auth-driver-removal-migrating-to-the-sql-driver-241.html
+
+==================================================================================================
+
+== This patch puts together
+
+* A patch to make vpopmail store domain aliases to MySQL. This gets dovecot's sql auth driver
+  aware of domain aliases, provided that you modify the sql query accordingly.
+  More info here https://notes.sagredo.eu/en/qmail-notes-185/dovecot-vpopmail-auth-driver-removal-241.html
+  See doc/README.sql-aliasdomains for more info.
+
+* A patch which installs the sql procedure needed for the dovecot's password_query for servers
+  with one table for each domains (--disable-many-domains).
+  You have to add --enable-mysql-bin to you configure command.
+  The sql procedure is in the vpopmail-5.4.33/dovecot/ folder and it will be copied to ~/vpopmail/etc/.
+  It supports aliasdomains and user/domain limits.
+  This feature does nothing if you have all domains in the vpopmail table (--enable-many-domains).
+  See doc/README.dovecot-pwd-query for more info.
+
+* A patch which makes vpopmail to copy your favourite delivery agent (stored in QMAILDIR/control/defauldelivery)
+  into the .qmail-default file of any newly created domain, overriding the default vpopmail's behaviour,
+  where vpopmail copies its delivery agent vdelivermail.
+  configure --enable-defaultdelivery (default is OFF) to enable this functionality.
+  See doc/README.defaultdelivery for more info.
+
+* A patch which gets vpopmail to compile with gcc-10
+
+=== Settings
+
+* An autoreconf is needed as I modified the original configure.in and Makefile.am files
+
+  autoreconf -f -i
+
+* Browse the doc/ directory for more info
+
+=================================================================================================
+
+diff -ruN ../vpopmail-5.4.33-original/Makefile.am vpopmail-5.4.33/Makefile.am
+--- ../vpopmail-5.4.33-original/Makefile.am	2011-02-28 18:00:45.000000000 +0100
++++ vpopmail-5.4.33/Makefile.am	2021-03-09 11:07:39.138178123 +0100
+@@ -19,6 +19,7 @@
+ MYSQLCONF=$(DESTDIR)@vpopmaildir@/etc/vpopmail.mysql
+ VLIMITS=$(DESTDIR)@vpopmaildir@/etc/vlimits.default
+ VUSAGECCONF=$(DESTDIR)@vpopmaildir@/etc/vusagec.conf
++DOVECOT_SQL=$(DESTDIR)@vpopmaildir@/etc/pwd-query_disable-many-domains.sql
+ 
+ noinst_LIBRARIES=libvpopmail.a
+ 
+@@ -31,7 +32,7 @@
+  vdeldomain vpasswd vadduser vdeluser vaddaliasdomain vsetuserquota \
+  vpopbull vdeloldusers vmoduser valias vuserinfo vmkpasswd vipmap \
+  vdominfo vconvert vkill vmoddomlimits vchangepw dotqmail2valias \
+- vpopmaild vlist authvchkpw vusagec
++ vpopmaild vlist authvchkpw vusagec vsavealiasdomains
+ 
+ vusagec_SOURCES = vusagec.c client.c conf.c ippp.c
+ vusagec_LDADD = libvpopmail.a @auth_libs@
+@@ -114,6 +115,9 @@
+ vmoddomlimits_SOURCES = vmoddomlimits.c
+ vmoddomlimits_LDADD = libvpopmail.a  @auth_libs@
+ 
++vsavealiasdomains_SOURCES = vsavealiasdomains.c
++vsavealiasdomains_LDADD = libvpopmail.a  @auth_libs@
++
+ DEFS=-I. @auth_inc@ 
+ 
+ install: install-recursive vusage-msg
+@@ -149,6 +153,13 @@
+ 	echo "-L@vpopmaildir@/lib -lvpopmail @auth_libs@ @LIBS@" > \
+ 	 $(DESTDIR)@vpopmaildir@/etc/lib_deps
+ 
++	if test @MANY_DOMAINS@ = 0; then \
++		if test ! -r $(DOVECOT_SQL); then \
++			$(INSTALL) -o root -m 0644 \
++			dovecot/pwd-query_disable-many-domains.sql $(DOVECOT_SQL); \
++		fi \
++	fi
++
+ 	if test ! -r $(VUSAGECCONF); then \
+ 		$(INSTALL) -o @vpopuser@ -m 0644 -g @vpopgroup@ \
+ 		vusagec.conf $(VUSAGECCONF); \
+diff -ruN ../vpopmail-5.4.33-original/configure.in vpopmail-5.4.33/configure.in
+--- ../vpopmail-5.4.33-original/configure.in	2011-02-28 18:00:45.000000000 +0100
++++ vpopmail-5.4.33/configure.in	2021-04-06 20:00:32.358213810 +0200
+@@ -1454,6 +1454,29 @@
+         ;;
+ esac
+ 
++
++#----------------------------------------------------------------------
++
++AC_MSG_CHECKING(whether defaultdelivery is enabled)
++AC_ARG_ENABLE(defaultdelivery,
++        [  --enable-defaultdelivery   Copy the content of control/defaultdelivery to .qmail-default on domain creation.],
++        DEFAULT_DELIVERY=$enableval,
++                [
++                        DEFAULT_DELIVERY=n
++                ]
++)
++
++case $DEFAULT_DELIVERY in
++  1*|y*|Y*)
++        AC_MSG_RESULT(yes)
++        DEFAULT_DELIVERY=1
++        AC_DEFINE_UNQUOTED(DEFAULT_DELIVERY,$DEFAULT_DELIVERY,"")
++        ;;
++  *)
++        AC_MSG_RESULT(no)
++        ;;
++esac
++
+ #----------------------------------------------------------------------
+ 
+ AC_MSG_CHECKING(whether many-domains is enabled)
+@@ -1484,6 +1507,92 @@
+ 
+ #----------------------------------------------------------------------
+ 
++# MySQL binary is needed because we have to create the procedure calling an sql file via command line
++# This is only with --disable-many-domains
++AC_SUBST(MANY_DOMAINS)
++
++if test $MANY_DOMAINS = 0
++then
++
++  AC_MSG_CHECKING(whether we can locate the MySQL binary)
++  # default MySQL binary
++  mysqlbin=""
++  for f in /usr/bin/mysql /usr/local/mysql/bin/mysql /usr/local/bin/mysql
++  do
++      if test -x $f
++      then
++          mysqlbin=$f
++      fi
++  done
++
++  # AC_ARG_ENABLE (feature, help-string, [action-if-given], [action-if-not-given])
++  AC_ARG_ENABLE(mysql-bin,
++      [  --enable-mysql-bin=PATH      Full path to your MySQL binary. Only with --disable-many-domains.],
++      binmysql=$enableval,
++      [
++          if test "$mysqlbin" = ""
++          then
++              AC_MSG_RESULT(no)
++              AC_MSG_ERROR([Unable to find your MySQL binary, specify --enable-mysql-bin=PATH.])
++          fi
++      ]
++  )
++
++  if test ! $binmysql = "yes"
++  then
++      if test ! -x $binmysql
++      then
++         AC_MSG_RESULT(no)
++         AC_MSG_ERROR([Unable to find your MySQL binary, specify --enable-mysql-bin=PATH.])
++      else
++         mysqlbin=$binmysql
++      fi
++  fi
++
++  AC_MSG_RESULT(yes)
++  AC_DEFINE_UNQUOTED(MYSQLBIN,"$mysqlbin","")
++
++else
++  AC_DEFINE_UNQUOTED(MYSQLBIN,"","")
++
++fi
++
++#----------------------------------------------------------------------
++
++AC_MSG_CHECKING(whether sql-aliasdomains is enabled)
++AC_ARG_ENABLE(sql-aliasdomains,
++        [  --enable-sql-aliasdomains  Saves the domain aliases to database. Only valid for MySQL auth module.],
++        SQL_ALIASDOMAINS=$enableval,
++                [
++	                if [[ "$AUTH_MODULE" != "mysql" ]];
++		        then
++	                        SQL_ALIASDOMAINS=n
++	                else
++				SQL_ALIASDOMAINS=y
++				AC_DEFINE_UNQUOTED(SQL_ALIASDOMAINS,$SQL_ALIASDOMAINS,"")
++	                fi
++                ]
++)
++
++case $SQL_ALIASDOMAINS in
++  1*|y*|Y*)
++                AC_MSG_RESULT(yes)
++		if [[ "$AUTH_MODULE" != "mysql" ]];
++                then
++			AC_MSG_ERROR(sql-aliasdomains is only supported in the MySQL authentication module.)
++                else
++			SQL_ALIASDOMAINS=1
++			AC_DEFINE_UNQUOTED(SQL_ALIASDOMAINS,$SQL_ALIASDOMAINS,"")
++                fi
++        ;;
++  *)
++                AC_MSG_RESULT(no)
++                SQL_ALIASDOMAINS=0
++        ;;
++esac
++
++#----------------------------------------------------------------------
++
+ AC_MSG_CHECKING(whether any discontinued --enable commands have been used)
+ 
+ AC_ARG_ENABLE(mysql-logging, [],
+@@ -1838,6 +1947,16 @@
+ esac
+ 
+ 
++case $DEFAULT_DELIVERY in
++  1*|y*|Y*)
++    echo "   defaultdelivery = ON  --enable-defaultdelivery"
++    ;;
++  *)
++    echo "   defaultdelivery = OFF --disable-defaultdelivery (default)"
++    ;;
++esac
++
++
+ if test "$USE_SQL" = 1
+ then
+   if test "$MANY_DOMAINS" = 1
+@@ -1848,6 +1967,16 @@
+   fi
+ fi
+ 
++if [[ "$AUTH_MODULE" == "mysql" ]];
++then
++  if test "$SQL_ALIASDOMAINS" = 1
++  then
++    echo "SQL domain aliases = ON  domain aliases saved to MySQL        --enable-sql-aliasdomains (default)"
++  else
++    echo "SQL domain aliases = OFF domain aliases NOT saved to MySQL    --disable-sql-aliasdomains"
++  fi
++fi
++
+ case $ENABLE_SPAMASSASSIN in
+   1*|y*|Y*)
+     echo "      spamassassin = ON  --enable-spamassassin"
+diff -ruN ../vpopmail-5.4.33-original/doc/README.defaultdelivery vpopmail-5.4.33/doc/README.defaultdelivery
+--- ../vpopmail-5.4.33-original/doc/README.defaultdelivery	1970-01-01 01:00:00.000000000 +0100
++++ vpopmail-5.4.33/doc/README.defaultdelivery	2021-03-30 10:55:44.036836446 +0200
+@@ -0,0 +1,19 @@
++vpopmail-defaultdelivery patch for vpopmail-5.4.33 by Roberto Puzzanghera
++More info here https://notes.sagredo.eu/en/qmail-notes-185/installing-and-configuring-vpopmail-81.html
++
++==================================================================================================================
++
++Normally vpopmail copies its delivery agent vdelivermail into the .qmail-default file of newly created domains.
++This patch makes vpopmail to copy your favourite delivery agent, stored in QMAILDIR/control/defauldelivery.
++
++== Settings
++
++An autoreconf is needed as I modified the original configure.in and Makefile.am files.
++
++Configure as follows:
++
++autoreconf -f -i
++./configure --enable-defaultdelivery (default OFF)
++
++If the functionality is disabled (--disable-defaultdelivery, which is the default option) vdelivermail is
++installed with the "delete" option instead of "bounce-no-mailbox", which is not reasonable anymore.
+diff -ruN ../vpopmail-5.4.33-original/doc/README.dovecot-pwd-query vpopmail-5.4.33/doc/README.dovecot-pwd-query
+--- ../vpopmail-5.4.33-original/doc/README.dovecot-pwd-query	1970-01-01 01:00:00.000000000 +0100
++++ vpopmail-5.4.33/doc/README.dovecot-pwd-query	2021-03-27 12:30:31.588286092 +0100
+@@ -0,0 +1,26 @@
++vpopmail-dovecot-pwd_query patch for vpopmail-5.4.33 by Roberto Puzzanghera
++More info here https://notes.sagredo.eu/en/qmail-notes-185/installing-and-configuring-vpopmail-81.html
++
++==================================================================================================================
++
++If you want to use the dovecot's sql auth driver with one table for each domain (--disable-many-domains) you have
++to heavily customize your password query.
++With this patch vpopmail installs the sql procedure and functions in the database when you create a new domain.
++The procedure can be called by dovecot to perform the auth.
++The sql stuff supports aliasdomains and mysql limits and will be loaded from ~/vpopmail/etc/pwd-query_disable-many-domains.sql.
++You can customize the sql procedure editing this file.
++Be aware that the aliasdomains support requires that you patched your vpopmail accordingly with my
++sql-aliasdomains patch.
++
++Read the reference above for more info.
++
++=================================================================================================================
++
++== Settings
++
++An autoreconf is needed as I modified the original configure.in and Makefile.am files.
++
++Configure as follows:
++
++autoreconf -f -i
++./configure --disable-many-domains --enable-mysql-bin=PATH
+diff -ruN ../vpopmail-5.4.33-original/doc/README.sql-aliasdomains vpopmail-5.4.33/doc/README.sql-aliasdomains
+--- ../vpopmail-5.4.33-original/doc/README.sql-aliasdomains	1970-01-01 01:00:00.000000000 +0100
++++ vpopmail-5.4.33/doc/README.sql-aliasdomains	2021-03-27 12:30:18.988411946 +0100
+@@ -0,0 +1,61 @@
++sql-aliasdomains patch for vpopmail-5.4.33 by Roberto Puzzanghera
++More info here https://notes.sagredo.eu/en/qmail-notes-185/dovecot-vpopmail-auth-driver-removal-241.html
++
++==================================================================================================================
++
++* A patch to make vpopmail store domain aliases to MySQL. This gets dovecot's sql auth driver
++  aware of domain aliases, provided that you modify the sql query accordingly.
++  More info here https://notes.sagredo.eu/en/qmail-notes-185/dovecot-vpopmail-auth-driver-removal-241.html
++
++* A patch which gets vpopmail to compile with gcc-10
++
++== Settings
++
++* An autoreconf is needed as I modified the original configure.in and Makefile.am files
++
++  autoreconf -f -i
++  ./configure \
++	--enable-auth-module=mysql \
++	--enable-sql-aliasdomains (default)
++
++* Adjust your dovecot-sql.conf.ext in order to auth both real and alias domains:
++  (more info here https://notes.sagredo.eu/en/qmail-notes-185/installing-dovecot-and-sieve-on-a-vpopmail-qmail-server-28.html#sql)
++
++password_query = \
++        SELECT \
++                CONCAT(vpopmail.pw_name, '@', vpopmail.pw_domain) AS user, \
++                vpopmail.pw_passwd AS password, \
++                vpopmail.pw_dir AS userdb_home, \
++                89 AS userdb_uid, \
++                89 AS userdb_gid, \
++                CONCAT('*:bytes=', REPLACE(SUBSTRING_INDEX(vpopmail.pw_shell, 'S', 1), 'NOQUOTA', '0')) AS userdb_quota_rule \
++        FROM `vpopmail` \
++                LEFT JOIN aliasdomains ON aliasdomains.alias='%d' \
++        WHERE \
++                vpopmail.pw_name='%n' \
++                AND \
++                (vpopmail.pw_domain='%d' OR vpopmail.pw_domain=aliasdomains.domain) \
++                AND \
++                ('%a'!='995' OR !(vpopmail.pw_gid & 2)) \
++                AND \
++                ('%r'!='[WEBMAIL-IP]' OR !(vpopmail.pw_gid & 4)) \
++                AND \
++                ('%r'='WEBMAIL-IP' OR '%a'!='993' OR !(vpopmail.pw_gid & 8))
++
++user_query = \
++        SELECT \
++                vpopmail.pw_dir AS home, \
++                89 AS uid, \
++                89 AS gid \
++        FROM vpopmail \
++        WHERE \
++                vpopmail.pw_name='%n' \
++                AND \
++                vpopmail.pw_domain='%d'
++
++* Create/delete aliasdomains in the usual way with vaddaliasdomain/vdeldomain
++
++* If you already have aliasdomains, you have to populate the dbtable. You can use my "vsavealiasdomains" program
++  to save all your domain aliases to MySQL.
++  Type "vsavealiasadomains -A" to save all your domain aliases to MySQL.
++  Type "vsavealiasadomains -h" for more options.
+diff -ruN ../vpopmail-5.4.33-original/dovecot/pwd-query_disable-many-domains.sql vpopmail-5.4.33/dovecot/pwd-query_disable-many-domains.sql
+--- ../vpopmail-5.4.33-original/dovecot/pwd-query_disable-many-domains.sql	1970-01-01 01:00:00.000000000 +0100
++++ vpopmail-5.4.33/dovecot/pwd-query_disable-many-domains.sql	2021-03-09 09:19:03.530730837 +0100
+@@ -0,0 +1,141 @@
++/************************************************************************************************
++  password_query procedure for dovecot's sql auth in case of --disable-many-domains.
++  It supports aliasdomains and mysql-limits.
++
++  More info here
++  https://notes.sagredo.eu/en/qmail-notes-185/dovecot-vpopmail-auth-driver-removal-migrating-to-the-sql-driver-241.html
++
++  By Roberto Puzzanghera
++
++######  auth-sql.conf.ext
++
++passdb {
++  driver = sql
++  args = /usr/local/dovecot/etc/dovecot/dovecot-sql.conf.ext
++}
++
++userdb {
++  driver = prefetch
++}
++
++# This is for LDA.
++userdb {
++  driver = static
++  args = uid=89 gid=89 home=/home/vpopmail/domains/%d/%n
++}
++}
++
++##### dovecot-sql.conf.ext
++
++password_query = CALL dovecot_password_query_disable_many_domains('%n','%d','127.0.0.1','%r','%a')
++
++ ***************************************************************************************************/
++
++
++/****************************************************************
++  Returns the domain table
++ ****************************************************************/
++DROP FUNCTION IF EXISTS `get_domain_table`;
++
++DELIMITER $$
++CREATE FUNCTION `get_domain_table`(`d` VARCHAR(100)) RETURNS varchar(100) CHARSET latin1
++BEGIN
++
++   DECLARE domain_table varchar(100);
++   SET domain_table = dot2underscore(get_real_domain(d));
++
++   RETURN domain_table;
++
++END$$
++DELIMITER ;
++
++
++/****************************************************************
++  Replaces dots and "-" with undescores in domain name
++ ****************************************************************/
++DROP FUNCTION IF EXISTS `dot2underscore`;
++
++DELIMITER $$
++CREATE FUNCTION `dot2underscore`(`d` VARCHAR(100)) RETURNS varchar(100) CHARSET latin1
++BEGIN
++
++   RETURN REPLACE(REPLACE(d, ".", "_"), "-", "_");
++
++END$$
++DELIMITER ;
++
++
++/*******************************************************************
++  Returns the real domain given an alias domain or the domain name
++  if it's not an alias.
++ *******************************************************************/
++DROP FUNCTION IF EXISTS `get_real_domain`;
++
++DELIMITER $$
++CREATE FUNCTION `get_real_domain`(`d` VARCHAR(100)) RETURNS varchar(100) CHARSET latin1
++BEGIN
++   DECLARE real_domain varchar(100);
++
++   IF NOT
++      (SELECT 1 FROM INFORMATION_SCHEMA.TABLES
++      WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=dot2underscore(d))
++   IS NULL THEN
++      SET real_domain = d;
++
++   ELSEIF NOT
++      (SELECT 1 FROM aliasdomains WHERE alias=d)
++   IS NULL THEN
++      SELECT domain INTO real_domain FROM aliasdomains WHERE alias=d;
++
++   ELSE
++   SET real_domain = NULL;
++
++   END IF;
++
++   RETURN real_domain;
++
++END$$
++DELIMITER ;
++
++
++/**************************************************************************
++  Stored procedure for password_query in case of "disabled many domains"
++ **************************************************************************/
++DROP PROCEDURE IF EXISTS `dovecot_password_query_disable_many_domains`;
++
++DELIMITER $$
++CREATE PROCEDURE `dovecot_password_query_disable_many_domains`(IN `name` VARCHAR(255), IN `domain` VARCHAR(255), IN `webmail_ip` VARCHAR(255), IN `remote_ip` VARCHAR(255), IN `port` INT)
++BEGIN
++DECLARE vpopmail varchar(256);
++SET vpopmail = get_domain_table(domain);
++
++IF (vpopmail) IS NULL THEN
++   SET @SQL = "SELECT NULL";
++ELSE
++	SET @SQL = CONCAT("SELECT CONCAT(",vpopmail,".pw_name, '@', '",domain,"') AS user,",
++	vpopmail,".pw_passwd AS password,",
++	vpopmail,".pw_dir AS userdb_home,
++	89 AS userdb_uid,
++	89 AS userdb_gid,
++	CONCAT('*:bytes=', REPLACE(SUBSTRING_INDEX(",vpopmail,".pw_shell, 'S', 1), 'NOQUOTA', '0')) AS userdb_quota_rule
++	FROM ",vpopmail,"
++	LEFT JOIN limits ON limits.domain='",get_real_domain(domain),"'
++	WHERE ",vpopmail,".pw_name='",name,"'
++	AND
++	('",port,"'!='995' OR !(",vpopmail,".pw_gid & 2))
++	AND
++	('",remote_ip,"'!='",webmail_ip,"' OR !(",vpopmail,".pw_gid & 4))
++	AND
++	('",remote_ip,"'='",webmail_ip,"' OR '",port,"'!='993' OR !(",vpopmail,".pw_gid & 8))
++	AND
++	('",remote_ip,"'!='",webmail_ip,"' OR COALESCE(disable_webmail,0)!=1)
++	AND
++	('",remote_ip,"'='",webmail_ip,"' OR COALESCE(disable_imap,0)!=1)");
++END IF;
++
++PREPARE sql_code FROM @SQL;
++EXECUTE sql_code;
++DEALLOCATE PREPARE sql_code;
++
++END$$
++DELIMITER ;
+diff -ruN ../vpopmail-5.4.33-original/vmysql.c vpopmail-5.4.33/vmysql.c
+--- ../vpopmail-5.4.33-original/vmysql.c	2011-02-28 18:00:45.000000000 +0100
++++ vpopmail-5.4.33/vmysql.c	2021-04-18 12:59:51.847675065 +0200
+@@ -96,6 +96,20 @@
+ void vcreate_lastauth_table();
+ #endif
+ 
++char *MYSQL_READ_SERVER;
++int MYSQL_READ_PORT;
++char *MYSQL_READ_SOCKET;
++char *MYSQL_READ_USER;
++char *MYSQL_READ_PASSWD;
++char *MYSQL_READ_DATABASE;
++
++char *MYSQL_UPDATE_SERVER;
++int MYSQL_UPDATE_PORT;
++char *MYSQL_UPDATE_SOCKET;
++char *MYSQL_UPDATE_USER;
++char *MYSQL_UPDATE_PASSWD;
++int MYSQL_UPDATE_VPORT;
++char *MYSQL_UPDATE_DATABASE;
+ 
+ /************************************************************************/
+ /* 
+@@ -356,13 +370,17 @@
+ int vauth_adddomain( char *domain )
+ {
+ #ifndef MANY_DOMAINS
++  vcreate_pwd_query_proc();
+   vset_default_domain( domain );
+   return (vauth_create_table (vauth_munch_domain( domain ), TABLE_LAYOUT, 1));
+ #else
+   /* if creation fails, don't show an error */
+   vauth_create_table (MYSQL_DEFAULT_TABLE, TABLE_LAYOUT, 0);
+-  return (0);
+ #endif
++#ifdef SQL_ALIASDOMAINS
++  vcreate_aliasdomains_table();
++#endif
++  return (0);
+ }
+ 
+ 
+@@ -1866,3 +1884,79 @@
+ 
+   return(strcmp(crypt(clear_pass,vpw->pw_passwd),vpw->pw_passwd));
+ }
++
++
++/************************************************************************/
++int vcreate_pwd_query_proc()
++{
++  char sql_file[256], command[256];
++  FILE *sql;
++
++  /* retrieve the file with the sql stuff */
++  snprintf(sql_file, sizeof(sql_file), "%s/etc/pwd-query_disable-many-domains.sql",VPOPMAILDIR);
++  sql = fopen(sql_file, "r");
++  if( sql == NULL )
++  {
++     printf("\nERROR: Missing %s/etc/pwd-query_disable-many-domains.sql file.\n",VPOPMAILDIR);
++     exit(EXIT_FAILURE);
++  }
++
++  /* build the shell command which runs the query */
++  snprintf(command, sizeof command, "%s -h %s -P %d -D %s -u %s -p%s < %s",
++	 MYSQLBIN, MYSQL_UPDATE_SERVER, MYSQL_UPDATE_PORT, MYSQL_UPDATE_DATABASE,
++         MYSQL_UPDATE_USER, MYSQL_UPDATE_PASSWD, sql_file);
++  system(command);
++
++  fclose(sql);
++}
++
++
++/************************************************************************/
++void vcreate_aliasdomains_table()
++{
++  /* if creation fails do not throw an error */
++  vauth_create_table ("aliasdomains", ALIASDOMAINS_TABLE_LAYOUT, 0);
++  return;
++}
++
++
++/************************************************************************/
++int vcreate_sql_aliasdomain(char *domain,  char *alias)
++{
++ int err;
++
++    if ( (err=vauth_open_update()) != 0 ) return(err);
++
++    qnprintf( SqlBufUpdate, SQL_BUF_SIZE,
++        "INSERT IGNORE INTO aliasdomains (domain,alias) VALUES ('%s','%s')",
++        domain,
++	alias );
++
++    vcreate_aliasdomains_table();
++    if (mysql_query(&mysql_update,SqlBufUpdate)) {
++        fprintf(stderr, "vmysql: sql error[m]: %s\n", mysql_error(&mysql_update));
++        return(-1);
++    }
++    return(0);
++}
++
++
++/************************************************************************/
++int vdelete_sql_aliasdomain(char *alias)
++{
++ int err;
++
++    if ( (err=vauth_open_update()) != 0 ) return(err);
++
++    qnprintf( SqlBufUpdate, SQL_BUF_SIZE,
++        "DELETE FROM aliasdomains WHERE alias='%s'",
++        alias );
++
++    vcreate_aliasdomains_table();
++    if (mysql_query(&mysql_update,SqlBufUpdate)) {
++        fprintf(stderr, "vmysql: sql error[m]: %s\n", mysql_error(&mysql_update));
++        return(-1);
++    }
++    return(0);
++}
++
+diff -ruN ../vpopmail-5.4.33-original/vmysql.h vpopmail-5.4.33/vmysql.h
+--- ../vpopmail-5.4.33-original/vmysql.h	2011-02-28 18:00:45.000000000 +0100
++++ vpopmail-5.4.33/vmysql.h	2021-04-18 13:02:45.147955369 +0200
+@@ -41,21 +41,6 @@
+    
+  */
+ 
+-char *MYSQL_READ_SERVER;
+-int MYSQL_READ_PORT;
+-char *MYSQL_READ_SOCKET;
+-char *MYSQL_READ_USER;
+-char *MYSQL_READ_PASSWD;
+-char *MYSQL_READ_DATABASE;
+-
+-char *MYSQL_UPDATE_SERVER;
+-int MYSQL_UPDATE_PORT;
+-char *MYSQL_UPDATE_SOCKET;
+-char *MYSQL_UPDATE_USER;
+-char *MYSQL_UPDATE_PASSWD;
+-int MYSQL_UPDATE_VPORT;
+-char *MYSQL_UPDATE_DATABASE;
+-
+ /* defaults - no need to change */
+ #define MYSQL_DEFAULT_TABLE "vpopmail"
+ #define MYSQL_DOT_CHAR '_'
+@@ -306,3 +291,12 @@
+       perm_defaultquota        TINYINT(2) NOT NULL DEFAULT 0"
+ #endif
+ 
++void vcreate_aliasdomains_table();
++int vdelete_sql_aliasdomain(char *alias);
++int vcreate_sql_aliasdomain(char *domain, char *alias);
++
++#define ALIASDOMAINS_TABLE_LAYOUT "alias varchar(100) NOT NULL, \
++      domain varchar(100) NOT NULL, \
++      PRIMARY KEY (alias)"
++
++int vcreate_pwd_query_proc();
+diff -ruN ../vpopmail-5.4.33-original/vpgsql.c vpopmail-5.4.33/vpgsql.c
+--- ../vpopmail-5.4.33-original/vpgsql.c	2011-02-28 18:00:45.000000000 +0100
++++ vpopmail-5.4.33/vpgsql.c	2021-02-14 18:03:15.812565902 +0100
+@@ -392,10 +392,10 @@
+ #endif
+ 
+ #ifdef ENABLE_SQL_LOGGING
+-    qnprintf( sqlBufUpdate, SQL_BUF_SIZE,
++    qnprintf( SqlBufUpdate, SQL_BUF_SIZE,
+        "delete from vlog where domain = '%s'", domain );
+     pgres=PQexec(pgc, SqlBufUpdate);
+-    if( !pgres || PGresultStatus(pgres)!=PGRES_COMMAND_OK) {
++    if( !pgres || PQresultStatus(pgres)!=PGRES_COMMAND_OK) {
+       return(-1);
+     }
+ #endif
+@@ -445,11 +445,11 @@
+ #endif
+ 
+ #ifdef ENABLE_SQL_LOGGING
+-    qnprintf( sqlBufUpdate, SQL_BUF_SIZE,
++    qnprintf( SqlBufUpdate, SQL_BUF_SIZE,
+         "delete from vlog where domain = '%s' and user='%s'", 
+        domain, user );
+     pgres=PQexec(pgc, SqlBufUpdate);
+-    if( !pgres || PGresultStatus(pgres)!=PGRES_COMMAND_OK) {
++    if( !pgres || PQresultStatus(pgres)!=PGRES_COMMAND_OK) {
+       err = -1;
+     }
+ #endif
+diff -ruN ../vpopmail-5.4.33-original/vpopmail.c vpopmail-5.4.33/vpopmail.c
+--- ../vpopmail-5.4.33-original/vpopmail.c	2011-02-28 18:00:45.000000000 +0100
++++ vpopmail-5.4.33/vpopmail.c	2021-04-06 16:46:23.869331004 +0200
+@@ -147,7 +147,16 @@
+  char Dir[MAX_BUFF];
+  int call_dir;
+  string_list aliases;
+- 
++ char ch, defaultdelivery_file[MAX_BUFF];
++ FILE *defaultdelivery;
++ int default_delivery_option;
++
++#ifdef DEFAULT_DELIVERY
++ default_delivery_option = 1;
++#else
++ default_delivery_option = 0;
++#endif
++
+ #ifdef ONCHANGE_SCRIPT
+   /*  Don't execute any implied onchange in called functions  */
+   allow_onchange = 0;
+@@ -269,10 +278,27 @@
+     dec_dir_control(dir_control_for_uid, uid, gid);
+     fchdir(call_dir); close(call_dir);
+     return(VA_COULD_NOT_OPEN_QMAIL_DEFAULT);
++  } else if ( default_delivery_option == 1 ) {
++
++    /* Copy the content of control/defaultdelivery into .qmail-default */
++
++      snprintf(defaultdelivery_file, sizeof(defaultdelivery_file), "%s/control/defaultdelivery", QMAILDIR);
++      defaultdelivery = fopen(defaultdelivery_file, "r");
++      if( defaultdelivery == NULL )
++      {
++	printf("\nERROR: Missing %s/control/defaultdelivery file.\n", QMAILDIR);
++	printf("To create a %s/control/defaultdelivery file type:\n", QMAILDIR);
++	printf("echo \"| %s/bin/vdelivermail '' delete\" > %s/control/defaultdelivery\n\n", VPOPMAILDIR, QMAILDIR);
++	exit(EXIT_FAILURE);
++      }
++
++      while ( ( ch = fgetc(defaultdelivery) ) != EOF ) fputc(ch, fs);
++
++      fclose(defaultdelivery);
+   } else {
+-    fprintf(fs, "| %s/bin/vdelivermail '' bounce-no-mailbox\n", VPOPMAILDIR);
+-    fclose(fs);
++    fprintf(fs, "| %s/bin/vdelivermail '' delete\n", VPOPMAILDIR);
+   }
++  fclose(fs);
+ 
+   /* create an entry in the assign file for our new domain */
+   snprintf(tmpbuf, sizeof(tmpbuf), "%s/%s/%s", dir, DOMAINS_DIR, DomainSubDir);
+@@ -554,6 +580,14 @@
+     fprintf (stderr, "Warning: Failed to delete domain from the assign file\n");
+   }
+ 
++#ifdef SQL_ALIASDOMAINS
++  /* aliasdomain table will eventually be created */
++  for(i=0; i<aliases.count; i++)
++  {
++    vdelete_sql_aliasdomain(aliases.values[i]);
++  }
++#endif
++
+   /* send a HUP signal to qmail-send process to reread control files */
+   signal_process("qmail-send", SIGHUP);
+ 
+@@ -3772,6 +3806,11 @@
+   call_onchange ( "add_alias_domain" );
+ #endif
+ 
++#ifdef SQL_ALIASDOMAINS
++  /* aliasdomain table will eventually be created */
++  vcreate_sql_aliasdomain(real_domain, alias_domain);
++#endif
++
+   return(VA_SUCCESS);
+ }
+ 
+diff -ruN ../vpopmail-5.4.33-original/vpopmail.h vpopmail-5.4.33/vpopmail.h
+--- ../vpopmail-5.4.33-original/vpopmail.h	2011-02-28 18:00:45.000000000 +0100
++++ vpopmail-5.4.33/vpopmail.h	2021-02-26 20:43:41.036073594 +0100
+@@ -372,3 +372,6 @@
+ #ifdef USERS_BIG_DIR
+ char *backfill(char *, char *, char *, int);
+ #endif
++
++int vcreate_sql_aliasdomain(char *domain, char *alias);
++int vdelete_sql_aliasdomain(char *alias);
+diff -ruN ../vpopmail-5.4.33-original/vsavealiasdomains.c vpopmail-5.4.33/vsavealiasdomains.c
+--- ../vpopmail-5.4.33-original/vsavealiasdomains.c	1970-01-01 01:00:00.000000000 +0100
++++ vpopmail-5.4.33/vsavealiasdomains.c	2021-04-14 20:46:37.266080059 +0200
+@@ -0,0 +1,251 @@
++/*
++ * $Id: vsavealiasdomains.c 2021-02-15
++ * Roberto Puzzanghera - https://notes.sagredo.eu
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
++ */
++
++/*
++ * This program can be useful to quickly create domain aliases records in the aliasdomains MySQL table
++ * when switching to the dovecot's sql driver.
++ *
++ * To save ALL your existing aliasdomains to MySQL just do like this:
++ *
++ * vsavealiasdomain -A
++ *
++ * Type 'vsavealiasdomain -h' for more options.
++ *
++ * Look at the documentation concerning the sql-aliasdomains feature in the doc/README.sql-aliasdomains file
++ * or at https://notes.sagredo.eu/en/qmail-notes-185/dovecot-vpopmail-auth-driver-removal-migrating-to-the-sql-driver-241.html
++ * web page.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <memory.h>
++#include "config.h"
++#include "vpopmail.h"
++#include "vauth.h"
++
++char Domain[MAX_BUFF];
++char Alias[MAX_BUFF];
++int SaveAll;
++
++void usage();
++void get_options(int argc, char **argv);
++void save_all_aliases();
++void save_one_real_domain_aliases( char *Domain );
++void save_alias( char *Domain, char *Alias );
++#ifndef SQL_ALIASDOMAINS
++int  vcreate_sql_aliasdomain(char *Domain, char *Alias);
++#endif
++
++int main(int argc, char *argv[])
++{
++	if( vauth_open( 0 )) {
++		vexiterror( stderr, "Initial open." );
++	}
++
++#ifndef SQL_ALIASDOMAINS
++	printf("\nPlease use option --enable-sql-aliasdomains at configure time\n\n");
++	exit(-1);
++#else
++	get_options(argc,argv);
++
++	/* did we want to save all aliases of one single domain? */
++	if ( Domain[0] > 0 && Alias[0] == 0 ) {
++        	save_one_real_domain_aliases( Domain );
++	}
++	/* did we want to save just an alias of a particular domain? */
++	else if ( Domain[0] > 0 && Alias[0] > 0 ) {
++	        save_alias( Domain, Alias );
++	}
++	/* save all aliases of all domains */
++	else if ( SaveAll == 1 ) {
++        	save_all_aliases();
++	}
++	else {
++		usage();
++	}
++	return(vexit(0));
++#endif
++}
++
++void usage()
++{
++    printf("\nUsage: vsavealiasdomains [options] [real_domain] [alias_domain]\n");
++    printf("options:          -v (print version number)\n");
++    printf("                  -h (help)\n");
++    printf("                  -A (saves all aliases of all domains to MySQL)\n");
++    printf("vsavealiasdomains domain (saves all aliases of a domain to MySQL)\n");
++    printf("vsavealiasdomains real_domain alias_domain (saves an alias domain to MySQL)\n\n");
++}
++
++void get_options(int argc, char **argv)
++{
++	int c;
++	int errflag;
++	extern int optind;
++
++	SaveAll = 0;
++
++	memset(Domain, 0, sizeof(Domain));
++
++	errflag = 0;
++	while( !errflag && (c=getopt(argc,argv,"vAh")) != -1 ) {
++        	switch(c) {
++			case 'v':
++		                printf("version: %s\n", VERSION);
++        		        break;
++
++			case 'A':
++	                	SaveAll = 1;
++		                break;
++
++			case 'h':
++				errflag = 1;
++				break;
++
++			default:
++		                errflag = 1;
++                		break;
++	        }
++	}
++
++	if ( errflag > 0 ) {
++        	usage();
++	        vexit(-1);
++	}
++
++	if ( optind < argc ) {
++		snprintf(Domain, sizeof(Domain), "%s", argv[optind]);
++	        ++optind;
++	}
++
++	if ( optind < argc ) {
++		snprintf(Alias, sizeof(Alias), "%s", argv[optind]);
++	        ++optind;
++	}
++
++	if ( Domain[0]>0 && Alias[0]>0 && strcmp( Domain, Alias ) == 0 ) {
++        	printf("Error: real domain and alias domain are the same!\n");
++	        usage();
++        	vexit(-1);
++	}
++}
++
++#ifdef SQL_ALIASDOMAINS
++/*
++ * Save all aliases of all real domains to database
++ */
++void save_all_aliases()
++{
++	domain_entry *entry;
++	entry = get_domain_entries("");
++
++	if (entry==NULL) {
++		if( verrori ) {
++			printf("Can't get domain entries - %s\n", verror( verrori ));
++			vexit(-1);
++		} else {
++			printf("No domain found\n");
++			vexit(0);
++		}
++	}
++
++        int i = 0;
++        while( entry ) {
++                /* we won't save realdomain/realdomain pairs */
++                if ( strcmp(entry->realdomain,entry->domain) != 0 ) {
++                        vcreate_sql_aliasdomain(entry->realdomain, entry->domain);
++                        printf ("Alias: %s Real domain: %s saved\n", entry->domain, entry->realdomain);
++			++i;
++                }
++                entry = get_domain_entries(NULL);
++        }
++        if ( i == 0 ) {
++                printf ("No aliases found\n");
++        }
++}
++
++
++/*
++ * Save all aliases of domain Domain to database
++ */
++void save_one_real_domain_aliases( char *Domain )
++{
++	domain_entry *entry;
++	entry = get_domain_entries ( Domain );
++
++	if (entry==NULL) {
++		if( verrori ) {
++			printf("Can't get domain entries - %s\n", verror( verrori ));
++			vexit(-1);
++		} else {
++			printf("%s does not exist\n", Domain);
++			vexit(0);
++		}
++	}
++
++	int i = 0;
++	while( entry ) {
++		/* we won't save realdomain/realdomain pairs */
++		if ( strcmp(entry->realdomain,entry->domain) != 0 ) {
++			vcreate_sql_aliasdomain(entry->realdomain, entry->domain);
++			printf ("Alias: %s  Real domain: %s     saved\n", entry->domain, entry->realdomain);
++			i++;
++		}
++		entry = get_domain_entries(NULL);
++	}
++        if ( i == 0 ) {
++        	printf ("No aliases found for domain %s\n", Domain);
++        }
++}
++
++
++/*
++ * Save the pair Alias/Domain to database
++ */
++void save_alias( char *Domain, char *Alias )
++{
++        domain_entry *entry;
++        entry = get_domain_entries ( Domain );
++
++        if (entry==NULL) {
++                if( verrori ) {
++                        printf("Can't get domain entries - %s\n", verror( verrori ));
++                        vexit(-1);
++                } else {
++                        printf("%s does not exist\n", Domain);
++                        vexit(0);
++                }
++        }
++
++        int i = 0;
++        while( entry ) {
++                /* we won't save realdomain/realdomain pairs */
++                if ( strcmp(Alias,entry->domain) == 0  && strcmp(entry->realdomain,entry->domain) != 0 ) {
++                        vcreate_sql_aliasdomain(entry->realdomain, entry->domain);
++                        printf ("Alias: %s  Real domain: %s     saved\n", entry->domain, entry->realdomain);
++                        i++;
++                }
++                entry = get_domain_entries(NULL);
++        }
++        if ( i == 0 ) {
++                printf ("No alias %s found for domain %s\n", Alias, Domain);
++        }
++}
++#endif

@@ -1,0 +1,55 @@
+version: "3.2"
+
+services:
+    sqmail:
+        build:
+            context: .
+            dockerfile: dockerfile
+            args:
+                - SQMAIL_TAG=${SQMAIL_TAG}
+                - FEHQLIBS_TAG=${FEHQLIBS_TAG}
+                - DAEMONTOOLS_TAG=${DAEMONTOOLS_TAG}
+                - UCSPISSL_TAG=${UCSPISSL_TAG}
+                - UCSPITCP6_TAG=${UCSPITCP6_TAG}
+                - DOVECOT_TAG=${DOVECOT_TAG}
+        container_name: sqmail
+        image: semhoun/sqmail:${SQMAIL_VERSION}
+        environment:
+            - QMAIL_NB_REMOTE=5
+            - QMAIL_NB_INCOMING=50
+            - VPOPMAIL_QUOTA=1073741824
+            - VPOPMAIL_MYSQL_HOST=mariadb
+            - VPOPMAIL_MYSQL_DB=vpopmail
+            - VPOPMAIL_MYSQL_USER=vpopmail
+            - VPOPMAIL_MYSQL_PASS=vpopmail_pwd
+            - VPOPMAIL_DEFAULT_DOMAIN=semhoun.net
+        volumes:
+            - ./data/qcontrol:/var/qmail/control
+            - ./data/ssl:/var/qmail/ssl
+            - ./data/domains:/var/vpopmail/domains/"
+        ports:
+            - 8090:80
+            - 25:25
+            - 465:465
+            - 587:587
+            - 110:110
+            - 995:995
+            - 143:143
+            - 993:993
+        depends_on:
+            - mariadb
+            
+    mariadb:
+        image: mariadb
+        restart: always
+        environment:
+            - MYSQL_ROOT_PASSWORD=mariadb_root
+            - MYSQL_DATABASES=vpopmail
+            - MYSQL_USER=vpopmail
+            - MYSQL_PASSWORD=vpopmail_pwd
+
+    adminer:
+        image: adminer
+        restart: always
+        ports:
+          - 8091:8080

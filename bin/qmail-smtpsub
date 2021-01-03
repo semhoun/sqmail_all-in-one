@@ -1,0 +1,15 @@
+#!/bin/sh
+QMAILDUID=`id -u vpopmail`
+QMAILDGID=`id -g vpopmail`
+HOSTNAME=`cat /etc/mailname | head -1`
+CONCURRENCY=`cat /var/qmail/control/concurrencyincoming`
+export SMTPAUTH="!"
+export UCSPITLS=""
+. /var/qmail/ssl/env
+exec env PATH="/var/qmail/bin:$PATH" \
+   sslserver \
+    -4 -6 \
+    -seVn -Rp -l $HOSTNAME -c $CONCURRENCY \
+    -x /var/qmail/control/rules.smtpsub.cdb \
+    -u $QMAILDUID -g $QMAILDGID :0 submission \
+    /var/qmail/bin/qmail-smtpd /var/vpopmail/bin/vchkpw true 2>&1

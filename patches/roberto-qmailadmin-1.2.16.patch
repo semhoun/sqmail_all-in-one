@@ -1,0 +1,5322 @@
+v. 2021.03.12
+Combined patch for qmailadmin-1.2.16 by Roberto Puzzanghera
+more info at https://notes.sagredo.eu/en/qmail-notes-185/qmailadmin-23.html
+=================================================================================================
+
+= This patch puts together
+
+* Roberto Puzzanghera's qmailadmin-skin patch
+  Provides a new responsive skin to the control panel.
+  It modifies everything under the html dir and many .c files in order to adjust the
+  html that the original author embedded into the source files.
+  Added a stylesheet style.css in the images folder and a couple of png files for the qmail logo.
+  https://notes.sagredo.eu/files/qmail/patches/qmailadmin/skin/
+* catchall patch by Luca Franceschini
+  Restore the catch all account functionality
+  https://notes.sagredo.eu/files/qmail/patches/qmailadmin/qmailadmin-catchall.patch
+* qmail-log (unknown author)
+  Gets the program to log authentication failures. This makes possibile to ban malicious
+  IPs via fail2ban. It is required to create the log file /var/log/qma-auth.log
+  initially and assign write priviledges to apache.
+  https://notes.sagredo.eu/files/qmail/patches/qmailadmin/qmailadmin-1.2.16-log.patch
+* mailinglist.c.ezmlm7 patch (unknown author)
+  Provides compatibility with ezmlm v. 7
+  https://notes.sagredo.eu/files/qmail/patches/qmailadmin/mailinglist.c.ezmlm7.patch
+* cracklib patch by Inter7. Improved by Roberto Puzzanghera
+  Check for the password strenght. Requires the cracklib library and a configure rebuild.
+  https://notes.sagredo.eu/files/qmail//patches//qmailadmin//cracklib/qmailadmin-cracklib.patch
+* autorespond.c fix by Roberto Puzzanghera
+  Creating the autoresponder (called robot in qmailadmin) .qmail files seems to be problematic in qmailadmin-1.2.16
+  Infact the .qmail file shows the destination mail in the first line while the program tries to retrieve it
+  from the second line when one wants to modify it. This patch is going to fix this trouble.
+  https://notes.sagredo.eu/files/qmail//patches//qmailadmin//qmailadmin-autorespond.patch
+
+== Changelog
+
+* 2021.03.12
+  -patch cleanup
+
+* 2020.09.02
+  -mod_user.html: cleaned the html as it was printing unneeded strings
+
+* 2020.08.10
+  -mod_user.html: added value attribute to the name/gecos input tag (tx Pablo Murillo)
+* 2020.05.22
+  -mod_user.html: removed "required" attribute on password field, to allow modification
+   with no password change
+
+* 2020.05.05
+  First release of the patch
+
+==================================================================================================
+
+diff -ruN ../qmailadmin-1.2.16-original/Makefile.am qmailadmin-1.2.16/Makefile.am
+--- ../qmailadmin-1.2.16-original/Makefile.am	2011-02-22 15:45:48.000000000 +0100
++++ qmailadmin-1.2.16/Makefile.am	2020-05-04 08:48:05.257814203 +0200
+@@ -79,4 +79,4 @@
+ 	chmod 644                $(DESTDIR)@htmllibdir@/lang/*
+ 	$(mkinstalldirs)         $(DESTDIR)@imagedir@
+ 	cp $(srcdir)/images/*.png $(DESTDIR)@imagedir@
+-
++	cp $(srcdir)/images/*.css $(DESTDIR)@imagedir@
+diff -ruN ../qmailadmin-1.2.16-original/alias.c qmailadmin-1.2.16/alias.c
+--- ../qmailadmin-1.2.16-original/alias.c	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/alias.c	2020-05-03 12:38:18.000000000 +0200
+@@ -305,11 +305,11 @@
+      */
+     
+     printf ("%s", HTML_ALIAS_ROW_START);
+-    qmail_button (this_alias, "deldotqmail", user, dom, mytime, "trash.png");
++    qmail_button (this_alias, "deldotqmail", user, dom, mytime, "delete_forever");
+     if (*curalias->alias_command == '#')
+       printf ("%s", HTML_EMPTY_TD);   /* don't allow modify on blackhole */
+     else
+-      qmail_button (this_alias, "moddotqmail", user, dom, mytime, "modify.png");
++      qmail_button (this_alias, "moddotqmail", user, dom, mytime, "create");
+     printh (HTML_ALIAS_NAME, this_alias);
+     printf (HTML_ALIAS_DEST_START);
+     
+@@ -715,7 +715,7 @@
+ 
+     *s = '\0';
+     if ((s = strrchr(user, '/')) == NULL) return NULL;
+-    if (b != NULL) { snprinth (user, sizeof(user), "%H <I>(%H)</I>", s+1, b); }
++    if (b != NULL) { snprinth (user, sizeof(user), "%H <i>(%H)</i>", s+1, b); }
+     else { snprinth (user, sizeof(user), "%H", s+1); }
+ 
+     return (user);
+@@ -739,7 +739,7 @@
+     /* back up to pipe or first slash to remove path */
+     while (line[len] != '/' && line[len] != '|') len--;
+     len++;   /* len is now first char of program name */
+-    snprinth (command, sizeof(command), "<I>%H</I>", &line[len]);
++    snprinth (command, sizeof(command), "<i>%H</i>", &line[len]);
+     return(command);
+ 
+   } else {
+diff -ruN ../qmailadmin-1.2.16-original/autorespond.c qmailadmin-1.2.16/autorespond.c
+--- ../qmailadmin-1.2.16-original/autorespond.c	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/autorespond.c	2021-03-10 22:12:17.953823637 +0100
+@@ -77,17 +77,17 @@
+   for (i = 0; (addr = sort_get_entry(i)); ++i) {
+     printf ("<tr>");
+     
+-    printf ("<td align=\"center\">");
++    printf ("<td>");
+     printh ("<a href=\"%s&modu=%C\">", cgiurl("delautorespond"), addr);
+-    printf ("<img src=\"%s/trash.png\" border=\"0\"></a>", IMAGEURL);
++    printf ("<span class=\"material-icons\">delete_forever</span></a>");
+     printf ("</td>");
+ 
+-    printf ("<td align=\"center\">");
++    printf ("<td>");
+     printh ("<a href=\"%s&modu=%C\">", cgiurl("modautorespond"), addr);
+-    printf ("<img src=\"%s/modify.png\" border=\"0\"></a>", IMAGEURL);
++    printf ("<span class=\"material-icons\">create</span></a>");
+     printf ("</td>");
+ 
+-    printh ("<td align=\"left\">%H@%H</td>", addr, Domain);
++    printh ("<td>%H@%H</td>", addr, Domain);
+     
+     printf ("</tr>\n");
+   }
+@@ -192,13 +192,13 @@
+    * Make the autoresponder .qmail file
+    */
+   valias_delete (ActionUser, Domain);
+-  if ( strlen(Newu) > 0 ) {
+-    sprintf(TmpBuf, "&%s", Newu);
+-    valias_insert (ActionUser, Domain, TmpBuf);
+-  } 
+   sprintf(TmpBuf, "|%s/autorespond 10000 5 %s/%s/message %s/%s",
+     AUTORESPOND_PATH, RealDir, TmpBuf2, RealDir, TmpBuf2);
+   valias_insert (ActionUser, Domain, TmpBuf);
++  if ( strlen(Newu) > 0 ) {
++    sprintf(TmpBuf, "&%s", Newu);
++    valias_insert (ActionUser, Domain, TmpBuf);
++  }
+ 
+   /*
+    * Report success
+diff -ruN ../qmailadmin-1.2.16-original/command.c qmailadmin-1.2.16/command.c
+--- ../qmailadmin-1.2.16-original/command.c	2011-02-22 15:45:48.000000000 +0100
++++ qmailadmin-1.2.16/command.c	2020-05-04 11:14:22.668604120 +0200
+@@ -30,6 +30,7 @@
+ #include <vpopmail.h>
+ #include <vauth.h>
+ 
++#include "config.h"
+ #include "alias.h"
+ #include "autorespond.h"
+ #include "cgi.h"
+diff -ruN ../qmailadmin-1.2.16-original/configure.in qmailadmin-1.2.16/configure.in
+--- ../qmailadmin-1.2.16-original/configure.in	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/configure.in	2020-05-04 11:15:44.923792626 +0200
+@@ -26,6 +26,7 @@
+ dnl Checks for libraries.
+ AC_CHECK_LIB(crypt,crypt)
+ AC_CHECK_LIB(shadow,crypt)
++AC_CHECK_LIB(crack,FascistCheck)
+ #AC_CHECK_LIB(m,floor)
+ #AC_CHECK_LIB(nsl, gethostbyaddr)
+ #AC_CHECK_LIB(socket, getsockname)
+@@ -421,6 +422,31 @@
+ AC_DEFINE_UNQUOTED(SPAM_COMMAND, "$spam_command","")
+ AC_SUBST(SPAM_COMMAND)
+ 
++cracklib=no
++AC_ARG_ENABLE(cracklib, [  --enable-cracklib=PATH     Path to cracklib dictionary.],
++    cracklib="$enableval",
++    [
++        if test "$cracklib" = ""
++        then
++            AC_MSG_ERROR([Unable to find your cracklib directory, specify --enable-cracklib.])
++        fi
++    ] )
++
++if test "$cracklib" = "yes"
++then
++       cracklib="/usr/lib/cracklib_dict"
++fi
++
++case $cracklib in
++0*|n*|N*)
++       echo "checking whether to use password checking... no"
++       ;;
++*)
++       AC_DEFINE_UNQUOTED(CRACKLIB,"$cracklib","")
++       echo "checking whether to use password checking... yes"
++       ;;
++esac
++
+ HELP=no
+ AC_ARG_ENABLE(help, [  --enable-help  Display help links on login page.],
+     HELP="$enableval",)
+@@ -485,4 +511,7 @@
+ then
+         echo "      spam command = "$spam_command""
+ fi
+-
++if test "$cracklib" != "no"
++then
++       echo "cracklib dictionary= "$cracklib""
++fi
+diff -ruN ../qmailadmin-1.2.16-original/html/add_autorespond.html qmailadmin-1.2.16/html/add_autorespond.html
+--- ../qmailadmin-1.2.16-original/html/add_autorespond.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/add_autorespond.html	2020-05-03 16:17:22.000000000 +0200
+@@ -1,76 +1,45 @@
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
++<!-- add robot -->
++<div class="col-sm-9">
+ 
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.addautorespond.newu.focus();
+-}
+-//-->
+-</script>
+-
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X003</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td align="left">
+-          <form method="post" name="addautorespond" action="##C/com/addautorespondnow?##&">
+-           <table cellpadding="0" cellspacing="0" border="0">
+-            <tr>
+-             <td align="right"><b>##X004&nbsp;</b></td>
+-             <td align="left"><input type="text" size="20" name="newu" maxlength="128">@##D</td>
+-            </tr>
+-            <tr>
+-             <td align="right"><b>##X005&nbsp;</b></td>
+-             <td align="left"><input type="text" size="40" name="owner" maxlength="128"></td>
+-            </tr>
+-            <tr>
+-             <td align="right"><b>##X006&nbsp;</b></td>
+-             <td align="left"><input type="text" size="40" name="alias" maxlength="128"></td>
+-            </tr>
+-           </table>
+-           <textarea cols="80" rows="10" name="message"></textarea>
+-           <input type="submit" value="##X060">
++	<h2>##X003</h2>
++
++          <form method="post" action="##C/com/addautorespondnow?##&">
++
++				<!-- name -->
++				<div class="form-group">
++		    		<label for="newu">##X004</label><br>
++					<input class="form-control" type="text" id="newu" size="40" name="newu" required autofocus>
++					<small class="form-text text-muted">@##D</small>
++				</div>
++
++				<!-- copy to -->
++				<div class="form-group">
++		    		<label for="owner">##X005</label><br>
++					<input class="form-control" type="email" id="owner" size="40" name="owner" required>
++				</div>
++				
++				<!-- subject -->
++ 				<div class="form-group">
++		    		<label for="alias">##X006</label><br>
++					<input class="form-control" type="text" id="alias" size="40" name="alias" required>
++				</div>
++				
++				<div class="form-group">
++					<textarea class="form-control" rows="10" name="message"></textarea>
++				</div>
++
++      		<button type="submit" class="btn btn-primary">##X060</button>
+           </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showautoresponders?##&">##X077</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
+- </body>
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showautoresponders?##&">##X077</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+diff -ruN ../qmailadmin-1.2.16-original/html/add_forward.html qmailadmin-1.2.16/html/add_forward.html
+--- ../qmailadmin-1.2.16-original/html/add_forward.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/add_forward.html	2020-05-03 11:41:50.000000000 +0200
+@@ -1,85 +1,35 @@
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
++<!-- add forward -->
++<div class="col-sm-9">
+ 
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.addforward.alias.focus();
+-}
+-//-->
+-</script>
++	<h2>##X007</h2>
+ 
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X007</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td align="left">
+-          <form method="post" name="addforward" action="##C/com/adddotqmailnow?##&">
+-           <table cellpadding="0" cellspacing="0" border="0">
+-            <tr>
+-             <td align=left><b>##X106</b></td>
+-             <td>&nbsp;</td>
+-             <td align=left><b>##X305</b></td>
+-            </tr>
+-            <tr valign=top>
+-             <td align=left>
+-              <nobr><input type="text" size="16" name="alias" maxlength="128">@##D</nobr>
+-             </td>
+-             <td align=center>
+-              <nobr>&nbsp;##X306&nbsp;</nobr>
+-             </td>
+-             <td>
+-              <input type="text" size="48" name="newu" maxlength="128"><br>##X010
+-             </td>
+-            </tr>
+-            <tr>
+-             <td>&nbsp;</td>
+-             <td>&nbsp;</td>
+-             <td align="right">
+-              <input type="submit" value="##X060">
+-             </td>
+-            </tr>
+-           </table>
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showforwards?##&">##X122</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-     <!-- End of form content -->
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++		<form method="post" action="##C/com/adddotqmailnow?##&">
++		
++			<!-- name -->
++			<div class="form-group">
++	    		<label for="alias">##X106</label><br>
++				<input class="my-input" type="text" id="alias" size="40" name="alias" required autofocus> @##D
++			</div>
++			
++			<!-- destination -->
++			<div class="form-group">
++	    		<label for="newu">##X306</label><br>
++				<input type="text" name="newu" size="40" class="my-input" id="newu"  required>
++				<small class="form-text text-muted">##X010</small>
++			</div>			
++			
++			<button type="submit" class="btn btn-primary">##X060</button>
++		</form>
++          
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showforwards?##&">##X122</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/add_listdig.html qmailadmin-1.2.16/html/add_listdig.html
+--- ../qmailadmin-1.2.16-original/html/add_listdig.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/add_listdig.html	2020-05-03 22:21:30.000000000 +0200
+@@ -1,68 +1,34 @@
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
++<!-- add m/l digest -->
+ 
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.addlistdignow.newu.focus();
+-}
+-//-->
+-</script>
+-
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X241</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <center><h3>##X241 ##A@##D</h3></center>
+-          <form method="post" name="addlistdignow" action="##C/com/addlistdignow?##&">
+-           <table cellpadding="0" cellspacing="0" border="0">
+-            <tr>
+-             <td><b>##X013&nbsp;</b></td>
+-             <td><input type="text" size="40" name="newu" maxlength="128"></td>
+-            </tr>
+-           </table>
+-           <input type="hidden" name="modu" value="##A">
+-           <input type="submit" value="##X060">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<div class="col-sm-9">
++
++	<h2>##X241</h2>
++
++	<h5>##X241 <mark>##A@##D</mark></h5>
++
++	<form method="post" action="##C/com/addlistdignow?##&">
++
++		<!-- user -->
++		<div class="form-group">
++    		<label for="newu">##X013</label>
++			<input class="form-control" type="email" id="newu" name="newu" required autofocus>
++		</div>          
++
++		<input type="hidden" name="modu" value="##A">
++		<button type="submit" class="btn btn-primary">##X060</button>
++
++	</form>
++
++</div>
++
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/add_listmod.html qmailadmin-1.2.16/html/add_listmod.html
+--- ../qmailadmin-1.2.16-original/html/add_listmod.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/add_listmod.html	2020-05-03 21:47:23.000000000 +0200
+@@ -1,68 +1,34 @@
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
++<!-- add m/l moderator -->
+ 
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.addlistmodnow.newu.focus();
+-}
+-//-->
+-</script>
+-
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X011</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <center><h3>##X012 ##A@##D</h3></center>
+-          <form method="post" name="addlistmodnow" action="##C/com/addlistmodnow?##&">
+-           <table cellpadding="0" cellspacing="0" border="0">
+-            <tr>
+-             <td><b>##X013&nbsp;</b></td>
+-             <td><input type="text" size="40" name="newu" maxlength="128"></td>
+-            </tr>
+-           </table>
+-           <input type="hidden" name="modu" value="##A">
+-           <input type="submit" value="##X060">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<div class="col-sm-9">
++
++	<h2>##X011</h2>
++
++	<h5>##X012 <mark>##A@##D</mark></h5>
++	
++	<form method="post" action="##C/com/addlistmodnow?##&">
++ 		
++ 		<!-- user -->
++		<div class="form-group">
++    		<label for="newu">##X013</label>
++			<input class="form-control" type="email" id="newu" name="newu" required autofocus>
++		</div>
++
++      <input type="hidden" name="modu" value="##A">
++		<button type="submit" class="btn btn-primary">##X060</button>
++	
++	</form>
++
++</div>
++
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/add_listuser.html qmailadmin-1.2.16/html/add_listuser.html
+--- ../qmailadmin-1.2.16-original/html/add_listuser.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/add_listuser.html	2020-05-03 20:12:16.000000000 +0200
+@@ -1,68 +1,34 @@
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
++<!-- add m/l subscriber -->
+ 
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.addlistusernow.newu.focus();
+-}
+-//-->
+-</script>
+-
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X014</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <center><h3>##X014 ##A@##D</h3></center>
+-          <form method="post" name="addlistusernow" action="##C/com/addlistusernow?##&">
+-           <table cellpadding="0" cellspacing="0" border="0">
+-            <tr>
+-             <td><b>##X013&nbsp;</b></td>
+-             <td><input type="text" size="40" name="newu" maxlength="128"></td>
+-            </tr>
+-           </table>
+-           <input type="hidden" name="modu" value="##A">
+-           <input type="submit" value="##X060">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<div class="col-sm-9">
++
++	<h2>##X014</h2>
++
++   <h5>##X014 <mark>##A@##D</mark></h5>
++   
++   <form method="post"action="##C/com/addlistusernow?##&">
++
++ 		<!-- user -->
++		<div class="form-group">
++    		<label for="newu">##X013</label>
++			<input class="form-control" type="email" id="newu" name="newu" required autofocus>
++		</div>
++		
++      <input type="hidden" name="modu" value="##A">
++      <button type="submit" class="btn btn-primary">##X060</button>
++      
++	 </form>
++
++</div>
++
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/add_mailinglist-idx.html qmailadmin-1.2.16/html/add_mailinglist-idx.html
+--- ../qmailadmin-1.2.16-original/html/add_mailinglist-idx.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/add_mailinglist-idx.html	2020-05-04 09:22:47.000000000 +0200
+@@ -1,76 +1,45 @@
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
++<!-- add mailing list -->
++
++<div class="col-sm-9">
++
++	<h2>##X015</h2>
++
++   <form method="post" name="addmailinglist" action="##C/com/addmailinglistnow?##&">
++  		
++  		<!-- name -->
++  		<div class="form-group">
++    		<label for="newu">##X016</label>
++			<input class="form-control" type="text" id="newu" name="newu" required autofocus>
++			<small class="form-text text-muted">@##D</small>
++ 		</div>
++
++		<!-- owner -->
++  		<div class="form-group">
++    		<label for="listowner">##X017</label>
++			<input class="form-control" type="email" id="listowner" name="listowner">
++ 		</div>
++ 		
++		<!-- prefix -->
++  		<div class="form-group">
++    		<label for="prefix">##X256</label>
++			<input class="form-control" type="text" id="prefix" name="prefix">
++ 		</div>
+ 
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.addmailinglist.newu.focus();
+-}
+-//-->
+-</script>
+-
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X015</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td align="left">
+-          <form method="post" name="addmailinglist" action="##C/com/addmailinglistnow?##&">
+-           <table cellpadding="0" cellspacing="0" border="0">
+-            <tr>
+-             <td ALIGN=RIGHT><b>##X016</b></td>
+-             <td><input type="text" size=16 name="newu" maxlength="128">@##D</td>
+-            </tr>
+-            <tr>
+-             <td ALIGN=RIGHT><b>##X017</b></td>
+-             <td><input type="text" size=30 name="listowner" maxlength="128"></td>
+-            </tr>
+-            <tr>
+-             <td ALIGN=RIGHT><b>##X256</b></td>
+-             <td><input type="text" size=16 name="prefix" maxlength="128"></td>
+-            </tr>
+-           </table>
+ <!-- options for the mailing list -->
+ ##E
+-           <DIV ALIGN=RIGHT><input type="submit" value="##X060"></DIV>
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<br>
++   	<button type="submit" class="btn btn-primary">##X060</button>
++	</form>
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/add_mailinglist-no-idx.html qmailadmin-1.2.16/html/add_mailinglist-no-idx.html
+--- ../qmailadmin-1.2.16-original/html/add_mailinglist-no-idx.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/add_mailinglist-no-idx.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,73 +1,42 @@
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
++<!-- add m/l no idx --> 
++ 
++<div class="col-sm-9">
++	
++	<h2>##X015</h2>
+ 
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.addmailinglist.newu.focus();
+-}
+-//-->
+-</script>
+-
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X015</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td align="left">
+-          <form method="post" name="addmailinglist" action="##C/com/addmailinglistnow?##&">
+-           <table cellpadding="0" cellspacing="0" border="0">
+-            <tr>
+-             <td align=right><b>##X016&nbsp;</b></td>
+-             <td><input type="text" size="30" name="newu" maxlength="128"></td>
+-            </tr>
+-            <tr>
+-             <td align="left" colspan=2><INPUT TYPE=CHECKBOX NAME="opt14" VALUE="a" CHECKED>&nbsp;##X018</td>
+-            </tr>
+-            <tr>
+-             <td align="left" colspan=2><input type=checkbox name="opt8" value="p"
+-              checked>&nbsp;##X039</td>
+-            </tr>
+-           </table>
+-           <input type="submit" value="##X060">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++	<form method="post" action="##C/com/addmailinglistnow?##&">
++
++     	<!-- name -->
++  		<div class="form-group">
++    		<label for="newu">##X016</label>
++			<input class="form-control" type="text" id="newu" name="newu" required autofocus>
++			<small class="form-text text-muted">@##D</small>
++ 		</div>          
++ 		
++ 		<!-- vacation msg -->
++ 		<div class="form-check">        
++			<input class="form-check-input" type="checkbox" name="opt14" id="opt14"	value="a">
++        	<label class="form-check-label" for="opt14">##X018</label>
++		</div>
++
++ 		<div class="form-check">        
++			<input class="form-check-input" type="checkbox" name="opt8" id="opt8" value="p" checked>
++        	<label class="form-check-label" for="opt8">##X039</label>
++		</div>
++
++		<button type="submit" class="btn btn-primary">##X060</button>
++
++	</form>
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/add_user.html qmailadmin-1.2.16/html/add_user.html
+--- ../qmailadmin-1.2.16-original/html/add_user.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/add_user.html	2020-05-02 22:50:12.000000000 +0200
+@@ -1,93 +1,66 @@
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
++<!-- add email account -->
++<div class="col-sm-9">
+ 
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.logon.newu.focus();
+-}
+-//-->
+-</script>
+-
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X090</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <form method="post" name="logon" action="##C/com/addusernow?##&">
+-           <table cellpadding="0" cellspacing="0" border="0">
+-            <tr>
+-             <td align=right><b>##X002:&nbsp;</b></td>
+-             <td align="left"><input type="text" size="16" name="newu" maxlength="128">@##D</td>
+-            </tr>
++	<!-- domain -->
++	<h2>##D</h2>
++
++	<!-- add email account -->
++	<h5>##X090</h5>
++
++   <form method="post" action="##C/com/addusernow?##&">
++
++		<!-- email -->
++  		<div class="form-group mt">
++    		<label for="newu">##X002</label>
++			<input class="form-control" type="text" id="newu" name="newu" required autofocus>
++			<small class="form-text text-muted">@##D</small>
++ 		</div>
+ ##tq
+-            <tr>
+-             <td align=right><b>##X249:&nbsp;</b></td>
+-             <td align="left"><input type="text" size="16" name="quota" maxlength="128">&nbsp;##X251</td>
+-            </tr>
++
++		<!-- quota -->
++		<div class="form-group">
++    		<label for="quota">##X249</label>
++			<input class="form-control" type="text" id="quota" name="quota" required>
++			<small class="form-text text-muted">##X251</small>
++		</div>
+ ##tt
+-            <tr>
+-             <td align=right><b>##X057:&nbsp;</b></td>
+-             <td align="left"><input type="password" size="16" name="password1" maxlength="128"></td>
+-            </tr>
+-            <tr>
+-             <td align=right><b>##X091&nbsp;</b></td>
+-             <td align="left"><input type="password" size="16" name="password2" maxlength="128"></td>
+-            </tr>
+-            <tr>
+-             <td align=right><b>##X092:&nbsp;</b></td>
+-             <td align="left"><input type="text" size="32" name="gecos" maxlength="128"></td>
+-            </tr>
++      <!-- password -->
++		<div class="form-group">
++    		<label for="password1">##X057</label>
++			<input class="form-control" type="password" id="password1" name="password1" required>
++		</div>
++		
++      <!-- password (again) -->
++		<div class="form-group">
++    		<label for="password2">##X091</label>
++			<input class="form-control" type="password" id="password2" name="password2" required>
++		</div>		
++		
++		<!-- real name -->
++		<div class="form-group">
++    		<label for="gecos">##X092</label>
++			<input class="form-control" type="text" id="gecos" name="gecos" required>
++		</div>
+ ##ts
+-            <tr>
+-             <td align=right><b>##X304</b></td>
+-             <td>
+-              <input type="checkbox" name="spamcheck">
+-             </td>
+-            </tr>
++		<!-- spam check -->
++		<div class="form-group">
++    		<label for="spamcheck">##X304</label><br>
++			<input type="checkbox" class="form-check-input" id="spamcheck" name="spamcheck">
++		</div>
+ ##tt
+-           </table>
+            ##c
+-           <input type="submit" value="##X060">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showusers?##&">##X061</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++      <button type="submit" class="btn btn-primary">##X060</button>
++	</form>
++          
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showusers?##&">##X061</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/change_password.html qmailadmin-1.2.16/html/change_password.html
+--- ../qmailadmin-1.2.16-original/html/change_password.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/change_password.html	2020-05-03 22:37:42.000000000 +0200
+@@ -1,36 +1,38 @@
+-</head>
+- <body bgcolor="#ffffff">
+-<CENTER>
+-<H2>##S</H2>
+-<FORM METHOD="POST" ACTION="##C/passwd/">
+-<TABLE BORDER=0>
+-<TR>
+-  <TD ALIGN=RIGHT>##X013</TD>
+-  <TD ALIGN=LEFT><INPUT TYPE="TEXT" NAME="address" SIZE=32 VALUE="##U"></TD>
+-</TR>
+-<TR>
+-  <TD ALIGN=RIGHT>##X057:</TD>
+-  <TD ALIGN=LEFT><INPUT TYPE="PASSWORD" NAME="oldpass" SIZE=17 VALUE="##W"></TD>
+-</TR>
+-<TR>
+-  <TD ALIGN=RIGHT>##X110:</TD>
+-  <TD ALIGN=LEFT><INPUT TYPE="PASSWORD" NAME="newpass1" SIZE=17></TD>
+-</TR>
+-<TR>
+-  <TD ALIGN=RIGHT>##X091</TD>
+-  <TD ALIGN=LEFT><INPUT TYPE="PASSWORD" NAME="newpass2" SIZE=17></TD>
+-</TR>
+-<TR>
+-  <TD COLSPAN=2 ALIGN=RIGHT>
+-    <INPUT TYPE="HIDDEN" NAME="returntext" VALUE="##n">
+-    <INPUT TYPE="HIDDEN" NAME="returnhttp" VALUE="##H">
+-    <INPUT TYPE="Submit" VALUE="##X316">
+-  </TD>
+-</TR>
+-<TR>
+-  <TD COLSPAN=2 ALIGN=LEFT>##R</TD>
+-</TR>
+-</TABLE>
+-</FORM>
+-</CENTER>
++<!-- show m/l digest -->
+ 
++<div class="col-sm-12">
++
++<form method="POST" action="##C/passwd/">
++
++ 		<!-- user -->
++		<div class="form-group">
++    		<label for="address">##X013</label>
++			<input class="form-control" type="email" id="address" name="address" value="##U" required autofocus>
++		</div>
++		
++ 		<!-- old pwd -->
++		<div class="form-group">
++    		<label for="oldpass">##X057</label>
++			<input class="form-control" type="password" id="oldpass" name="oldpass" value="##W" required>
++		</div>		
++
++ 		<!-- new pwd -->
++		<div class="form-group">
++    		<label for="password">##X110</label>
++			<input class="form-control" type="password" id="password" name="newpass1" required>
++		</div>
++
++		<!-- new pwd (again)) -->
++		<div class="form-group">
++    		<label for="password2">##X091</label>
++			<input class="form-control" type="password" id="password2" name="newpass2" required>
++		</div>
++
++		<input type="hidden" name="returntext" value="##n">
++    	<input type="hidden" name="returnhttp" value="##H">
++    
++    	<button type="submit" class="btn btn-primary">##X316</button>
++
++</form>
++	
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/change_password_success.html qmailadmin-1.2.16/html/change_password_success.html
+--- ../qmailadmin-1.2.16-original/html/change_password_success.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/change_password_success.html	2020-05-03 22:40:14.000000000 +0200
+@@ -1,7 +1,9 @@
+-</head>
+- <body bgcolor="#ffffff">
+-<CENTER>
+-<H2>##X139</H2>
++<!-- change pwd success -->
++
++<div class="col-sm-12">
++
++<h2>##X139</h2>
++
+ ##R
+-</CENTER>
+ 
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/del_autorespond_confirm.html qmailadmin-1.2.16/html/del_autorespond_confirm.html
+--- ../qmailadmin-1.2.16-original/html/del_autorespond_confirm.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/del_autorespond_confirm.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,52 +1,27 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X098</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <h3>##X098 ##A@##D?</h3>
+-          <form method="post" name="logon" action="##C/com/delautorespondnow?##&">
++<!-- delete autoresponder/robot confirm -->
++
++<div class="col-sm-9">
++	
++	<h2>##X098</h2>
++
++		<h5>##X098 <mark>##A@##D</mark>?</h5>
++          
++      <form method="post" action="##C/com/delautorespondnow?##&">
+            <input type="hidden" name="modu" value="##A">
+-           <input type="submit" value="##X098">
+-          </form>
+-           <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showautoresponders?##&">##X077</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-                       </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++           <button type="submit" class="btn btn-primary">##X098</button>
++      </form>
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++##ta	
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showautoresponders?##&">##X077</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++##tt
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/del_forward_confirm.html qmailadmin-1.2.16/html/del_forward_confirm.html
+--- ../qmailadmin-1.2.16-original/html/del_forward_confirm.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/del_forward_confirm.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,52 +1,23 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X100</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <h3>##X100 ##A@##D?</h3>
+-          <form method="post" name="deleteforwar" action="##C/com/deldotqmailnow?##&">
+-           <input type="hidden" name="modu" value="##A">
+-           <input type="submit" value="##X097">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showforwards?##&">##X122</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<!-- delete forward confirm -->
++<div class="col-sm-9">
++
++	<h2>##X100</h2>
++
++	<h5>##X100 <mark>##A@##D</mark>?</h5>
++	
++	<form method="post" action="##C/com/deldotqmailnow?##&">
++		<input type="hidden" name="modu" value="##A">
++      <button type="submit" class="btn btn-primary">##X097</button>
++   </form>
++          
++</div>
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- add forwards -->
++		<a class="nav-link" href="##C/com/showforwards?##&">##X122</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++		<!-- logout -->  		
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/del_listdig.html qmailadmin-1.2.16/html/del_listdig.html
+--- ../qmailadmin-1.2.16-original/html/del_listdig.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/del_listdig.html	2020-05-03 22:25:04.000000000 +0200
+@@ -1,58 +1,32 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X243</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <h3>##X243 ##A@##D?</h3>
+-          <form method="post" name="dellistdignow" action="##C/com/dellistdignow?##&">
+-           <table border="0" cellspacing="0" cellpadding="0">
+-            <tr>
+-             <td><b>##X013</b>&nbsp;</td>
+-             <td><input type="text" size="16" name="newu" maxlength="128"></td>
+-            </tr>
+-           </table>
+-           <input type="hidden" name="modu" value="##A">
+-           <input type="submit" value="##X072">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-                       </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<!-- del m/l moderator -->
++
++<div class="col-sm-9">
++
++	<h2>##X243</h2>
++
++	<h5>##X243 <mark>##A@##D?</mark></h5>
++
++	<form method="post" action="##C/com/dellistdignow?##&">
++
++		<!-- user -->
++		<div class="form-group">
++    		<label for="newu">##X013</label>
++			<input class="form-control" type="email" id="newu" name="newu" required autofocus>
++		</div>
++
++   	<input type="hidden" name="modu" value="##A">
++      <button type="submit" class="btn btn-primary">##X072</button>
++	</form>
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/del_listmod.html qmailadmin-1.2.16/html/del_listmod.html
+--- ../qmailadmin-1.2.16-original/html/del_listmod.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/del_listmod.html	2020-05-03 22:12:56.000000000 +0200
+@@ -1,58 +1,33 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X196</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <h3>##X196 ##A@##D?</h3>
+-          <form method="post" name="dellistusernow" action="##C/com/dellistmodnow?##&">
+-           <table border="0" cellspacing="0" cellpadding="0">
+-            <tr>
+-             <td><b>##X013</b>&nbsp;</td>
+-             <td><input type="text" size="16" name="newu" maxlength="128"></td>
+-            </tr>
+-           </table>
+-           <input type="hidden" name="modu" value="##A">
+-           <input type="submit" value="##X072">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-                       </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<!-- del m/l moderator -->
++
++<div class="col-sm-9">
++
++	<h2>##X196</h2>
++
++	<h5>##X196 <mark>##A@##D?</mark></h5>
++
++   <form method="post" name="dellistusernow" action="##C/com/dellistmodnow?##&">
++
++		<!-- user -->
++		<div class="form-group">
++    		<label for="newu">##X013</label>
++			<input class="form-control" type="email" id="newu" name="newu" required autofocus>
++		</div>
++
++      <input type="hidden" name="modu" value="##A">
++		<button type="submit" class="btn btn-primary">##X072</button>
++
++	</form>
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/del_listuser.html qmailadmin-1.2.16/html/del_listuser.html
+--- ../qmailadmin-1.2.16-original/html/del_listuser.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/del_listuser.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,58 +1,31 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X195</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <h3>##X195 ##A@##D?</h3>
+-          <form method="post" name="dellistusernow" action="##C/com/dellistusernow?##&">
+-           <table border="0" cellspacing="0" cellpadding="0">
+-            <tr>
+-             <td><b>##X013</b>&nbsp;</td>
+-             <td><input type="text" size="16" name="newu" maxlength="128"></td>
+-            </tr>
+-           </table>
+-           <input type="hidden" name="modu" value="##A">
+-           <input type="submit" value="##X072">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-                       </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<!-- delete m/l user confirm -->
++
++<div class="col-sm-9">
++
++	<h2>##X195</h2>
++
++	<h5>##X195 <mark>##A@##D</mark>?</h5>
++	
++	<form method="post" action="##C/com/dellistusernow?##&">
++   
++		<div class="form-group">
++    		<label for="newu">##X013</label><br>
++			<input class="form-control" type="email" id="newu" name="newu" required autofocus>
++		</div>
++
++		<input type="hidden" name="modu" value="##A">
++      <button type="submit" class="btn btn-primary">##X072</button>
++	</form>
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/del_mailinglist_confirm.html qmailadmin-1.2.16/html/del_mailinglist_confirm.html
+--- ../qmailadmin-1.2.16-original/html/del_mailinglist_confirm.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/del_mailinglist_confirm.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,52 +1,25 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X101</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <h3>##X101 ##A@##D?</h3>
+-          <form method="post" name="logon" action="##C/com/delmailinglistnow?##&">
+-           <input type="hidden" name="modu" value="##A">
+-           <input type="submit" value="##X097">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-                       </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++ <!-- delete m/l -->
++
++<div class="col-sm-9">
++
++	<h2>##X101</h2>
++
++	<h5>##X101 <mark>##A@##D</mark>?</h5>
++	
++   <form method="post" action="##C/com/delmailinglistnow?##&">
++		<input type="hidden" name="modu" value="##A">
++		<button type="submit" class="btn btn-primary">##X097</button>
++	</form>
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/del_user_confirm.html qmailadmin-1.2.16/html/del_user_confirm.html
+--- ../qmailadmin-1.2.16-original/html/del_user_confirm.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/del_user_confirm.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,59 +1,39 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X102</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <h3>##X102 ##A@##D?</h3>
+-          <form method="post" name="logon" action="##C/com/delusernow?##&">
+-           <input type="checkbox" name="forward">&nbsp;##X103<br>
+-           <table border="0" cellspacing="0" cellpadding="0">
+-            <tr>
+-             <td><b>##X104</b>&nbsp;</td>
+-             <td><input type="text" name="forwardto" value=""></td>
+-            </tr>
+-           </table>
+-           <input type="hidden" name="deluser" value="##A">
+-           <input type="submit" value="##X097">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showusers?##&">##X061</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-                       </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<!-- delete user confirm -->
++
++<div class="col-sm-9">
++	<h2>##X102</h2>
++
++         <h5>##X102 <mark>##A@##D</mark>?</h5>
++          
++			<form method="post" action="##C/com/delusernow?##&">
++          
++          	<!-- forward email -->
++		 		<div class="form-check">        
++					<input class="form-check-input" type="checkbox" name="forward" id="forward">
++		        	<label class="form-check-label" for="forward">##X103</label>
++				</div>
++				
++			  	<!-- yes forward to -->
++				##ta	  	
++		 		<div class="form-group">
++			   	<label for="forwardto">##X104</label>
++			    	<input type="text" class="form-control" name="forwardto" id="forwardto" value="">
++			  	</div>
++
++				<input type="hidden" name="deluser" value="##A">
++          	<button type="submit" class="btn btn-primary">##X097</button>
++         </form>
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++##ta	
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showusers?##&">##X061</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++##tt
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/footer.html qmailadmin-1.2.16/html/footer.html
+--- ../qmailadmin-1.2.16-original/html/footer.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/footer.html	2020-05-05 15:30:06.974439672 +0200
+@@ -1,2 +1,13 @@
+- </body>
++	</div>
++</div>
++
++<footer class="fixed-bottom" id="footer">
++	<p>##V</p>
++</footer>
++
++<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
++<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
++<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
++
++</body>
+ </html>
+diff -ruN ../qmailadmin-1.2.16-original/html/header.html qmailadmin-1.2.16/html/header.html
+--- ../qmailadmin-1.2.16-original/html/header.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/header.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,6 +1,59 @@
+-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 TRansitional//EN" "http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+-<html>
+- <head>
+-  <title>QmailAdmin ##D</title>
+-  <meta http-equiv="content-type" content="text/html; charset=##X000">
+-  <meta name="robots" content="noindex,follow">
++<!DOCTYPE HTML>
++<html dir="ltr" lang="##~">
++<head>
++	<meta charset="##X000">
++	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
++	<meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
++	<meta name="author" content="Roberto Puzzanghera - https://notes.sagredo.eu">
++	<meta name="robots" content="noindex,nofollow">
++	<meta http-equiv="Pragma" content="no-cache">
++	<meta http-equiv="Expires" content="Thu, 1 Jan 1970 00:00:00 GMT">
++	<title>QmailAdmin ##D</title>
++	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
++	<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
++	<link rel="Shortcut Icon" href="##Z/favicon-32x32.png" sizes="32x32" type="image/x-icon">
++	<link rel="Shortcut Icon" href="##Z/favicon-16x16.png" sizes="16x16" type="image/x-icon">
++	<link rel="stylesheet" href="##Z/style.css">
++</head>
++
++<body>
++
++<nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top" id="navbar">
++  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarTogglerDemo03" aria-controls="navbarTogglerDemo03" aria-expanded="false" aria-label="Toggle navigation">
++    <span class="navbar-toggler-icon"></span>
++  </button>
++  <a class="navbar-brand" href="#">
++    <img src="##Z/logo.png" width="30" height="30" class="d-inline-block align-top" alt="">
++	 ##D mail administration
++  </a>
++##ta
++  <div class="collapse navbar-collapse" id="navbarTogglerDemo03">
++    <ul class="navbar-nav mr-auto mt-2 mt-lg-0">
++      <li class="nav-item">
++        <a class="nav-link" href="##C/com/showmenu?##&">Home <span class="sr-only">(current)</span></a>
++      </li>
++      <li class="nav-item">
++        ##x
++      </li>
++    </ul>
++
++    <form class="form-inline my-2 my-lg-0" method="post" action="##C/com/quick?##&">
++      <input class="form-control mr-sm-2" name="modu" type="search" placeholder="@##D" aria-label="Search">
++      <input type="hidden" name="MODIFY" value="##X071">
++      <button class="btn btn-outline-success my-2 my-sm-0" type="submit">##X071</button>
++    </form>
++  </div>
++  ##tt
++</nav>
++
++<div class="container mt">     
++	<div class="row">
++		<div class="col-sm-12">
++			<!-- status messages -->
++   		<h4 class="bg-danger text-white">##S</h4>
++		</div>
++	</div>
++</div>
++
++<div class="container mbc">     
++	<div class="row">
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/main_menu.html qmailadmin-1.2.16/html/main_menu.html
+--- ../qmailadmin-1.2.16-original/html/main_menu.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/main_menu.html	2020-05-03 08:29:51.000000000 +0200
+@@ -1,36 +1,9 @@
+-<style type="text/css">
+-<!--
+-a {color: black;}
+--->
+-</style>
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <table height="464" width="405" cellspacing="0" cellpadding="0" border="0" background="##Z/main.png">
+-    <tr>
+-     <td width="199" height="250"><img src="##Z/pixel.png" height="1" width="1" border="0"></td>
+-     <td width="206" height="325" rowspan="2" align="left">
+-      ##v
+-     </td>
+-    </tr>
+-    <tr VALIGN=TOP>
+-     <td ALIGN=CENTER height="75">
+-<a href="##C/com/showmenu?##&"><font size="2" color="#000000"><b>##X217</b></font></a>
+-         <br><span style="font-weight: bold; font-size: medium;">##x</span>
+-     </td>
+-    </tr>
+-    <tr valign="top">
+-     <td align="center" colspan="2" height="114">
+-       ##ta
+-         <FORM METHOD="POST" ACTION="##C/com/quick?##&">
+-         <BR>
+-         <font size="2" color="#ff0000"><b>##X124</b></font><br>
+-         <INPUT TYPE="TEXT" NAME="modu" WIDTH="32"><small>@##D</small><BR>
+-         <INPUT TYPE="SUBMIT" VALUE="##X071" NAME="MODIFY"> &nbsp; <INPUT TYPE="SUBMIT" VALUE="##X072" NAME="DELETE">
+-         </FORM>
+-       ##tt
+-     </td>
+-    </tr>
+-   </table>
+-  </center>
++<div class="col-sm-8">
++   <!-- main menu items from templates.c -->
++	##v
++	<ul><li class="p0">##x</li></ul>
++</div>
++<div class="col-sm-4">
++	<!-- logo big -->
++	<img class="mb-4" src="##Z/logo_big.png" alt="">
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/mod_autorespond.html qmailadmin-1.2.16/html/mod_autorespond.html
+--- ../qmailadmin-1.2.16-original/html/mod_autorespond.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/mod_autorespond.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,71 +1,55 @@
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
++<!-- modify robot/autoresponder -->	
+ 
+-<script language="Javascript" type="text/javascript">
++<div class="col-sm-9">
++	
++	<h2>##X105</h2>
++	
++		<form method="post" action="##C/com/modautorespondnow?##&">
++				
++				<!-- name -->
++  				<div class="form-group">
++		    		<label for="none">##X004</label>
++					<input class="form-control" type="text" id="none" name="none" value="##A@##D" disabled>
++				</div>
++
++				<!-- send to -->
++  				<div class="form-group">
++		    		<label for="owner">##X005</label>
++					<input class="form-control" type="text" id="owner" name="owner" ##F 
++					
++					<!-- WHAT THE FUCK IS THIS???? IT BREAKS THE HTML TAG GO BACK TO SRC AND CONTINUE HTML THERE!!! AHAHAHAHA -->
+ <!--
+-function init()
+-{
+-document.modautorespond.owner.focus();
+-}
+-//-->
+-</script>
++template.c line 223
++					value="%H@%H">
++				</div>
++				
++				// subject/alias
++				<div class="form-group">
++		         <label for="alias">text6</label>
++					<input class="form-control" type="text" name="alias" id="alias" value="##??">
++				</div>
++				
++				// message
++				<div class="form-group">
++       			<textarea class="form-control" rows="40" name="message"">##??</textarea>
++				</div>
++-->
++
++				<input type="hidden" name="newu" value="##A">
++           
++           	<button type="submit" class="btn btn-primary">##X105</button>
++      </form>
++</div>
+ 
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X105</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <form method="post" name="modautorespond" action="##C/com/modautorespondnow?##&">
+-           <table cellpadding="0" cellspacing="0" border="0">
+-            <tr>
+-             <td align=right><b>##X004</b>&nbsp;</td>
+-             <td>##A@##D</td>
+-            </tr>
+-            <tr>
+-             <td align=right><b>##X005</b>&nbsp;</td>
+-             <td><input type="text" size="40" name="owner" maxlength="128" ##F
+-           <input type="hidden" name="newu" value="##A">
+-           <input type="submit" value="##X105">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showautoresponders?##&">##X077</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-             </td>
+-            </tr>
+-        <!-- End of form fields -->
+-           </table>
+-         </td>
+-        </tr>
+-       </table>
+-    <!-- End of frame content -->
+-      </td>
+-     </tr>
+-    </table>
+-   <!-- End of black frame -->
+-  </center>
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++##ta	
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showautoresponders?##&">##X077</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++##tt
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/mod_dotqmail.html qmailadmin-1.2.16/html/mod_dotqmail.html
+--- ../qmailadmin-1.2.16-original/html/mod_dotqmail.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/mod_dotqmail.html	2020-05-03 14:04:34.000000000 +0200
+@@ -1,83 +1,41 @@
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
++<!-- modify forward -->
++<div class="col-sm-9">
+ 
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.moddotqmail.newu.focus();
+-}
+-//-->
+-</script>
+-
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X071</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="1" cellspacing="1" border="0" width="100%">
+-        <tr>
+-         <th>##X106</th>
+-         <th>##X305</th>
+-         <th>##X072</th>
+-        </tr>
+-        ##I
++	<h2>##X071</h2>
++
++		<table class="table table-borderless table-hover">
++      	<thead class="thead-dark"><tr>
++         	<th scope="col">##X106</th>
++         	<th scope="col">##X305</th>
++         	<th scope="col">##X072</th>
++        	</thead>
++			<tbody>        	
++        	##I
++        	</tbody>
+        </table>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <form method="post" name="moddotqmail" action="##C/com/moddotqmailnow?##&">
+-        <tr>
+-         <td valign=top>
+-           <b>##X108</b>
+-         </td>
+-         <td valign=top>
+-           <b>##X305</b><br>
+-           <input type="text" size="48" name="newu" maxlength="128"><br>##X010
+-         </td>
+-        </tr>
+-        <tr>
+-         <td>&nbsp;</td>
+-         <td align="right">
++
++        <form method="post" action="##C/com/moddotqmailnow?##&">
++        
++	        	<div class="form-group">
++		    		<label for="newu">##X108 ##X305</label><br>
++					<input class="form-control" type="text" name="newu" id="newu"  required>
++					<small class="form-text text-muted">##X010</small>
++				</div>	
++
+            <input type="hidden" name="modu" value="##A">
+            <input type="hidden" name="action" value="add">
+-           <input type="submit" value="##X060"></td>
+-        </tr>
++           <button type="submit" class="btn btn-primary">##X060</button>
+         </form>
+-        <tr>
+-         <td colspan="2">
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showforwards?##&">##X122</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++
++
++</div>
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- add forwards -->
++		<a class="nav-link" href="##C/com/showforwards?##&">##X122</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++		<!-- logout -->  		
++  		##x
++	</nav>
++</div>
+diff -ruN ../qmailadmin-1.2.16-original/html/mod_mailinglist-idx.html qmailadmin-1.2.16/html/mod_mailinglist-idx.html
+--- ../qmailadmin-1.2.16-original/html/mod_mailinglist-idx.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/mod_mailinglist-idx.html	2020-05-04 12:58:23.899161687 +0200
+@@ -1,75 +1,41 @@
+-  <META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+-  <META HTTP-EQUIV="Expires" CONTENT="Thu, 1 Jan 1970 00:00:00 GMT">
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
+-
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.modmailinglistnow.listowner.focus();
+-}
+-//-->
+-</script>
+-
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X225 ##A@##D</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td align="left">
+-          <form method="post" name="modmailinglistnow" action="##C/com/modmailinglistnow?##&">
+-           <table cellpadding="0" cellspacing="0" border="0">
+-            <tr>
+-             <td ALIGN=RIGHT><b>##X017</b></td>
+-             <td><input type="text" size=30 name="listowner" maxlength="128" value="##a"></td>
+-            </tr>
+-            <tr>
+-             <td ALIGN=RIGHT><b>##X256</b></td>
+-             <td><input type="text" size=16 name="prefix" maxlength="128" value="##P"></td>
+-            </tr>
+-           </table>
++<!-- modify m/l -->
++
++<div class="col-sm-9">
++
++	<h2>##X225 <mark>##A@##D</mark></h2>
++
++	<form method="post" action="##C/com/modmailinglistnow?##&">
++
++		<!-- owner -->
++  		<div class="form-group">
++    		<label for="listowner">##X017</label>
++			<input class="form-control" type="email" id="listowner" name="listowner" value="##a">
++ 		</div>
++ 		
++		<!-- prefix -->
++  		<div class="form-group">
++    		<label for="prefix">##X256</label>
++			<input class="form-control" type="text" id="prefix" name="prefix" value="##P">
++ 		</div>
++ 		
+ <!-- options for the mailing list -->
+ ##E
+-           <input type="hidden" name="newu" value="##A">
+-           <DIV ALIGN=RIGHT><input type="submit" value="##X071"></DIV> 
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++      <input type="hidden" name="newu" value="##A">
++		<br>
++		<button type="submit" class="btn btn-primary">##X071</button>
++
++	</form>
++
++</div>
++
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+diff -ruN ../qmailadmin-1.2.16-original/html/mod_user.html qmailadmin-1.2.16/html/mod_user.html
+--- ../qmailadmin-1.2.16-original/html/mod_user.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/mod_user.html	2020-09-01 14:36:38.758282654 +0200
+@@ -1,151 +1,154 @@
+-        </head>
+-        <body bgcolor="#ffffff" onload="init();">
+-
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.logon.gecos.focus();
+-}
+-//-->
+-</script>
+-
+-<script type="text/javascript">
+-<!--
++<!-- Modify email account -->
++<script>
+ function enablefields(txt)
+ {
+   if (txt=="disable")
+   {
+-    document.forms[0].nforward.disabled=true;
+-    document.forms[0].fsaved.disabled=true;
+-##ts document.forms[0].spamcheck.disabled=false; ##tt
++    document.forms.namedItem("logon").nforward.disabled=true;
++    document.forms.namedItem("logon").fsaved.disabled=true;
++##ts document.forms.namedItem("logon").spamcheck.disabled=false; ##tt
+   }
+   else if (txt=="forward")
+   {
+-    document.forms[0].nforward.disabled=false;
+-    document.forms[0].fsaved.disabled=false;
+-##ts document.forms[0].spamcheck.disabled=false; ##tt
++    document.forms.namedItem("logon").nforward.disabled=false;
++    document.forms.namedItem("logon").fsaved.disabled=false;
++##ts document.forms.namedItem("logon").spamcheck.disabled=false; ##tt
+   }
+   else if (txt=="blackhole")
+   {
+-    document.forms[0].nforward.disabled=true;
+-    document.forms[0].fsaved.disabled=true;
+-##ts document.forms[0].spamcheck.disabled=true; ##tt
++    document.forms.namedItem("logon").nforward.disabled=true;
++    document.forms.namedItem("logon").fsaved.disabled=true;
++##ts document.forms.namedItem("logon").spamcheck.disabled=true; ##tt
+   }
+   else
+   {
+-    document.forms[0].nforward.disabled=false;
+-    document.forms[0].fsaved.disabled=false;
+-##ts document.forms[0].spamcheck.disabled=false; ##tt
++    document.forms.namedItem("logon").nforward.disabled=false;
++    document.forms.namedItem("logon").fsaved.disabled=false;
++##ts document.forms.namedItem("logon").spamcheck.disabled=false; ##tt
+   }
+ }
+ 
+ function GetSelected()
+ {
+    var i;
+-   for( i=0; i<document.forms[0].cforward.length; ++i)
+-      if( document.forms[0].cforward[i].checked)
+-         return document.forms[0].cforward[i].value;
++   for( i=0; i<document.forms.namedItem("logon").cforward.length; ++i)
++      if( document.forms.namedItem("logon").cforward[i].checked)
++         return document.forms.namedItem("logon")	.cforward[i].value;
+    // default (non selected)
+    return -1;
+ }
+-
+-//-->
+ </script>
+ 
+-    <center>
+-      <h2>##S</h2>
+-      <!-- Black frame 2 pixels wide -->
+-      <table cellpadding="2" cellspacing="0" border="0" align="center" width="600" bgcolor="#000000"><tr><td>
+-        <!-- Frame content -->
+-        <table cellpadding="0" cellspacing="0" border="0" align="center" width="100%" bgcolor="#ffffff">
+-          <!-- Form title -->
+-          <tr>
+-            <td bgcolor="#000000" align="center">
+-              <font color="#ffffff" size="3">
+-      <b>##X109: ##A@##D</b>
+-              </font>
+-            </td>
+-          </tr>
+-          <!-- End of form title -->
+-          <!-- Form content -->
+-          <tr>
+-            <td>
+-              <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-    <!-- Form fields -->
+-    <tr>
+-     <td>
+-      <form method="post" name="logon" action="##C/com/modusernow?##&">
+-          <input type="hidden" name="modu" value="##A">
+-      <table cellpadding="1" cellspacing="1" border="0">
+-      <tr>
+-        <td align="right">##X092:</td>
+-        <td align="left"><input type="text" name="gecos" maxlength="128" size="32" value="##i7"></td>
+-      </tr>
+-      <tr>
+-        <td align="right">##X110:</td>
+-        <td align="left"><input type="password" name="password1" maxlength=128 size=16></td>
+-      </tr>
+-      <tr>
+-        <td align="right">##X091</td>
+-        <td align="left"><input type="password" name="password2" maxlength=128 size=16></td>
+-      </tr>
+-##tq      <tr>
+-        <td align="right">##X249:</td>
+-        <td align="left">
+-##ta
+-          <input type="text" name="quota" maxlength="128" size="16" value="##q">
+-          &nbsp;##X251
+-##tt
+-##tu ##Q ##q ##tt
+-        </td>
+-      </tr>
++<div class="col-sm-9">
++
++	<!-- Modify user -->
++	<h2>##X109: ##A@##D</h2>
++
++	<form method="post" id="logon" action="##C/com/modusernow?##&">
++ 		<input type="hidden" name="modu" value="##A">
++          
++		<!-- real name -->
++ 		<div class="form-group">
++	   	<label for="gecos">##X092</label>
++	    	<input type="text" class="form-control" name="gecos" value="##i7" id="gecos" required>
++	  	</div>
++
++		<!-- new pwd -->
++ 		<div class="form-group">
++	   	<label for="password1">##X110</label>
++	    	<input type="password" class="form-control" name="password1" id="password1">
++	  	</div>
++	  	
++	  	<!-- new pwd (again) -->
++ 		<div class="form-group">
++	   	<label for="password2">##X091</label>
++	    	<input type="password" class="form-control" name="password2" id="password2">
++	  	</div>
++##tq	  	
++	  	<!-- quota -->
++		##ta	  	
++ 		<div class="form-group">
++	   	<label for="quota">##X249</label>
++	    	<input type="text" class="form-control" name="quota" id="quota" value="##q" required>
++			<small class="form-text text-muted">##X251</small>
++	  	</div>
++		##tt
++		<!-- displays quota for simple users -->
++		##tu
++ 		<div class="form-group">
++	   	<label for="quota">##X249</label>
++	    	<input type="text" class="form-control" name="quota" id="quota" value="##q" disabled>
++			<small class="form-text text-muted">##Q ##q MB</small>
++	  	</div>
++		##tt
+ ##tt
+-      </table><HR>
+-      <table cellpadding="1" cellspacing="1" border="0">
+-      <tr>
+-        <td align="right" valign="top">##X260:</td>
+-        <td align="left">
+-          <input type="radio" name="cforward"
+-onClick="document.forms[0].nforward.disabled=true;
+-document.forms[0].fsaved.disabled=true;
+-##ts document.forms[0].spamcheck.disabled=false; ##tt"
+-value="disable" ##i0> ##X205
+-<HR>
+-          <input type="radio" name="cforward"
+-onClick="document.forms[0].nforward.disabled=true;
+-document.forms[0].fsaved.disabled=true;
+-##ts document.forms[0].spamcheck.disabled=true; ##tt"
+-value="blackhole" ##i8> ##X303
+-<HR>
+-        <input type="radio" name="cforward"
+-onClick="document.forms[0].nforward.disabled=false;
+-document.forms[0].fsaved.disabled=false;
+-document.forms[0].nforward.select()
+-document.forms[0].nforward.focus()
+-##ts document.forms[0].spamcheck.disabled=false; ##tt"
+-value="forward" ##i1>&nbsp;##X211&nbsp;<input type="text" size="35" name="nforward" 
+-value="##i2"><BR>
+-&nbsp; &nbsp; <input type="checkbox" name="fsaved" ##i3> ##X210&nbsp;
+-        </td>
+-      </tr>
+-      </table><HR>
+-        <input type="checkbox" name="vacation"
+-onClick="document.forms[0].vsubject.select()
+-document.forms[0].vsubject.focus()"
+-value="on" ##i4> ##X212<BR>
+-        ##X213&nbsp;<input type="text" name="vsubject" size="50" value="##i5">
+-<BR>##X214&nbsp;<BR>
+-<textarea name="vmessage" rows="10" cols="60">##i6</textarea>
+-<HR>
+-      <table cellpadding="1" cellspacing="1" border="0">
++
++     	<!-- routing -->
++		<h3>##X260</h3>
++
++		<!-- standard -->
++ 		<div class="form-check">
++			<input class="form-check-input" type="radio" name="cforward" id="cforward" 
++				onclick="document.forms.namedItem('logon').nforward.disabled=true;
++				document.forms.namedItem('logon').fsaved.disabled=true; ##ts document.forms[1].spamcheck.disabled=false; ##tt"
++				value="disable" ##i0>
++			<label class="form-check-label" for="cforward">##X205</label>
++		</div>
++
++		<!-- all mail deleted -->
++ 		<div class="form-check">		
++      	<input class="form-check-input" type="radio" name="cforward" 
++				onclick="document.forms[1].nforward.disabled=true;
++				document.forms.namedItem('logon').fsaved.disabled=true;
++				##ts document.forms.namedItem('logon').spamcheck.disabled=true; ##tt"
++				value="blackhole" ##i8>
++			<label class="form-check-label" for="cforward">##X303</label>
++		</div>
++
++		<!-- forward to -->
++ 		<div class="form-check">		
++			<input class="form-check-input" type="radio" name="cforward"
++				onclick="document.forms.namedItem('logon').nforward.disabled=false;
++				document.forms.namedItem('logon').fsaved.disabled=false;
++				document.forms.namedItem('logon').nforward.select();
++				document.forms.namedItem('logon').nforward.focus();
++				##ts document.forms.namedItem('logon').spamcheck.disabled=false; ##tt"
++				value="forward" ##i1>
++			<label class="form-check-label" for="cforward">##X211</label>		
++			<input class="my-input" type="text" size="35" name="nforward" value="##i2">
++			&nbsp; &nbsp; <input "form-check-input" type="checkbox" name="fsaved" id="fsaved" ##i3> 
++			<label class="form-check-label" for="fsaved">##X210</label>
++   	</div>
++      
++      <hr>
++      
++      <!-- vacation msg -->
++ 		<div class="form-check">        
++			<input class="form-check-input" type="checkbox" name="vacation" id="vacation"
++				onclick="document.forms.namedItem('logon').vsubject.select()
++				document.forms.namedItem('logon').vsubject.focus()"
++				value="on" ##i4>
++        	<label class="form-check-label" for="vacation">##X212</label>
++		</div>
++        
++      <!-- vacation subject -->
++      <div class="form-group"><br>
++	   	<label for="vsubject">##X213</label>
++        	<input class="form-control" type="text" name="vsubject" id="vsubject" value="##i5">
++		</div>
++		
++		<div class="form-group">
++			<label for="vmessage">##X214</label>
++			<textarea class="form-control" name="vmessage" id="vmessage" rows="10" cols="60">##i6</textarea>
++		</div>
++
++
++		<!-- spamcheck -->
+ ##ts
+-      <tr>
+-         <td align="right">##X304:</td>
+-         <td align="left">
+-            <input type="checkbox" name="spamcheck" ##i9>
+-         </td>
+-      </tr>
++ 		<div class="form-check">
++         <input class="form-check-input" type="checkbox" name="spamcheck" id="spamcheck" ##i9> 
++			<label class="form-check-label" for="vacation">##X304</label>
++      </div>
+ ##tt
+ 
+     <!-- user mailbox flags
+@@ -175,42 +178,25 @@
+     </tr>
+     user mailbox flags -->
+ 
+-    <tr>
+-     <td colspan=2 align=right>
+-      <input type="submit" value="##X111">
+-     </td>
+-    </tr>
+-   </table>
++      <button type="submit" class="btn btn-primary">##X111</button>
+    </form>
+ 
+-<script type="text/javascript">
+-<!--
++<script>
+   // alert( GetSelected() );
+   enablefields( GetSelected() );
+-//-->
+ </script>
+-        </td>
+-      </tr>
+-          </table>
+-        <div align="right">
+-          <hr>
+-          <font size="2"><b>
+-          [&nbsp;
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
+ ##ta
+-          <a href="##C/com/showusers?##&">##X061</a>
+-          &nbsp;|&nbsp;
+-          <a href="##C/com/showmenu?##&">##X001</a>
+-          &nbsp;|&nbsp;
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showusers?##&">##X061</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
+ ##tt
+-##x
+-          &nbsp;]
+-          </b></font>
+-        </div>
+-      </td>
+-    </tr>
+-    <!-- End of form fields -->
+-              </table>
+-        <!-- End of frame content -->
+-      </td></tr></table>
+-      <!-- End of black frame -->
+-    </center>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+diff -ruN ../qmailadmin-1.2.16-original/html/setremotecatchall.html qmailadmin-1.2.16/html/setremotecatchall.html
+--- ../qmailadmin-1.2.16-original/html/setremotecatchall.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/setremotecatchall.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,66 +1,29 @@
+- </head>
+- <body bgcolor="#ffffff" onload="init();">
++<!-- set remote catch all account -->
++<div class="col-sm-9">
+ 
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.addforward.newu.focus();
+-}
+-//-->
+-</script>
+-
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X207</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <form method="post" name="addforward" action="##C/com/setremotecatchallnow?##&">
+-           <table cellpadding="0" cellspacing="0" border="0">
+-            <tr>
+-             <td>##X208&nbsp;</td>
+-             <td><input type="text" name="newu" size="16" maxlength="128"></td>
+-            </tr>
+-           </table>
+-           <input type="submit" value="##X060">
+-          </form>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showusers?##&">##X061</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++	<h2>##X207</h2>
++
++	<form method="post" action="##C/com/setremotecatchallnow?##&">
++
++ 		<div class="form-group">
++	   	<label for="newu">##X208</label>
++	    	<input type="text" class="form-control" name="newu" id="newu" required>
++	  	</div>
++
++		<button type="submit" class="btn btn-primary">##X060</button>
++	</form>
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++##ta	
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showusers?##&">##X061</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++##tt
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/show_autorespond.html qmailadmin-1.2.16/html/show_autorespond.html
+--- ../qmailadmin-1.2.16-original/html/show_autorespond.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/show_autorespond.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,53 +1,32 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding=3 cellspacing=0 border=0 align=center valign=top width=100% bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr bgcolor="#000000" valign=center>
+-      <td align=left><font color="#ffffff" size=3><B>##D</B></FONT></td>  
+-      <td align=center><font color="#ffffff" size=3><B>##X077</B></FONT></td>
+-      <td align=right><font color="#ffffff" size=3><b>[##X254 ##K]</b></FONT></td>  
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td colspan=3>
+-       <table cellpadding="5" cellspacing="0" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <table cellpadding="1" cellspacing="0" border="0" width="100%">
+-           <tr bgcolor="cccccc">
+-            <th align="center" width=50><font size="2">##X072</font></th>
+-            <th align="center" width=50><font size="2">##X071</font></th>
+-            <th align="left"><font size="2">##X078</font></th>
+-           </tr>
++<!-- show robots / autoresponders -->
++
++<div class="col-sm-9">
++
++     <h2>##D</h2>
++     
++     <h5>##X077 <span class="badge badge-primary badge-pill">##X254 ##K</span></h5>  
++
++		<table class="table table-borderless table-hover">
++			<thead class="thead-dark">
++				<th scope="col">##X072</th>
++	         <th scope="col">##X071</th>
++	         <th scope="col">##X078</th>
++         </thead>
++         <tbody>
+            <!-- inserts a three columns row -->
+            ##g
+-          </table>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/addautorespond?##&">##X079</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-       </table>
+-      </td>
+-     </tr>
+-     <!-- End of form fields -->
+-    </table>
+-   <!-- End of black frame -->
+-   </tr></td></table>
+-  </center>
++         </tbody>
++      </table>
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/addautorespond?##&">##X079</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/show_digest_subscribers.html qmailadmin-1.2.16/html/show_digest_subscribers.html
+--- ../qmailadmin-1.2.16-original/html/show_digest_subscribers.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/show_digest_subscribers.html	2020-05-03 22:27:14.000000000 +0200
+@@ -1,55 +1,22 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X247</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+-           <tr>
+-            <td>
+-                <b>##X248 ##A@##D</b><p>
+-             ##G
+-            </td>
+-           </tr>
+-          </table>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<!-- show m/l digest -->
++
++<div class="col-sm-9">
++
++	<h2>##X247</h2>
++
++	<h5>##X248 <mark>##A@##D</mark></h5>
++
++	##G
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/show_forwards.html qmailadmin-1.2.16/html/show_forwards.html
+--- ../qmailadmin-1.2.16-original/html/show_forwards.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/show_forwards.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,55 +1,32 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding=3 cellspacing=0 border=0 align=center valign=top width=100% bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr bgcolor="#000000" valign=center>
+-      <td align=left><font color="#ffffff" size=3><B>##D</B></FONT></td>
+-      <td align=center><font color="#ffffff" size=3><B>##X074</B></FONT></td>
+-      <td align=right><font color="#ffffff" size=3><b>[##X254 ##k]</b></FONT></td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td bgcolor="#ffffff" align="center" width="100%" colspan=3>
+-       <table cellpadding="5" cellspacing="0" border="0" align="center" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td width="100%">
+-          <table cellpadding="1" cellspacing="0" border="0" align="center" width="100%">
+-           <tr bgcolor="#cccccc">
+-            <th align="center" width=50><font size="2">##X072</font></th>
+-            <th align="center" width=50><font size="2">##X071</font></th>
+-            <th align="left"><font size="2">##X106</font></th>
+-            <th align="left"><font size="2">##X305</font></th>
++<!-- show forwards -->
++<div class="col-sm-9">
++	<!-- domain -->
++	<h2>##D</h2>
++
++	<!-- forwards account -->	
++	<h5>##X074 <span class="badge badge-primary badge-pill">##X254 ##k</span></h5>
++	
++		<table class="table table-borderless table-hover">
++			<thead class="thead-dark">
++				<th scope="col">##X072</th>
++            <th scope="col">##X071</th>
++            <th scope="col">##X106</th>
++            <th scope="col">##X305</th>
+            </tr>
++			</thead>
++			<tbody>
+            <!-- Inserts a four columns row -->
+            ##d
+-          </table>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/adddotqmail?atype=forward&##&">##X076</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++         </tbody>
++		</table>
++</div>
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- add forwards -->
++		<a class="nav-link" href="##C/com/adddotqmail?atype=forward&##&">##X076</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++		<!-- logout -->  		
++  		##x
++	</nav>
++</div>
+diff -ruN ../qmailadmin-1.2.16-original/html/show_login.html qmailadmin-1.2.16/html/show_login.html
+--- ../qmailadmin-1.2.16-original/html/show_login.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/show_login.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,126 +1,26 @@
+- </head>
+- <body bgcolor="#ffffff" vlink="#000000" link="#000000" alink="#000000" onload="init();">
++<div class="col-sm-12 text-center">
+ 
+-<script language="Javascript" type="text/javascript">
+-<!--
+-function init()
+-{
+-document.logon.username.focus();
+-}
+-//-->
+-</script>
+-
+-  <center>
+-   <h2>##S</h2>
+-   <table border="0" cellpadding="0" cellspacing="0">
+-    <tr>
+-     <td width="147">
+-      <table background="##Z/upperleft.png" border="0" cellpadding="0" cellspacing="0">
+-       <tr><td width="147" height="41"><img src="##Z/pixel.png" height="1" width="1"></td></tr>
+-      </table>
+-     </td>
+-     <td>
+-      <table background="##Z/uppermiddle1.png" border="0" cellpadding="0" cellspacing="0" width="100%">
+-       <tr><td height="41"><img src="##Z/pixel.png" height="1" width="1"></td></tr>
+-      </table>
+-     </td>
+-     <td>
+-      <table background="##Z/upperright.png" border="0" cellpadding="0" cellspacing="0">
+-       <tr><td width="31" height="41"><img src="##Z/pixel.png" height="1" width="1"></td></tr>
+-      </table>
+-     </td>
+-    </tr>
+-    <tr>
+-     <td>
+-      <table background="##Z/middleleft1.png" border="0" cellpadding="0" cellspacing="0">
+-       <tr><td width="147" height="199"><img src="##Z/pixel.png" height="1" width="1"></td></tr>
+-      </table>
+-     </td>
+-     <td rowspan="2" style="font:Verdana,Arial,Helvetica,sans-serif" align=center valign=bottom>
+-      <!--Content-->
+-      <form method="post" name="logon" action="##C">
+-       <table>
+-        <tr><td>##X112</td><td><input type="text" size="14" name="username" value="##L" maxlength="128"></td></tr>
+-        <tr><td>##X113</td><td><input type="text" size="14" name="domain" maxlength="128" value="##z"></td></tr>
+-        <tr><td>##X057</td><td><input type="password" size="14" name="password" maxlength="128"></td></tr>
+-        <tr>
+-          <td colspan="2" align="right">
+-         <input type="hidden" name="returnhttp" value="##y">
+-         <input type="hidden" name="returntext" value="##Y">
+-         <input type="submit" value="##X114">
+-          </td>
+-        </tr>
+-        <tr>
+-          <td colspan=2 align=left><A HREF="##C/passwd/"><font 
+-            size="2" color="#000000"><B>##X316</B></FONT></A></TD>
+-        </tr>
+-       </table>
+-      </form>
+-      <img src="##Z/pixel.png" height="1" width="250">
+-      <!--Content-->
+-     </td>
+-     <td>
+-      <table background="##Z/middleright1.png"  border="0" cellpadding="0" cellspacing="0">
+-       <tr><td width="31" height="199"><img src="##Z/pixel.png" height="1" width="1"></td></tr>
+-      </table>
+-     </td>
+-    </tr>
+-    <tr>
+-     <td>
+-      <table background="##Z/middleleft2.png"  border="0" cellpadding="0" cellspacing="0">
+-       <!-- Insert a height attribute here to get the table higher thus allowing more vertical content"-->
+-       <tr><td width="147"><img src="##Z/pixel.png" height="1" width="1"></td></tr>
+-      </table>
+-     </td>
+-     <td>
+-      <table background="##Z/middleright1.png" border="0" cellpadding="0" cellspacing="0">
+-       <!-- Insert the same height attribute as above to get it look nice -->
+-       <tr><td width="31"><img src="##Z/pixel.png" height="1" width="1"></td></tr>
+-      </table>
+-     </td>
+-    </tr>
+-    <tr>
+-     <td>
+-      <table background="##Z/middleleft2.png"  border="0" cellpadding="0" cellspacing="0">
+-       <tr>
+-        <td width="147" height="119"><img src="##Z/pixel.png" height="1" width="1">
+-         <center> 
+-          ##V
+-         </center>
+-        </td>
+-       </tr>
+-      </table>
+-     </td>
+-     <td align=center>
+-       <!-- Help Links -->
+-##th
+-       <a href="##Z/help/email_user/"><font color="blue">##X257</font></a><BR>
+-       <a href="##Z/help/email_admin/"><font color="blue">##X258</font></a><BR>
+-       <a href="##Z/help/index.html"><font color="blue">##X259</font></a>
+-##tt
+-     </td>
+-     <td>
+-      <table background="##Z/middlelogin.png"  border="0" cellpadding="0" cellspacing="0">
+-       <tr><td width="31" height="119"><img src="##Z/pixel.png" height="1" width="1"></td></tr>
+-      </table>
+-     </td>
+-    </tr>
+-    <tr>
+-     <td>
+-      <table background="##Z/lowerleft.png"  border="0" cellpadding="0" cellspacing="0">
+-       <tr><td width="147" height="11"><img src="##Z/pixel.png" height="1" width="1"></td></tr>
+-      </table>
+-     </td>
+-     <td>
+-      <table background="##Z/lowermiddle.png" width="100%"  border="0" cellpadding="0" cellspacing="0">
+-       <tr><td height="11"><img src="##Z/pixel.png" height="1" width="1"></td></tr>
+-      </table>
+-     </td>
+-     <td>
+-      <table background="##Z/lowerright.png" width="31" border="0" cellpadding="0" cellspacing="0">
+-       <tr><td height="11"><img src="##Z/pixel.png" height="1" width="1"></td></tr>
+-      </table>
+-     </td>
+-    </tr>
+-   </table>
+-  </center>
++<form class="form-signin" method="post" action="##C">
++  <!-- logo big -->
++  <img class="mb-4" src="##Z/logo_big.png" alt="">
++
++  <h1 class="h3 mb-3 font-weight-normal">Login</h1>
++
++  <label for="username" class="sr-only">##X112</label>
++  <input type="text" name="username" id="username" class="form-control" value="##L" placeholder="##X112" required autofocus>
++
++  <label for="domain" class="sr-only">##X113</label>
++  <input type="text" name="domain" id="domain" class="form-control" value="##z"placeholder="##X113" required>  
++
++  <label for="password" class="sr-only">##X057</label>
++  <input type="password" name="password" id="password" class="form-control" placeholder="##X057" required>
++
++  <input type="hidden" name="returnhttp" value="##y">
++  <input type="hidden" name="returntext" value="##Y">
++
++  <button class="btn btn-lg btn-primary btn-block" type="submit">##X114</button>
++</form>
++
++<p>[ <a href="##C/passwd/">##X316</a> ]</p>
++
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/show_mailinglist.html qmailadmin-1.2.16/html/show_mailinglist.html
+--- ../qmailadmin-1.2.16-original/html/show_mailinglist.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/show_mailinglist.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,48 +1,23 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding=3 cellspacing=0 border=0 align=center valign=top width=100% bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr bgcolor="#000000" valign=center>
+-      <td align=left><font color="#ffffff" size=3><B>##D</B></FONT></td>  
+-      <td align=center><font color="#ffffff" size=3><B>##X080</B></FONT></td>
+-      <td align=right><font color="#ffffff" size=3><b>[##X254 ##j]</b></FONT></td>  
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td colspan=3>
+-       <table cellpadding=5 cellspacing=1 border=0 width=100%>
+-        <!-- Form fields -->
+-        <tr>
+-         <td align="left">
+-          <table cellpadding=2 cellspacing=0 border=0 width=100%>
+-           ##e
+-          </table>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/addmailinglist?##&">##X089</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<!-- show m/l -->
++
++<div class="col-sm-12">
++
++	<h2>##D</h2>
++	
++	<h5>##X080 <span class="badge badge-primary badge-pill">##X254 ##j</span></h5>
++ 
++   <table class="table table-borderless table-hover big">
++   ##e
++   </table>
++
++	<hr>
++	
++	<nav class="nav justify-content-center">
++		<!-- new m/l -->
++		<a class="nav-link" href="##C/com/addmailinglist?##&">##X089</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/show_moderators.html qmailadmin-1.2.16/html/show_moderators.html
+--- ../qmailadmin-1.2.16-original/html/show_moderators.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/show_moderators.html	2020-05-03 22:26:48.000000000 +0200
+@@ -1,55 +1,24 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding="0" cellspacing="0" border="0" align="center" valign="top" width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X219</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+-           <tr>
+-            <td>
+-           <b>##X191 ##A@##D</b><p>
+-                               ##o
+-            </td>
+-           </tr>
+-          </table>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<!-- add m/l moderator -->
++
++<div class="col-sm-9">
++
++	<h2>##X219</h2>
++
++	<h5>##X191 <mark>##A@##D</mark></h5>
++	
++		
++	##o
++
++</div>
++
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html/show_subscribers.html qmailadmin-1.2.16/html/show_subscribers.html
+--- ../qmailadmin-1.2.16-original/html/show_subscribers.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/show_subscribers.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,55 +1,25 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding=2 cellspacing=0 border=0 align=center width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding=0 cellspacing=0 border=0 align=center width="100%" bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr>
+-      <td bgcolor="#000000" align="center">
+-       <font color="#ffffff" size="3">
+-        <b>##X221</b>
+-       </font>
+-      </td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+-           <tr>
+-            <td>
+-                <P><b>##X189 ##A@##D</b></P>
+-             ##M
+-            </td>
+-           </tr>
+-          </table>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/showmailinglists?##&">##X080</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<!-- show m/l subscribers -->
++
++<div class="col-sm-9">
++
++	<!-- list subscribers -->
++	<h2>##X221</h2>
++
++	<!-- list of addresses title -->
++	<h5>##X189 <mark>##A@##D</mark></h5>
++	
++	<!-- subscribers table -->
++	##M
++
++</div>
++
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- email accounts -->
++		<a class="nav-link" href="##C/com/showmailinglists?##&">##X080</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++  		<!-- logout -->
++  		##x
++	</nav>
++</div>
+diff -ruN ../qmailadmin-1.2.16-original/html/show_users.html qmailadmin-1.2.16/html/show_users.html
+--- ../qmailadmin-1.2.16-original/html/show_users.html	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/html/show_users.html	2020-05-03 20:10:20.000000000 +0200
+@@ -1,61 +1,37 @@
+- </head>
+- <body bgcolor="#ffffff">
+-  <center>
+-   <h2>##S</h2>
+-   <!-- Black frame 2 pixels wide -->
+-   <table cellpadding="2" cellspacing="0" border="0" align="center" valign="top" width="600" bgcolor="#000000"><tr><td>
+-    <!-- Frame content -->
+-    <table cellpadding=3 cellspacing=0 border=0 align=center valign=top width=100% bgcolor="#ffffff">
+-     <!-- Form title -->
+-     <tr bgcolor="#000000" valign=center>
+-      <td align=left><font color="#ffffff" size=3><B>##D</B></FONT></td>
+-      <td align=center><font color="#ffffff" size=3><B>##X061</B></FONT></td>
+-      <td align=right><font color="#ffffff" size=3><b>[##X254 ##B]</b></FONT></td>
+-     </tr>
+-     <!-- End of form title -->
+-     <!-- Form content -->
+-     <tr>
+-      <td colspan=3>
+-       <table cellpadding="5" cellspacing="1" border="0" width="100%">
+-        <!-- Form fields -->
+-        <tr>
+-         <td>
+-          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+-           <tr bgcolor="#ffffff">
+-            <td colspan="5">##s</td>
+-           </tr>
+-           <tr bgcolor="#cccccc">
+-            <th align="left"><font size="2">##X002</font></th>
+-            <th align="left"><font size="2">##X063</font></th>
+-            <th align="right"><font size="2">##X250&nbsp;/&nbsp;</font></th>
+-            <th align="left"><font size="2">##X249</font>&nbsp;&nbsp;</th>
+-            <th><font size="2">##X064</font></th>
+-            <th><font size="2">##X065</font></th>
+-            <th><font size="2">##X066</font></th>
+-           </tr> 
+-           <!-- inserts a five columns row -->
+-           ##p
+-          </table>
+-          <div align="right">
+-           <hr>
+-           <font size="2"><b>
+-           [&nbsp;
+-           <a href="##C/com/adduser?##&">##X067</a>
+-           &nbsp;|&nbsp;
+-           <a href="##C/com/showmenu?##&">##X001</a>
+-           &nbsp;|&nbsp;
+-##x
+-           &nbsp;]
+-           </b></font>
+-          </div>
+-         </td>
+-        </tr>
+-        <!-- End of form fields -->
+-       </table>
+-      </td>
+-     </tr>
+-    </table>
+-    <!-- End of frame content -->
+-   </td></tr></table>
+-   <!-- End of black frame -->
+-  </center>
++<!-- email accounts -->
++<div class="col-sm-9">
++	<!-- domain -->
++	<h2>##D</h2>
++	
++	<!-- used vs allowed mailboxes -->
++	<h5>##X061 <span class="badge badge-primary badge-pill">##X254 ##B</span></h5>
++	<!-- Catch all -->
++	<h6>##s</h6>
++	
++	<table class="table table-borderless table-hover">
++		<thead class="thead-dark">
++			<th scope="col">##X002</th>
++			<th scope="col">##X063</th>
++			<th scope="col">##X250</th>
++			<th scope="col">##X249</th>
++			<th scope="col">##X064</th>
++			<th scope="col">##X065</th>
++			<th scope="col">##X066</th>
++		</thead>
++		<tbody>
++	   <!-- inserts a five columns row -->
++	   ##p
++	   </tbody>
++	</table>
++
++</div>
++<div class="col-sm-3">
++	<nav class="nav flex-column">
++		<!-- create account -->
++		<a class="nav-link" href="##C/com/adduser?##&">##X067</a>
++		<!-- main menu -->
++  		<a class="nav-link" href="##C/com/showmenu?##&">##X001</a>
++		<!-- logout -->  		
++  		##x
++	</nav>
++</div>
+\ No newline at end of file
+diff -ruN ../qmailadmin-1.2.16-original/html.h qmailadmin-1.2.16/html.h
+--- ../qmailadmin-1.2.16-original/html.h	2011-02-22 15:45:48.000000000 +0100
++++ qmailadmin-1.2.16/html.h	2020-05-03 13:22:18.000000000 +0200
+@@ -18,47 +18,46 @@
+  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
+  */
+ 
+-#define HTML_MENU_START			"[&nbsp;"
+-#define HTML_MENU_SEP			"&nbsp;|&nbsp;"
+-#define HTML_MENU_END			"&nbsp;]"
++#define HTML_MENU_START			"[ "
++#define HTML_MENU_SEP			" | "
++#define HTML_MENU_END			" ]"
+ 
+ #define HTML_EMPTY_TD			"<td> </td>"
+ 
+-#define HTML_BTN_GENERIC		"<img border=\"0\" src=\"" IMAGEURL "/delete.png\">"
+-#define HTML_BTN_DELETE			"<img border=\"0\" src=\"" IMAGEURL "/trash.png\">"
++#define HTML_BTN_GENERIC		"<span class=\"material-icons\">clear</span>"
++#define HTML_BTN_DELETE			"<span class=\"material-icons\">delete_forever</span>"
+ 
+ #define HTML_ALIAS_ERROR		"<tr><td colspan=\"4\">%s %s</td></tr>\n"
+ 
+ #define HTML_ALIAS_ROW_START	"<tr>"
+ #define HTML_ALIAS_ROW_END		"</tr>\n"
+ 
+-#define HTML_ALIAS_NAME			"<td align=left>%H</td>"
++#define HTML_ALIAS_NAME			"<td>%H</td>"
+ 
+ // start of the list of destination addresses
+-#define HTML_ALIAS_DEST_START	"<td align=left>"
++#define HTML_ALIAS_DEST_START	"<td>"
+ #define HTML_ALIAS_DEST_END	"</td>"
+ 
+ // Possible destinations in list
+ // BLACKHOLE uses text string 303 (All mail deleted)
+-#define HTML_ALIAS_BLACKHOLE	"<i>%s</i>"
++#define HTML_ALIAS_BLACKHOLE	"%s"
+ // LOCAL is for local addresses (no domain shown)
+ #define HTML_ALIAS_LOCAL		"%H"
+ // INVALID is for local addresses that no longer exist (error condition)
+-#define HTML_ALIAS_INVALID		"<font color=\"red\"><b>%H</b></font>"
++#define HTML_ALIAS_INVALID		"%H"
+ // REMOTE is for remote addresses (domain is shown)
+ #define HTML_ALIAS_REMOTE		"%H"
+ 
+ #define HTML_ALIAS_SHOWPAGE	"<a href=\"%s&page=%d\">%s</a>"
+ #define HTML_ALIAS_DOSEARCH	"<a href=\"%s&searchuser=%C\">%s</a>"
+ 
+-#define HTML_ALIAS_FOOTER_START	"<tr><td align=\"right\" colspan=\"4\">"
++#define HTML_ALIAS_FOOTER_START	"<tr><td class=\"text-center\" colspan=\"4\">"
+ #define HTML_ALIAS_FOOTER_END		"</td></tr>"
+ 
+ // HTML from the "modify alias" page
+ #define HTML_ALIAS_MOD_ROW_START	"<tr>"
+ #define HTML_ALIAS_MOD_ROW_END	"</tr>"
+-#define HTML_ALIAS_MOD_NAME		"<td align=\"center\" valign=\"top\"><b>%H</b></td>"
+-#define HTML_ALIAS_MOD_DEST		"<td align=\"center\" valign=\"top\">%s</td>\n"
+-#define HTML_ALIAS_MOD_DELETE		"<td align=\"center\" valign=\"top\">" \
++#define HTML_ALIAS_MOD_NAME		"<td>%H</td>"
++#define HTML_ALIAS_MOD_DEST		"<td>%s</td>\n"
++#define HTML_ALIAS_MOD_DELETE		"<td>" \
+ 	"<a href=\"%s&modu=%C&linedata=%C&action=delentry\">" HTML_BTN_DELETE "</a></td>\n"
+-	
+Binary files ../qmailadmin-1.2.16-original/images/favicon-16x16.png and qmailadmin-1.2.16/images/favicon-16x16.png differ
+Binary files ../qmailadmin-1.2.16-original/images/favicon-32x32.png and qmailadmin-1.2.16/images/favicon-32x32.png differ
+Binary files ../qmailadmin-1.2.16-original/images/logo.png and qmailadmin-1.2.16/images/logo.png differ
+Binary files ../qmailadmin-1.2.16-original/images/logo_big.png and qmailadmin-1.2.16/images/logo_big.png differ
+diff -ruN ../qmailadmin-1.2.16-original/images/style.css qmailadmin-1.2.16/images/style.css
+--- ../qmailadmin-1.2.16-original/images/style.css	1970-01-01 01:00:00.000000000 +0100
++++ qmailadmin-1.2.16/images/style.css	2020-05-05 14:58:17.283124241 +0200
+@@ -0,0 +1,77 @@
++.mt {margin-top: 40px;}
++.mo {margin-left: 15px; margin-right: 15px;}
++.mbc {margin-bottom: 90px;}
++.p0, .p0 a {padding: 0px;}
++footer {
++	font-size: 80%;
++	padding-top: 10px; 
++	background-color: #ebebeb;
++	text-align: center;
++}
++h2 {margin-bottom: 40px;}
++h5 {padding-bottom: 20px;}
++
++.form-signin {
++  width: 100%;
++  max-width: 330px;
++  padding: 15px;
++  margin: auto;
++}
++.form-signin .checkbox {
++  font-weight: 400;
++}
++.form-signin .form-control {
++  position: relative;
++  box-sizing: border-box;
++  height: auto;
++  padding: 10px;
++  font-size: 16px;
++}
++.form-signin .form-control:focus {
++  z-index: 2;
++}
++.form-signin input[type="password"] {margin-bottom: 10px;}
++.my-input, input[type="text"] { 
++	border: 1px solid #ced4da;
++	border-radius: .25rem;
++	padding-left: 5px;
++	padding-right: 5px;
++	margin-right: 10px;
++}
++.my-select {
++	padding: .1rem .1rem;
++	font-size: 1rem;
++	font-weight: 400;
++	line-height: 1.5;
++	color: #495057;
++	background-color: #fff;
++	background-clip: padding-box;
++	border: 1px solid #ced4da;
++	border-radius: .25rem;
++	transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
++}
++td input[type="radio"] {
++	margin-left: 5px;
++	margin-right: 5px;
++}
++.btn-block, .btn-primary, .badge-primary {
++	background-color: #337ab7;
++   border-color: #2e6da4;
++}
++.d-flex div {
++	padding: .75rem 1.25rem;
++	margin-bottom: 20px;
++	margin-right: 20px;
++	border: 1px solid #ced4da;
++	border-radius: .25rem;
++	transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
++}
++.material-icons {
++	color:#555;
++	vertical-align:middle;
++}
++
++.table.big thead th {
++	font-size: 0.8rem;
++	padding: .40rem;
++}
+diff -ruN ../qmailadmin-1.2.16-original/lang/en qmailadmin-1.2.16/lang/en
+--- ../qmailadmin-1.2.16-original/lang/en	2011-02-22 15:45:48.000000000 +0100
++++ qmailadmin-1.2.16/lang/en	2020-05-03 11:09:15.000000000 +0200
+@@ -8,7 +8,7 @@
+ 007 Add Forward Account:
+ 008 Forward Email Address: 
+ 009 Local Name:
+-010 (Account name to forward to<br>OR<br>full email address if forwarding to another domain)
++010 (Account name to forward to OR full email address if forwarding to another domain.)
+ 011 Add List Moderator
+ 012 Add Moderator to mailing list
+ 013 Email Address:
+diff -ruN ../qmailadmin-1.2.16-original/lang/it qmailadmin-1.2.16/lang/it
+--- ../qmailadmin-1.2.16-original/lang/it	2011-02-22 15:45:48.000000000 +0100
++++ qmailadmin-1.2.16/lang/it	2020-05-03 11:05:14.000000000 +0200
+@@ -8,7 +8,7 @@
+ 007 Aggiungi Forward:
+ 008 Indirizzo Email Forward:
+ 009 Casella locale:
+-010 L'indirizzo destinatario dell'inoltro deve essere indicato nella forma <B>casella@dominio.xxx</B>.  <BR>Il nome locale deve essere indicato nella forma: <B>casella</B> <BR><b> Esempio: </b> <BR>Forward: remo@remo.it Nome locale: pluto <BR>In questo modo tutto cio' che sara' inviato alla casella pluto del vostro dominio sara' inoltrato a remo@remo.it
++010 L'indirizzo destinatario dell'inoltro deve essere indicato nella forma <b>casella@dominio.xxx</b>.  <br>Il nome locale deve essere indicato nella forma: <b>casella</b> <br><b> Esempio: </b> <br>Forward: remo@remo.it Nome locale: pluto <br>In questo modo tutto cio' che sara' inviato alla casella pluto del vostro dominio sara' inoltrato a remo@remo.it
+ 011 Aggiungi moderatore della lista
+ 012 Aggiungi moderatore alla Lista
+ 013 Indirizzo Email:
+diff -ruN ../qmailadmin-1.2.16-original/mailinglist.c qmailadmin-1.2.16/mailinglist.c
+--- ../qmailadmin-1.2.16-original/mailinglist.c	2011-02-22 15:45:48.000000000 +0100
++++ qmailadmin-1.2.16/mailinglist.c	2020-05-05 15:49:45.566952776 +0200
+@@ -59,6 +59,10 @@
+ #define REPLYTO_LIST 2
+ #define REPLYTO_ADDRESS 3
+ 
++#define GROUP_SUBSCRIBER 0
++#define GROUP_MODERATOR 1
++#define GROUP_DIGEST 2
++
+ void set_options();
+ void default_options();
+ 
+@@ -110,24 +114,24 @@
+   }
+ 
+   /* First display the title row */
+-  printf ("<tr bgcolor=\"#cccccc\">");
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[72]);
++  printf ("<thead class=\"thead-dark\">\n");
++  printf ("<th scope=\"col\">%s</th>\n", html_text[72]);
+ #ifdef EZMLMIDX
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[71]);  
++  printf ("<th scope=\"col\">%s</th>\n", html_text[71]);  
+ #endif
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[81]);
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[83]);
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[84]);
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[85]);
++  printf ("<th scope=\"col\">%s</th>\n", html_text[81]);
++  printf ("<th scope=\"col\">%s</th>\n", html_text[83]);
++  printf ("<th scope=\"col\">%s</th>\n", html_text[84]);
++  printf ("<th scope=\"col\">%s</th>\n", html_text[85]);
+ #ifdef EZMLMIDX
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[86]);
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[87]);
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[88]);
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[237]);
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[238]);
+-  printf ("<th align=center><font size=2>%s</font></th>", html_text[239]);
++  printf ("<th scope=\"col\">%s</th>\n", html_text[86]);
++  printf ("<th scope=\"col\">%s</th>\n", html_text[87]);
++  printf ("<th scope=\"col\">%s</th>\n", html_text[88]);
++  printf ("<th scope=\"col\">%s</th>\n", html_text[237]);
++  printf ("<th scope=\"col\">%s</th>\n", html_text[238]);
++  printf ("<th scope=\"col\">%s</th>\n", html_text[239]);
+ #endif
+-  printf ("</tr>\n");
++  printf ("</thead>\n<tbody>\n");
+  
+   sort_init();
+ 
+@@ -136,9 +140,9 @@
+     if ( strncmp(".qmail-", mydirent->d_name, 7) == 0 ) {
+       if ( (fs=fopen(mydirent->d_name,"r"))==NULL) {
+ #ifdef EZMLMIDX
+-        printf ("<tr><td colspan=12>%s %s</td></tr>\n", html_text[144], mydirent->d_name);
++        printf ("<tr><td colspan=\"12\">%s %s</td></tr>\n", html_text[144], mydirent->d_name);
+ #else
+-        printf ("<tr><td colspan=5>%s %s</td></tr>\n", html_text[144], mydirent->d_name);
++        printf ("<tr><td colspan=\"5\">%s %s</td></tr>\n", html_text[144], mydirent->d_name);
+ #endif
+         continue;
+       }
+@@ -158,34 +162,34 @@
+     str_replace (addr, ':', '.');
+ 
+     printf ("<tr>");
+-    qmail_button(addr, "delmailinglist", user, dom, mytime, "trash.png");
++    qmail_button(addr, "delmailinglist", user, dom, mytime, "delete_forever");
+ 
+ #ifdef EZMLMIDX
+-    qmail_button(addr, "modmailinglist", user, dom, mytime, "modify.png");
++    qmail_button(addr, "modmailinglist", user, dom, mytime, "create");
+ #endif
+-    printh ("<td align=left>%H</td>\n", addr); 
++    printh ("<td>%H</td>\n", addr); 
+ 
+-    qmail_button(addr, "addlistuser", user, dom, mytime, "delete.png");
+-    qmail_button(addr, "dellistuser", user, dom, mytime, "delete.png");
+-    qmail_button(addr, "showlistusers", user, dom, mytime, "delete.png");
++    qmail_button(addr, "addlistuser", user, dom, mytime, "radio_button_checked");
++    qmail_button(addr, "dellistuser", user, dom, mytime, "radio_button_checked");
++    qmail_button(addr, "showlistusers", user, dom, mytime, "radio_button_checked");
+ 
+ #ifdef EZMLMIDX
+-    qmail_button(addr, "addlistmod", user, dom, mytime, "delete.png");
+-    qmail_button(addr, "dellistmod", user, dom, mytime, "delete.png");
+-    qmail_button(addr, "showlistmod", user, dom, mytime, "delete.png");
++    qmail_button(addr, "addlistmod", user, dom, mytime, "radio_button_checked");
++    qmail_button(addr, "dellistmod", user, dom, mytime, "radio_button_checked");
++    qmail_button(addr, "showlistmod", user, dom, mytime, "radio_button_checked");
+ 
+     /* Is it a digest list? */
+     if ( (fs=fopen(testfn,"r"))==NULL) {
+       /* not a digest list */
+-      printf ("<TD COLSPAN=3> </TD>");
++      printf ("<td colspan=\"3\"> </td>");
+     } else {
+-      qmail_button(addr, "addlistdig", user, dom, mytime, "delete.png");
+-      qmail_button(addr, "dellistdig", user, dom, mytime, "delete.png");
+-      qmail_button(addr, "showlistdig", user, dom, mytime, "delete.png");
++      qmail_button(addr, "addlistdig", user, dom, mytime, "radio_button_checked");
++      qmail_button(addr, "dellistdig", user, dom, mytime, "radio_button_checked");
++      qmail_button(addr, "showlistdig", user, dom, mytime, "radio_button_checked");
+       fclose(fs);
+     }
+ #endif
+-    printf ("</tr>\n");
++    printf ("</tr>\n</tbody>\n");
+   }
+   sort_cleanup();
+ }
+@@ -222,7 +226,7 @@
+   }
+ 
+   if ( (mydir = opendir(".")) == NULL ) {
+-    printf ("%s %d<BR>\n", html_text[143], 1);
++    printf ("%s %d<br>\n", html_text[143], 1);
+     return;
+   }
+ 
+@@ -246,30 +250,27 @@
+   }
+   closedir(mydir);
+ 
++  /* subscibe user to the following lists */
+   /* if there aren't any lists, don't display anything */
+   if (listcount == 0) {
+     sort_cleanup();
+     return;
+   }
+ 
+-  printf ("<hr><table width=100%% cellpadding=1 cellspacing=0 border=0");
+-  printf (" align=center bgcolor=\"#000000\"><tr><td>");
+-  printf ("<table width=100%% cellpadding=0 cellspacing=0 border=0 bgcolor=\"#e6e6e6\">");
+-  printf ("<tr><th bgcolor=\"#000000\" colspan=2>");
+-  printf ("<font color=\"#ffffff\">%s</font></th>\n", 
+-    html_text[95]);
++  printf ("<h4>%s</h4>\n", html_text[95]);
+ 
+   sort_dosort();
+ 
+-  printf ("<INPUT NAME=number_of_mailinglist TYPE=hidden VALUE=%d>\n", listcount);
++  printf ("<input name=\"number_of_mailinglist\" type=\"hidden\" value=\"%d\">\n", listcount);
++  printf ("<ul>");
+   for (i = 0; i < listcount; ++i)
+   {
+     addr = sort_get_entry(i);
+     str_replace (addr, ':', '.');
+-    printh ("<TR><TD ALIGN=RIGHT><INPUT NAME=\"subscribe%d\" TYPE=checkbox VALUE=\"%H\"></TD>", i, addr);
+-    printh ("<TD align=LEFT>%H@%H</TD></TR>", addr, Domain);
++    printh ("<li><input name=\"subscribe%d\" type=\"checkbox\" value=\"%H\"> ", i, addr);
++    printh ("%H@%H</li>", addr, Domain);
+   }
+-  printf ("</table></td></tr></table>\n");
++  printf ("</ul>\n");
+   sort_cleanup();
+ }
+ 
+@@ -533,7 +534,7 @@
+     arguments[argc++]=TmpBuf3;
+     arguments[argc++]=ActionUser;
+     arguments[argc++]=Domain;
+-    arguments[argc]=NULL;
++    arguments[argc]=(char *) NULL;
+ 
+     execv(TmpBuf1, arguments);
+     exit(127);
+@@ -541,29 +542,6 @@
+     wait(&pid);
+   }
+ 
+-  /* 
+-   * ezmlm-make -e leaves .qmail-listname-(accept||reject) links for some reason.
+-   * (causing file permission errors in "show mailing lists") Also, it doesn't 
+-   * delete dir/digest/ when turning off digests.  This section cleans up...
+-   */
+-  if(listopt['M'-'A'] == 'M') { /* moderation off */
+-    sprintf(tmp, "%s/.qmail-%s-accept-default", RealDir, dotqmail_name);
+-    unlink (tmp);
+-    sprintf(tmp, "%s/.qmail-%s-reject-default", RealDir, dotqmail_name);
+-    unlink (tmp);
+-  }
+-  if(listopt['D'-'A'] == 'D') { /* digest off */
+-    sprintf(tmp, "%s/.qmail-%s-digest-return-default", RealDir, dotqmail_name);
+-    unlink (tmp);
+-    sprintf(tmp, "%s/.qmail-%s-digest-owner", RealDir, dotqmail_name);
+-    unlink (tmp);
+-
+-    /* delete the digest directory */
+-    sprintf(tmp, "%s/%s/digest", RealDir, ActionUser);
+-    vdelfiles(tmp);
+-    chdir(RealDir);
+-  }
+-
+   /* Check for prefix setting */
+   GetValue(TmpCGI, tmp, "prefix=", sizeof(tmp));
+   
+@@ -617,10 +595,10 @@
+ #ifdef EZMLMIDX
+   /* if this is a new list, add owner as subscriber */
+   if (newlist && (*list_owner != '\0')) {
+-    ezmlm_sub ("", list_owner);
++    ezmlm_sub (GROUP_SUBSCRIBER, list_owner);
+     if (listopt['M'-'A'] == 'm') { /* moderation on */
+       /* add owner as moderator/remote admin as well */
+-      ezmlm_sub ("mod", list_owner);
++      ezmlm_sub (GROUP_MODERATOR, list_owner);
+     }
+   }
+ #endif
+@@ -680,14 +658,14 @@
+     close(handles[0]);
+     dup2(handles[1],fileno(stdout));
+     sprintf(TmpBuf1, "%s/ezmlm-list", EZMLMDIR);
+-    if(mod == 1) {
+-        sprintf(TmpBuf2, "%s/%s/mod", RealDir, ActionUser);
+-    } else if(mod == 2) {
+-        sprintf(TmpBuf2, "%s/%s/digest", RealDir, ActionUser);
++    sprintf(TmpBuf2, "%s/%s", RealDir, ActionUser);
++    if(mod == GROUP_MODERATOR) {
++        execl(TmpBuf1, "ezmlm-list", TmpBuf2, "mod", (char *)NULL);
++    } else if(mod == GROUP_DIGEST) {
++        execl(TmpBuf1, "ezmlm-list", TmpBuf2, "digest", (char *)NULL);
+     } else {
+-        sprintf(TmpBuf2, "%s/%s/", RealDir, ActionUser);
++    	execl(TmpBuf1, "ezmlm-list", TmpBuf2, (char *)NULL);
+     }
+-    execl(TmpBuf1, "ezmlm-list", TmpBuf2, NULL);
+     exit(127);
+   } else {
+     close(handles[1]);
+@@ -715,16 +693,20 @@
+         /* strcpy(TmpBuf2, "084"); */
+     }
+     strcpy(TmpBuf2, "072");
+-    printf ("<TABLE border=0 width=\"100%%\">\n");
+-    printf (" <TR>\n");
+-    printf ("  <TH align=left COLSPAN=4><B>%s</B> %d<BR><BR></TH>\n", get_html_text(TmpBuf), subuser_count);
+-    printf (" </TR>\n");
+-    printf (" <TR align=center bgcolor=%s>\n", get_color_text("002"));
+-    printf ("  <TH align=center><b><font size=2>%s</font></b></TH>\n", get_html_text(TmpBuf2));
+-    printf ("  <TH align=center><b><font size=2>%s</font></b></TH>\n", get_html_text(TmpBuf1));
+-    printf ("  <TH align=center><b><font size=2>%s</font></b></TH>\n", get_html_text(TmpBuf2));
+-    printf ("  <TH align=center><b><font size=2>%s</font></b></TH>\n", get_html_text(TmpBuf1));
+-    printf (" </TR>\n");
++    /* total subscribers */
++    printf ("<p>%s <span class=\"badge badge-primary badge-pill\">%d</span></p>", get_html_text(TmpBuf), subuser_count);
++
++    /* column names */
++    /*
++    printf ("<thead class=\"thead-dark\">\n");
++    printf ("<th scope=\"col\">%s</th>\n", get_html_text(TmpBuf2));
++    printf ("<th scope=\"col\">%s</th>\n", get_html_text(TmpBuf1));
++    printf ("<th scope=\"col\">%s</th>\n", get_html_text(TmpBuf2));
++    printf ("<th scope=\"col\">%s</th>\n", get_html_text(TmpBuf1));
++    printf ("</thead>\n");
++    */
++
++    printf ("<div class=\"d-flex flex-wrap\">\n");
+ 
+     if(mod == 1) {
+         strcpy(TmpBuf, "dellistmodnow");
+@@ -733,25 +715,25 @@
+     } else {
+         strcpy(TmpBuf, "dellistusernow");
+     }
++
+     for(z = 0; (addr = sort_get_entry(z)); ++z) {
+-      printf (" <TR align=center>");
+-      printh ("  <TD align=right><A href=\"%s&modu=%C&newu=%C\"><IMG src=\"%s/trash.png\" border=0></A></TD>\n",
+-        cgiurl(TmpBuf), ActionUser, addr, IMAGEURL);
+-      printh ("  <TD align=left>%H</TD>\n", addr);
++      printh ("<div><a href=\"%s&modu=%C&newu=%C\"><span class=\"material-icons\">delete_forever</span></a> ",
++        cgiurl(TmpBuf), ActionUser, addr);
++      printh ("%H</div>\n", addr);
+       ++z;
+       if( (addr = sort_get_entry(z)) ) {
+-        printh ("  <TD align=right><A href=\"%s&modu=%C&newu=%C\"><IMG src=\"%s/trash.png\" border=0></A></TD>\n",
+-          cgiurl(TmpBuf), ActionUser, addr, IMAGEURL);
+-      printh ("  <TD align=left>%H</TD>\n", addr);
++        printh ("<div><a href=\"%s&modu=%C&newu=%C\"><span class=\"material-icons\">delete_forever</span></a> ",
++          cgiurl(TmpBuf), ActionUser, addr);
++      printh ("%H</div>\n", addr);
+       } else {
+-        printf ("  <TD COLSPAN=2> </TD>");
++        printf (" ");
+       }
+-      printf (" </TR>");
+     }
+ 
++    printf ("</div>\n");
++
+     sort_cleanup();
+ 
+-    printf ("</TABLE>");
+     fclose(fs); close(handles[0]);
+     wait(&pid);
+     snprintf (StatusMessage, sizeof(StatusMessage), "%s\n", html_text[190]);
+@@ -790,7 +772,7 @@
+ void addlistdig() { addlistgroup( "add_listdig.html" ); }
+ 
+ /* returns 0 for success */
+-int ezmlm_sub (char *dir, char *email)
++int ezmlm_sub (int mod, char *email)
+ {
+  int pid;
+  char subpath[MAX_BUFF];
+@@ -799,9 +781,14 @@
+   pid=fork();
+   if (pid==0) {
+     snprintf(subpath, sizeof(subpath), "%s/ezmlm-sub", EZMLMDIR);
+-    snprintf(listpath, sizeof(listpath), "%s/%s/%s",
+-      RealDir, ActionUser, dir);
+-    execl(subpath, "ezmlm-sub", listpath, email, NULL);
++    snprintf(listpath, sizeof(listpath), "%s/%s", RealDir, ActionUser);
++    if (mod == GROUP_MODERATOR) {
++        execl(subpath, "ezmlm-sub", listpath, "mod", email, (char *)NULL);
++    } else if (mod == GROUP_DIGEST) {
++        execl(subpath, "ezmlm-sub", listpath, "digest", email, (char *)NULL);
++    } else {
++        execl(subpath, "ezmlm-sub", listpath, email, (char *)NULL);
++    }
+     exit(127);
+   } else wait(&pid);
+ 
+@@ -824,9 +811,9 @@
+ 
+   if ( check_email_addr(Newu) ) {
+     snprinth (StatusMessage, sizeof(StatusMessage), "%s %H\n", html_text[148], Newu);
+-    if (mod == 1) {
++    if (mod == GROUP_MODERATOR) {
+       addlistmod();
+-    } else if (mod == 2) {
++    } else if (mod == GROUP_DIGEST) {
+       addlistdig();
+     } else {
+       addlistuser();
+@@ -835,18 +822,16 @@
+     exit(0);
+   }
+ 
+-  if(mod == 1 ) {
+-    ezmlm_sub ("mod", Newu);
++  ezmlm_sub (mod, Newu);
++  if(mod == GROUP_MODERATOR ) {
+     snprinth (StatusMessage, sizeof(StatusMessage), "%H %s %H@%H\n", Newu, 
+         html_text[194], ActionUser, Domain);
+     send_template( "add_listmod.html" );
+-  } else if(mod == 2) {
+-    ezmlm_sub ("digest", Newu);
++  } else if(mod == GROUP_DIGEST) {
+     snprinth (StatusMessage, sizeof(StatusMessage), "%H %s %H@%H\n", Newu, 
+         html_text[240], ActionUser, Domain);
+     send_template( "add_listdig.html" );
+   } else {
+-    ezmlm_sub ("", Newu);
+     snprinth (StatusMessage, sizeof(StatusMessage), "%H %s %H@%H\n", Newu, 
+         html_text[193], ActionUser, Domain);
+     send_template( "add_listuser.html" );
+@@ -888,21 +873,21 @@
+   pid=fork();
+   if (pid==0) {
+     sprintf(TmpBuf1, "%s/ezmlm-unsub", EZMLMDIR);
+-    if(mod == 1) {
+-        sprintf(TmpBuf2, "%s/%s/mod", RealDir, ActionUser);
+-    } else if(mod == 2 ) {
+-        sprintf(TmpBuf2, "%s/%s/digest", RealDir, ActionUser);
++    sprintf(TmpBuf2, "%s/%s", RealDir, ActionUser);
++    if(mod == GROUP_MODERATOR) {
++        execl(TmpBuf1, "ezmlm-unsub", TmpBuf2, "mod", Newu, (char *)NULL);
++    } else if(mod == GROUP_DIGEST ) {
++        execl(TmpBuf1, "ezmlm-unsub", TmpBuf2, "digest", Newu, (char *)NULL);
+     } else {
+-        sprintf(TmpBuf2, "%s/%s/", RealDir, ActionUser);
++        execl(TmpBuf1, "ezmlm-unsub", TmpBuf2, Newu, (char *)NULL);
+     }
+-    execl(TmpBuf1, "ezmlm-unsub", TmpBuf2, Newu, NULL);
+     exit(127);
+   } else wait(&pid);
+ 
+-  if(mod == 1) {
++  if(mod == GROUP_MODERATOR) {
+     snprinth (StatusMessage, sizeof(StatusMessage), "%H %s %H@%H\n", Newu, html_text[197],
+         ActionUser, Domain);
+-  } else if(mod == 2) {
++  } else if(mod == GROUP_DIGEST) {
+     snprinth (StatusMessage, sizeof(StatusMessage), "%H %s %H@%H\n", Newu, html_text[242],
+         ActionUser, Domain);
+   } else {
+@@ -921,7 +906,7 @@
+  FILE *fs;
+ 
+   if ( (mydir = opendir(".")) == NULL ) {
+-    printf ("%s %d<BR>\n", html_text[143], 1);
++    printf ("%s %d<br>\n", html_text[143], 1);
+     printf ("</table>");
+     return;
+   }
+@@ -1092,42 +1077,96 @@
+   // default to false for lowercase letters
+   for (c = 'a'; c <= 'z'; checkopt[(int) c++] = 0);
+ 
+-  // figure out some options in the -default file
++  // ------ newer configuration reads
++
++  // -s: Subscription moderation. touching dir/modsub
++  sprintf(TmpBuf, "%s/modsub", ActionUser);
++  checkopt['s'] = file_exists(TmpBuf);
++  // -h: Help  subscription. Don't require confirmation. Not recommented!
++  sprintf(TmpBuf, "%s/nosubconfirm", ActionUser);
++  checkopt['h'] = file_exists(TmpBuf);
++  // -j Jump off. Unsubscribe  does not require confirmation.
++  sprintf(TmpBuf, "%s/nounsubconfirm", ActionUser);
++  checkopt['j'] = file_exists(TmpBuf);
++
++  // -m: Message  moderation. touch dir/modpost
++  sprintf(TmpBuf, "%s/modpost", ActionUser);   // valid for newer ezmlm-versions
++  checkopt['m'] = file_exists(TmpBuf);
++  // -o: Reject others than; applicable to message moderated lists only
++  sprintf(TmpBuf, "%s/modpostonly", ActionUser);
++  checkopt['o'] = file_exists(TmpBuf);
++  // -u: User posts only. subscribers, digest-subscribers and dir/allow
++  sprintf(TmpBuf, "%s/subpostonly", ActionUser);
++  checkopt['u'] = file_exists(TmpBuf);
++
++  // -f: Subject Prefix. outgoing subject will be pre-fixed with the list name
++  sprintf(TmpBuf, "%s/prefix", ActionUser);
++  checkopt['f'] = file_exists(TmpBuf);
++  // -t: Message Trailer. create dir/text/trailer
++  sprintf(TmpBuf, "%s/addtrailer", ActionUser);
++  checkopt['t'] = file_exists(TmpBuf);
++
++  // -a: Archived: touch dir/archived and dir/indexed
++  sprintf(TmpBuf, "%s/archived", ActionUser);
++  checkopt['a'] = file_exists(TmpBuf);
++  // -i: indexed for WWW archive access
++  sprintf(TmpBuf, "%s/threaded", ActionUser);
++  checkopt['i'] = file_exists(TmpBuf);
++  // -p: Public archive. touch dir/public
++  sprintf(TmpBuf, "%s/public", ActionUser);
++  checkopt['p'] = file_exists(TmpBuf);
++  // -g: Guard archive. Access requests from unrecognized SENDERs will be rejected.
++  sprintf(TmpBuf, "%s/subgetonly", ActionUser);
++  checkopt['g'] = file_exists(TmpBuf);
++  // -b: Block archive. Only moderators are allowed to access the archive.
++  sprintf(TmpBuf, "%s/modgetonly", ActionUser);
++  checkopt['b'] = file_exists(TmpBuf);
++
++  // -d: Digest
++  sprintf(TmpBuf, "%s/digested", ActionUser);
++  checkopt['d'] = file_exists(TmpBuf);
++
++  // -r: Remote admin. touching dir/remote
++  sprintf(TmpBuf, "%s/remote", ActionUser);
++  checkopt['r'] = file_exists(TmpBuf);
++  // -l List subscribers. administrators can request a subscriber
++  sprintf(TmpBuf, "%s/modcanlist", ActionUser);
++  checkopt['l'] = file_exists(TmpBuf);
++  // -n New text file. administrators may edit texts
++  sprintf(TmpBuf, "%s/modcanedit", ActionUser);
++  checkopt['n'] = file_exists(TmpBuf);
++
++  // ------ end of newer configuration reads
++
++  // ------ read in old ezmlm's values
++  // figure out some options in the -default file;
+   sprintf(TmpBuf, ".qmail-%s-default", dotqmail_name);
+   if( (fs=fopen(TmpBuf, "r")) !=NULL ) {
+     while(fgets(TmpBuf2, sizeof(TmpBuf2), fs)) {
++      // -b: Block archive. Only moderators are allowed to access the archive.
+       if((get_ezmlmidx_line_arguments(TmpBuf2, "ezmlm-get", 'P')) > 0) {
+         checkopt['b'] = 1;
+       }
++      // -g: Guard archive. Access requests from unrecognized SENDERs will be rejected.
+       if((get_ezmlmidx_line_arguments(TmpBuf2, "ezmlm-get", 's')) > 0) {
+         checkopt['g'] = 1;
+       }
+-      if((get_ezmlmidx_line_arguments(TmpBuf2, "ezmlm-manage", 'S')) > 0) {
++      // -h: Help  subscription. Don't require confirmation. Not recommented!
++      if((get_ezmlmidx_line_arguments(TmpBuf2, "ezmlm-manage", 'S')) > 0){
+         checkopt['h'] = 1;
+       }
++      // -j Jump off. Unsubscribe  does not require confirmation.
+       if((get_ezmlmidx_line_arguments(TmpBuf2, "ezmlm-manage", 'U')) > 0) {
+         checkopt['j'] = 1;
+       }
++      // -l List subscribers. administrators can request a subscriber
+       if((get_ezmlmidx_line_arguments(TmpBuf2, "ezmlm-manage", 'l')) > 0) {
+         checkopt['l'] = 1;
+       }
++      // -n New text file. administrators may edit texts
+       if((get_ezmlmidx_line_arguments(TmpBuf2, "ezmlm-manage", 'e')) > 0) {
+         checkopt['n'] = 1;
+       }
+-      if((strstr(TmpBuf2, "ezmlm-request")) != 0) {
+-        checkopt['q'] = 1;
+-      }
+-    }
+-    fclose(fs);
+-  }
+-
+-  // figure out some options in the -accept-default file
+-  sprintf(TmpBuf, ".qmail-%s-accept-default", dotqmail_name);
+-  if( (fs=fopen(TmpBuf, "r")) !=NULL ) {
+-    while(fgets(TmpBuf2, sizeof(TmpBuf2), fs)) {
+-      if(strstr(TmpBuf2, "ezmlm-archive") !=0) {
+-        checkopt['i'] = 1;
+-      }
+     }
+     fclose(fs);
+   }
+@@ -1136,43 +1175,21 @@
+   sprintf(TmpBuf, ".qmail-%s", dotqmail_name);
+   if( (fs=fopen(TmpBuf, "r")) !=NULL ) {
+     while(fgets(TmpBuf2, sizeof(TmpBuf2), fs)) {
+-      if((get_ezmlmidx_line_arguments(TmpBuf2, "ezmlm-store", 'P')) > 0) {
++      // -o: Reject others than; applicable to message moderated lists only
++      if( ( (get_ezmlmidx_line_arguments(TmpBuf2, "ezmlm-store", 'P')) > 0)){
+         checkopt['o'] = 1;
+       }
+-      if((strstr(TmpBuf2, "ezmlm-gate")) != 0 || (strstr(TmpBuf2, "ezmlm-issubn")) != 0) {
+-        checkopt['u'] = 1;
+-      }
+-      if(strstr(TmpBuf2, "ezmlm-archive") !=0) {
+-        checkopt['i'] = 1;
+-      }
+     }
+     fclose(fs);
+   }
+ 
+-  sprintf(TmpBuf, ".qmail-%s-accept-default", dotqmail_name);
+-  checkopt['m'] = file_exists(TmpBuf);
+-
+-  sprintf(TmpBuf, "%s/archived", ActionUser);
+-  checkopt['a'] = file_exists(TmpBuf);
+-  
+-  sprintf(TmpBuf, "%s/digest/bouncer", ActionUser);
+-  checkopt['d'] = file_exists(TmpBuf);
+-  
+-  sprintf(TmpBuf, "%s/prefix", ActionUser);
+-  checkopt['f'] = file_exists(TmpBuf);
+-
+-  sprintf(TmpBuf, "%s/public", ActionUser);
+-  checkopt['p'] = file_exists(TmpBuf);
+-  
+-  sprintf(TmpBuf, "%s/remote", ActionUser);
+-  checkopt['r'] = file_exists(TmpBuf);
+-  
+-  sprintf(TmpBuf, "%s/modsub", ActionUser);
+-  checkopt['s'] = file_exists(TmpBuf);
+-  
++  // -t: Message Trailer. create dir/text/trailer
+   sprintf(TmpBuf, "%s/text/trailer", ActionUser);
+-  checkopt['t'] = file_exists(TmpBuf);
+-  
++  if (file_exists(TmpBuf)) {
++    checkopt['t'] = 1;
++  }
++  // ------ end of read in old ezmlm's values
++
+   /* update the uppercase option letters (just the opposite of the lowercase) */
+   for (c = 'A'; c <= 'Z'; c++)
+   {
+@@ -1208,7 +1225,7 @@
+   checkopt['n'] = 0; /* Remote admins can edit text files */
+   checkopt['o'] = 0; /* Others rejected (for Moderated lists only */
+   checkopt['p'] = 1; /* Public */
+-  checkopt['q'] = 1; /* Service listname-request */
++  checkopt['q'] = 1; /* Service listname-request, no longer supported */
+   checkopt['r'] = 0; /* Remote Administration */
+   checkopt['s'] = 0; /* Subscriptions are moderated */
+   checkopt['t'] = 0; /* Add Trailer to outgoing messages */
+@@ -1253,93 +1270,88 @@
+     snprinth (listname, sizeof(listname), "%H", dotqmail_name);
+     str_replace (listname, ':', '.');
+   } else {
+-    sprintf (listname, "<I>%s</I>", html_text[261]);
++    sprintf (listname, "<i>%s</i>", html_text[261]);
+   }
+ 
+   /* Posting Messages */
+-  printf ("<P><B><U>%s</U></B><BR>\n", html_text[262]);
+-  build_option_str ("RADIO", "opt1", "MU", html_text[263]);
+-  printf ("<BR>\n");
+-  build_option_str ("RADIO", "opt1", "Mu", html_text[264]);
+-  printf ("<BR>\n");
+-  build_option_str ("RADIO", "opt1", "mu", html_text[265]);
+-  printf ("<BR>\n");
+-  build_option_str ("RADIO", "opt1", "mUo", html_text[266]);
+-  printf ("<BR>\n");
+-  build_option_str ("RADIO", "opt1", "mUO", html_text[267]);
+-  printf ("</P>\n");
++  printf ("<h4>%s</h4>\n<p>\n", html_text[262]);
++  build_option_str ("radio", "opt1", "MU", html_text[263]);
++  printf ("<br>\n");
++  build_option_str ("radio", "opt1", "Mu", html_text[264]);
++  printf ("<br>\n");
++  build_option_str ("radio", "opt1", "mu", html_text[265]);
++  printf ("<br>\n");
++  build_option_str ("radio", "opt1", "mUo", html_text[266]);
++  printf ("<br>\n");
++  build_option_str ("radio", "opt1", "mUO", html_text[267]);
++  printf ("</p>\n");
+ 
+   /* List Options */
+-  printf ("<P><B><U>%s</U></B><BR>\n", html_text[268]);
++  printf ("<h4>%s</h4>\n<p>\n", html_text[268]);
+   /* this next option isn't necessary since we use the edit box to
+    * set/delete the prefix
+   sprintf (TmpBuf, html_text[269], listname);
+-  build_option_str ("CHECKBOX", "opt3", "f", TmpBuf);
+-  printf ("<BR>\n");
++  build_option_str ("checkbox", "opt3", "f", TmpBuf);
++  printf ("<p>\n");
+   */
+-  printf ("<TABLE><TR><TD ROWSPAN=3 VALIGN=TOP>%s</TD>",
++  printf ("<table><tr><td rowspan=\"3\" valign=\"top\">%s</td>",
+     html_text[310]);
+-  printf ("<TD><INPUT TYPE=RADIO NAME=\"replyto\" VALUE=\"%d\"%s>%s</TD></TR>\n",
+-    REPLYTO_SENDER, (replyto == REPLYTO_SENDER) ? " CHECKED" : "", html_text[311]);
+-  printf ("<TR><TD><INPUT TYPE=RADIO NAME=\"replyto\" VALUE=\"%d\"%s>%s</TD></TR>\n",
+-    REPLYTO_LIST, (replyto == REPLYTO_LIST) ? " CHECKED" : "", html_text[312]);
+-  printf ("<TR><TD><INPUT TYPE=RADIO NAME=\"replyto\" VALUE=\"%d\"%s>%s ",
+-    REPLYTO_ADDRESS, (replyto == REPLYTO_ADDRESS) ? " CHECKED" : "", html_text[313]);
+-  printh ("<INPUT TYPE=TEXT NAME=\"replyaddr\" VALUE=\"%H\" SIZE=30></TD></TR>\n",
++  printf ("<td><input type=\"radio\" name=\"replyto\" value=\"%d\"%s>%s</td></tr>\n",
++    REPLYTO_SENDER, (replyto == REPLYTO_SENDER) ? " checked" : "", html_text[311]);
++  printf ("<tr><td><input type=\"radio\" name=\"replyto\" value=\"%d\"%s>%s</td></tr>\n",
++    REPLYTO_LIST, (replyto == REPLYTO_LIST) ? " checked" : "", html_text[312]);
++  printf ("<tr><td><input type=\"radio\" name=\"replyto\" value=\"%d\"%s>%s ",
++    REPLYTO_ADDRESS, (replyto == REPLYTO_ADDRESS) ? " checked" : "", html_text[313]);
++  printh ("<input type=\"text\" name=\"replyaddr\" value=\"%H\" size=\"30\"></td></tr>\n",
+     replyto_addr);
+-  printf ("</TABLE><BR>\n");
+-  build_option_str ("CHECKBOX", "opt4", "t", html_text[270]);
+-  printf ("<BR>\n");
+-  build_option_str ("CHECKBOX", "opt5", "d", html_text[271]);
++  printf ("</table><br>\n");
++  build_option_str ("checkbox", "opt4", "t", html_text[270]);
++  printf ("<br>\n");
++  build_option_str ("checkbox", "opt5", "d", html_text[271]);
+   sprintf (TmpBuf, html_text[272], listname);
+-  printf ("<SMALL>(%s)</SMALL>", TmpBuf);
+-  printf ("<BR>\n");
+-  sprintf (TmpBuf, html_text[273], listname);
+-  build_option_str ("CHECKBOX", "opt6", "q", TmpBuf);
+-  printf ("<BR>\n");
+-  sprintf (TmpBuf, html_text[274], listname, listname, listname);
+-  printf ("&nbsp; &nbsp; <SMALL>(%s)</SMALL></P>", TmpBuf);
++  printf ("<small>(%s)</small>", TmpBuf);
++  printf ("</p>", TmpBuf);
+ 
+   /* Remote Administration */
+-  printf ("<P><B><U>%s</U></B><BR>\n", html_text[275]);
+-  build_option_str ("CHECKBOX", "opt7", "r", html_text[276]);
+-  printf ("<BR>\n");
+-  build_option_str ("CHECKBOX", "opt8", "P", html_text[277]);
+-  printf ("<SMALL>(%s)</SMALL><BR>", html_text[278]);
+-  printf ("<TABLE><TR><TD ROWSPAN=2 VALIGN=TOP>%s</TD>",
++  printf ("<h4>%s</h4>\n<p>\n", html_text[275]);
++  build_option_str ("checkbox", "opt7", "r", html_text[276]);
++  printf ("<br>\n");
++  build_option_str ("checkbox", "opt8", "P", html_text[277]);
++  printf ("<small>(%s)</small><br>", html_text[278]);
++  printf ("<table><tr><td rowspan=\"2\" valign=\"top\">%s</td>",
+     html_text[279]);
+-  printf ("<TD>");
+-  build_option_str ("CHECKBOX", "opt9", "l", html_text[280]);
+-  printf ("</TD>\n</TR><TR>\n<TD>");
+-  build_option_str ("CHECKBOX", "opt10", "n", html_text[281]);
+-  printf ("<SMALL>(%s)</SMALL>.</TD>\n", html_text[282]);
+-  printf ("</TR></TABLE>\n</P>\n");
+-
+-  printf ("<P><B><U>%s</U></B><BR>\n", html_text[283]);
+-  printf ("%s<BR>\n&nbsp; &nbsp; ", html_text[284]);
+-  build_option_str ("CHECKBOX", "opt11", "H", html_text[285]);
+-  printf ("<BR>\n&nbsp; &nbsp; ");
+-  build_option_str ("CHECKBOX", "opt12", "s", html_text[286]);
+-  printf ("<BR>\n%s<BR>\n&nbsp; &nbsp; ", html_text[287]);
+-  build_option_str ("CHECKBOX", "opt13", "J", html_text[285]);
+-  printf ("<BR>\n");
+-  printf ("<SMALL>%s</SMALL>\n</P>\n", html_text[288]);
+-
+-  printf ("<P><B><U>%s</U></B><BR>\n", html_text[289]);
+-  build_option_str ("CHECKBOX", "opt14", "a", html_text[290]);
+-  printf (" &nbsp; %s\n<SELECT NAME=\"opt15\">", html_text[292]);
+-  printf ("<OPTION VALUE=\"BG\"%s>%s\n",
+-  	checkopt['B'] && checkopt['G'] ? " SELECTED" : "", html_text[293]);
+-  printf ("<OPTION VALUE=\"Bg\"%s>%s\n",
+-  	checkopt['B'] && checkopt['g'] ? " SELECTED" : "", html_text[294]);
+-  printf ("<OPTION VALUE=\"b\"%s>%s\n",
+-  	checkopt['b'] ? " SELECTED" : "", html_text[295]);
+-  printf ("</SELECT>.");
+-  printf ("<BR>\n");
++  printf ("<td>");
++  build_option_str ("checkbox", "opt9", "l", html_text[280]);
++  printf ("</td>\n</tr><tr>\n<td>");
++  build_option_str ("checkbox", "opt10", "n", html_text[281]);
++  printf ("<small>(%s)</small>.</td>\n", html_text[282]);
++  printf ("</tr></table>\n</p>\n");
++
++  printf ("<h4>%s</h4>\n<p>\n", html_text[283]);
++  printf ("%s<br>\n&nbsp; &nbsp; ", html_text[284]);
++  build_option_str ("checkbox", "opt11", "H", html_text[285]);
++  printf ("<br>\n&nbsp; &nbsp; ");
++  build_option_str ("checkbox", "opt12", "s", html_text[286]);
++  printf ("<br>\n%s<br>\n&nbsp; &nbsp; ", html_text[287]);
++  build_option_str ("checkbox", "opt13", "J", html_text[285]);
++  printf ("<br>\n");
++  printf ("<small>%s</small>\n</p>\n", html_text[288]);
++
++  printf ("<h4>%s</h4>\n<p>\n", html_text[289]);
++  build_option_str ("checkbox", "opt14", "a", html_text[290]);
++  printf (" &nbsp; %s\n<select class=\"my-select\" name=\"opt15\">", html_text[292]);
++  printf ("<option value=\"BG\"%s>%s\n",
++  	checkopt['B'] && checkopt['G'] ? " selected" : "", html_text[293]);
++  printf ("<option value=\"Bg\"%s>%s\n",
++  	checkopt['B'] && checkopt['g'] ? " selected" : "", html_text[294]);
++  printf ("<option value=\"b\"%s>%s\n",
++  	checkopt['b'] ? " selected" : "", html_text[295]);
++  printf ("</select>.");
++  printf ("<br>\n");
+   /* note that if user doesn't have ezmlm-cgi installed, it might be
+      a good idea to default to having option i off. */
+-  build_option_str ("CHECKBOX", "opt16", "i", html_text[291]);
+-  printf ("</P>\n");
++  build_option_str ("checkbox", "opt16", "i", html_text[291]);
++  printf ("</p>\n");
+ 
+   /***********************/
+   /* begin MySQL options */
+@@ -1361,15 +1373,15 @@
+     fclose(fs);
+   }
+ #ifdef ENABLE_MYSQL
+-  printf ("<P><B><U>%s</U></B><BR>\n", html_text[99]);
++  printf ("<h4>%s</h4>\n<p>\n", html_text[99]);
+   printf ("<input type=checkbox name=\"sqlsupport\" value=\"-6\"%s> %s",
+-    checked ? " CHECKED" : "", html_text[53]);
++    checked ? " checked" : "", html_text[53]);
+ 
+   /* parse dir/sql file for SQL settings */
+-  printf ("    <table cellpadding=0 cellspacing=2 border=0>\n");
++  printf ("<table>\n");
+ #else
+   if (checked)
+-    printf ("<INPUT TYPE=HIDDEN NAME=sqlsupport VALUE=\"-6\">\n");
++    printf ("<input type=\"hidden\" name=\"sqlsupport\" value=\"-6\">\n");
+ #endif
+ 
+   /* get hostname */
+@@ -1383,12 +1395,12 @@
+   }       
+ 
+ #ifdef ENABLE_MYSQL
+-  printf ("      <tr>\n");
+-  printf ("        <td ALIGN=RIGHT>%s:\n", html_text[54]);
+-  printf ("          </td><td>\n");
+-  printh ("          <input type=text name=sql1 value=\"%H\"></td>\n", checked1);
++  printf ("<tr>\n");
++  printf ("<td align=\"right\">%s:\n", html_text[54]);
++  printf ("</td><td>\n");
++  printh ("<input type=\"text\" name=\"sql1\" value=\"%H\"></td>\n", checked1);
+ #else
+-  printh ("<INPUT TYPE=HIDDEN NAME=sql1 VALUE=\"%H\">\n", checked1);
++  printh ("<input type=\"hidden\" name=\"sql1\" value=\"%H\">\n", checked1);
+ #endif
+ 
+   /* get port */
+@@ -1401,12 +1413,12 @@
+     }       
+   }       
+ #ifdef ENABLE_MYSQL
+-  printf ("        <td ALIGN=RIGHT>%s:\n", html_text[55]);
+-  printf ("          </td><td>\n");
+-  printh ("          <input type=text size=7 name=sql2 value=\"%H\"></td>\n", checked1);
+-  printf ("      </tr>\n");
++  printf ("<td align=\"right\">%s:\n", html_text[55]);
++  printf ("</td><td>\n");
++  printh ("<input type=\"text\" name=\"sql2\" value=\"%H\"></td>\n", checked1);
++  printf ("</tr>\n");
+ #else
+-  printh ("<INPUT TYPE=HIDDEN NAME=sql2 VALUE=\"%H\">\n", checked1);
++  printh ("<input type=\"hidden\" name=\"sql2\" value=\"%H\">\n", checked1);
+ #endif
+ 
+   /* get user */
+@@ -1419,12 +1431,12 @@
+     }       
+   }       
+ #ifdef ENABLE_MYSQL
+-  printf ("      <tr>\n");
+-  printf ("        <td ALIGN=RIGHT>%s:\n", html_text[56]);
+-  printf ("          </td><td>\n");
+-  printh ("          <input type=text name=sql3 value=\"%H\"></td>\n", checked1);
++  printf ("<tr>\n");
++  printf ("<td align=\"right\">%s:\n", html_text[56]);
++  printf ("</td><td>\n");
++  printh ("<input type=\"text\" name=\"sql3\" value=\"%H\"></td>\n", checked1);
+ #else
+-  printh ("<INPUT TYPE=HIDDEN NAME=sql3 VALUE=\"%H\">\n", checked1);
++  printh ("<input type=\"hidden\" name=\"sql3\" value=\"%H\">\n", checked1);
+ #endif
+ 
+   /* get password */
+@@ -1437,12 +1449,12 @@
+     }
+   }
+ #ifdef ENABLE_MYSQL
+-  printf ("        <td ALIGN=RIGHT>%s:\n", html_text[57]);
+-  printf ("          </td><td>\n");
+-  printh ("          <input type=text name=sql4 value=\"%H\"></td>\n", checked1);
+-  printf ("      </tr>\n");
++  printf ("<td align=\"right\">%s:\n", html_text[57]);
++  printf ("</td><td>\n");
++  printh ("<input type=\"text\" name=\"sql4\" value=\"%H\"></td>\n", checked1);
++  printf ("</tr>\n");
+ #else
+-  printh ("<INPUT TYPE=HIDDEN NAME=sql4 VALUE=\"%H\">\n", checked1);
++  printh ("<input type=\"hidden\" name=\"sql4\" value=\"%H\">\n", checked1);
+ #endif
+ 
+   /* get database name */
+@@ -1455,12 +1467,12 @@
+     }       
+   }       
+ #ifdef ENABLE_MYSQL
+-  printf ("      <tr>\n");
+-  printf ("        <td ALIGN=RIGHT>%s:\n", html_text[58]);
+-  printf ("          </td><td>\n");
+-  printh ("          <input type=text name=sql5 value=\"%H\"></td>\n", checked1);
++  printf ("<tr>\n");
++  printf ("<td align=\right\">%s:\n", html_text[58]);
++  printf ("</td><td>\n");
++  printh ("<input type=\"text\" name=\"sql5\" value=\"%H\"></td>\n", checked1);
+ #else
+-  printh ("<INPUT TYPE=HIDDEN NAME=sql5 VALUE=\"%H\">\n", checked1);
++  printh ("<input type=\"hidden\" name=\"sql5\" value=\"%H\">\n", checked1);
+ #endif
+ 
+   /* get table name */
+@@ -1473,13 +1485,13 @@
+     }       
+   }       
+ #ifdef ENABLE_MYSQL
+-  printf ("        <td ALIGN=RIGHT>%s:\n", html_text[59]);
+-  printf ("          </td><td>\n");
+-  printh ("          <input type=text name=\"sql6\" value=\"%H\"></td>\n", checked1);
+-  printf ("      </tr>\n");
+-  printf ("    </table>\n");
++  printf ("<td align=\"right\">%s:\n", html_text[59]);
++  printf ("</td><td>\n");
++  printh ("<input type=\"text\" name=\"sql6\" value=\"%H\"></td>\n", checked1);
++  printf ("</tr>\n");
++  printf ("</table>\n");
+ #else
+-  printh ("<INPUT TYPE=HIDDEN NAME=sql6 VALUE=\"%H\">\n", checked1);
++  printh ("<input type=\"hidden\" name=\"sql6\" value=\"%H\">\n", checked1);
+ #endif
+ 
+ }
+diff -ruN ../qmailadmin-1.2.16-original/mailinglist.h qmailadmin-1.2.16/mailinglist.h
+--- ../qmailadmin-1.2.16-original/mailinglist.h	2011-02-22 15:45:48.000000000 +0100
++++ qmailadmin-1.2.16/mailinglist.h	2020-05-04 11:17:54.219516892 +0200
+@@ -13,7 +13,7 @@
+ void dellistgroupnow(int mod);
+ void delmailinglist();
+ void delmailinglistnow();
+-int ezmlm_sub (char *dir, char *email);
++int ezmlm_sub (int mod, char *email);
+ void modmailinglist();
+ void modmailinglistnow();
+ void show_list_group(char *template);
+diff -ruN ../qmailadmin-1.2.16-original/qmailadmin.c qmailadmin-1.2.16/qmailadmin.c
+--- ../qmailadmin-1.2.16-original/qmailadmin.c	2011-02-22 15:45:48.000000000 +0100
++++ qmailadmin-1.2.16/qmailadmin.c	2020-05-04 11:16:38.212266863 +0200
+@@ -22,6 +22,7 @@
+ #include <string.h>
+ #include <unistd.h>
+ #include <sys/stat.h>
++#include <sys/time.h>
+ #include <unistd.h>
+ #include <pwd.h>
+ #include <dirent.h>
+@@ -50,6 +51,11 @@
+ #include "template.h"
+ #include "user.h"
+ #include "util.h"
++/* cracklib patch */
++#ifdef CRACKLIB
++#      include <crack.h>
++#endif
++/* end cracklib */
+ 
+ char Username[MAX_BUFF];
+ char Domain[MAX_BUFF];
+@@ -109,6 +115,33 @@
+ char RealDir[156];
+ char Lang[40];
+ 
++static void
++log_auth(char *msg)
++{
++    FILE *fp = NULL;
++    if ((fp = fopen("/var/log/qma-auth.log", "a")) == NULL) {
++ exit(-1);
++    }
++
++    const char *ip_addr = getenv("REMOTE_ADDR");
++    if (!ip_addr)
++        ip_addr = "127.0.0.1";
++
++    time_t tv;
++    struct tm tm;
++    char time_buf[64];
++
++    time(&tv);
++    localtime_r(&tv, &tm);
++    strftime(time_buf, sizeof(time_buf) - 2, "%Y/%m/%d %H:%M:%S", &tm);
++
++    fprintf(fp, "%s user:%s@%s ip:%s auth:%s\n", time_buf, Username, Domain, ip_addr, msg);
++
++    if (fclose(fp) != 0) {
++        exit(-1);
++    }
++}
++
+ void qmailadmin_suid (gid_t Gid, uid_t Uid)
+ {
+   if ( geteuid() == 0 ) {
+@@ -131,6 +164,7 @@
+  int argc;
+  char *argv[];
+ {
++ char *tmpstr;
+  const char *ip_addr=getenv("REMOTE_ADDR");
+  const char *x_forward=getenv("HTTP_X_FORWARDED_FOR");
+  char *pi;
+@@ -195,6 +229,11 @@
+     if (*Username && (*Password == '\0') && (*Password1 || *Password2)) {
+       /* username entered, but no password */
+       snprintf (StatusMessage, sizeof(StatusMessage), "%s", html_text[198]);
++
++      char log_buf[3 * MAX_BUFF];
++      memset(log_buf, 0x0, sizeof(log_buf));
++      snprintf(log_buf, sizeof(log_buf) - 2, "failed [%s@%s]", Newu, Domain);
++      log_auth(log_buf);
+     } else if (*Username && *Password) {
+       /* attempt to authenticate user */
+       vget_assign (Domain, RealDir, sizeof(RealDir), &Uid, &Gid);
+@@ -208,6 +247,11 @@
+ 
+       if ( *Domain == '\0' ) {
+         snprintf (StatusMessage, sizeof(StatusMessage), "%s", html_text[198]);
++
++        char log_buf[3 * MAX_BUFF];
++        memset(log_buf, 0x0, sizeof(log_buf));
++        snprintf(log_buf, sizeof(log_buf) - 2, "failed [%s@%s]", Newu, Domain);
++        log_auth(log_buf);
+       } else {
+         chdir(RealDir);
+         load_limits();
+@@ -215,6 +259,11 @@
+         pw = vauth_user( User, Domain, Password, "" );
+         if ( pw == NULL ) {
+           snprintf (StatusMessage, sizeof(StatusMessage), "%s", html_text[198]);
++
++          char log_buf[3 * MAX_BUFF];
++          memset(log_buf, 0x0, sizeof(log_buf));
++          snprintf(log_buf, sizeof(log_buf) - 2, "failed [%s@%s]", Newu, Domain);
++          log_auth(log_buf);
+         } else if (pw->pw_flags & NO_PASSWD_CHNG) {
+           strcpy (StatusMessage, "You don't have permission to change your password.");
+         } else if (strcmp (Password1, Password2) != 0) {
+@@ -227,6 +276,12 @@
+          } else if ( strstr(User,Password1)!=NULL) {
+           snprintf (StatusMessage, sizeof(StatusMessage), "%s\n", html_text[320]);
+ #endif
++/* cracklib patch */
++#ifdef CRACKLIB
++	} else if ((tmpstr = FascistCheck(Password1, CRACKLIB)) != NULL ) {
++	  sprintf (StatusMessage, "Bad password - %s\n", tmpstr);
++#endif
++/* end cracklib */
+         } else {
+           /* success */
+           snprintf (StatusMessage, sizeof(StatusMessage), "%s", html_text[139]);
+@@ -264,6 +319,12 @@
+          pw = vauth_user( Username, Domain, Password, "" );
+          if ( pw == NULL ) { 
+            snprintf (StatusMessage, sizeof(StatusMessage), "%s\n", html_text[198]);
++
++           char log_buf[3 * MAX_BUFF];
++           memset(log_buf, 0x0, sizeof(log_buf));
++           snprintf(log_buf, sizeof(log_buf) - 2, "failed [%s@%s]", Newu, Domain);
++           log_auth(log_buf);
++
+            show_login();
+            vclose();
+            exit(0);
+diff -ruN ../qmailadmin-1.2.16-original/qmailadmin.h qmailadmin-1.2.16/qmailadmin.h
+--- ../qmailadmin-1.2.16-original/qmailadmin.h	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/qmailadmin.h	2021-01-30 22:09:58.246656353 +0100
+@@ -41,7 +41,7 @@
+ #ifdef MAX_BUFF
+ #undef MAX_BUFF
+ #endif
+-#define MAX_BUFF 500
++#define MAX_BUFF 5000
+ #define MAX_BIG_BUFF 5000
+ 
+ #define MAX_LANG_STR 500
+diff -ruN ../qmailadmin-1.2.16-original/template.c qmailadmin-1.2.16/template.c
+--- ../qmailadmin-1.2.16-original/template.c	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/template.c	2020-05-03 16:14:53.000000000 +0200
+@@ -92,11 +92,11 @@
+   snprintf(TmpBuf2, (sizeof(TmpBuf2) - 1), "%s/html/%s", tmpstr, filename);
+ 
+   if (lstat(TmpBuf2, &mystat) == -1) {
+-    printf("Warning: cannot lstat '%s', check permissions.<BR>\n", TmpBuf2);
++    printf("Warning: cannot lstat '%s', check permissions.<br>\n", TmpBuf2);
+     return(-1);
+   }
+   if (S_ISLNK(mystat.st_mode)) {
+-    printf("Warning: '%s' is a symbolic link.<BR>\n", TmpBuf2);
++    printf("Warning: '%s' is a symbolic link.<br>\n", TmpBuf2);
+     return(-1);
+   }
+ 
+@@ -217,9 +217,10 @@
+                     TmpBuf3[j] = TmpBuf2[i];
+                   }
+                   TmpBuf3[j] = '\0';
+-                  printh ("value=\"%H@%H\"></td>\n", TmpBuf3, Domain);
++		  /* mod_autorespond.html */
++                  printh ("value=\"%H@%H\"></div>\n", TmpBuf3, Domain);
+                 } else {
+-                  printh ("value=\"%H\"></td>\n", &TmpBuf2[1]);
++                  printh ("value=\"%H\"></div>\n", &TmpBuf2[1]);
+                 }
+               } 
+               upperit(ActionUser);
+@@ -229,19 +230,16 @@
+ 
+               fgets( TmpBuf2, sizeof(TmpBuf2), fs);
+               fgets( TmpBuf2, sizeof(TmpBuf2), fs);
+-              printf ("         <td>&nbsp;</td>\n");
+-              printf ("         </tr>\n");
+-              printf ("         <tr>\n");
+-              printf ("         <td align=right><b>%s</b></td>\n", html_text[6]);
++	      printf("<div class=\"form-group\">");
++              printf("<label for=\"alias\">%s</label>\n", html_text[6]);
+ 
+               /* take off newline */
+               i = strlen(TmpBuf2); --i; TmpBuf2[i] = 0;
+-              printh ("         <td><input type=\"text\" size=40 name=\"alias\" maxlength=128 value=\"%H\"></td>\n",
++	      printh ("<input class=\"form-control\" type=\"text\" name=\"alias\" id=\"alias\" value=\"%H\">\n",
+                 &TmpBuf2[9]);
+-              printf ("         <td>&nbsp;</td>\n");
+-              printf ("        </tr>\n");
+-              printf ("       </table>\n");
+-              printf ("       <textarea cols=80 rows=40 name=\"message\">");
++              printf("</div>\n");
++	      printf("<div class=\"form-group\">\n");
++              printf ("<textarea class=\"form-control\" rows=\"10\" name=\"message\">");
+ 
+ 			  /*
+ 			     Skip custom headers
+@@ -258,7 +256,7 @@
+               while (fgets(TmpBuf2, sizeof(TmpBuf2), fs)) {
+                 printf ("%s", TmpBuf2);
+               }
+-              printf ("</textarea>");
++              printf ("</textarea>\n</div>\n");
+               fclose(fs);
+             }
+             break;
+@@ -469,7 +467,7 @@
+             GetValue (TmpCGI, value, "returntext=", sizeof(value));
+             GetValue (TmpCGI, value2, "returnhttp=", sizeof(value2));
+             if (*value != '\0') {
+-              printh ("<A HREF=\"%C\">%H</A>", value2, value);
++              printh ("<a href=\"%C\">%H</a>", value2, value);
+             }
+             break;
+ 
+@@ -512,49 +510,52 @@
+ 
+           /* show version number */
+           case 'V':
+-            printf("<a href=\"http://sourceforge.net/projects/qmailadmin/\">%s</a> %s<BR>", 
++            printf("<a href=\"http://sourceforge.net/projects/qmailadmin/\" target=\"_blank\">%s</a> %s ~ ",
+               QA_PACKAGE, QA_VERSION);
+-            printf("<a href=\"http://www.inter7.com/vpopmail/\">%s</a> %s<BR>", 
++            printf("<a href=\"http://www.inter7.com/vpopmail/\" target=\"_blank\">%s</a> %s",
+               PACKAGE, VERSION);
+             break;
+ 
+           /* display the main menu */
+           /* move this to a function... */
+           case 'v':
+-            printh ("<font size=\"2\" color=\"#000000\"><b>%H</b></font><br><br>", 
++            printh ("<h2>%H</h2>",
+               Domain);
+             printf (
+-       "<font size=\"2\" color=\"#ff0000\"><b>%s</b></font><br>", 
++ 	      "<h5>%s</h5>",
+               html_text[1]);
++	    printf ("<ul>");
+             if (AdminType==DOMAIN_ADMIN){
+ 
+               if (MaxPopAccounts != 0) {
+-                printh ("<a href=\"%s\">", cgiurl("showusers")); 
++                printh ("<li><a href=\"%s\">", cgiurl("showusers"));
+                 printf (
+-       "<font size=\"2\" color=\"#000000\"><b>%s</b></font></a><br>",
++		"%s</a></li>",
+                   html_text[61]);
+               }
+ 
+               if (MaxForwards != 0 || MaxAliases != 0) {
+-                printh ("<a href=\"%s\">", cgiurl("showforwards")); 
++                printh ("<li><a href=\"%s\">", cgiurl("showforwards"));
+                 printf (
+-       "<font size=\"2\" color=\"#000000\"><b>%s</b></font></a><br>",
++		"%s</a></li>",
+                   html_text[122]);
+               }
+ 
+               if (MaxAutoResponders != 0) {
+-                printh ("<a href=\"%s\">", cgiurl("showautoresponders")); 
++                printh ("<li><a href=\"%s\">", cgiurl("showautoresponders")); 
+                 printf (
+-       "<font size=\"2\" color=\"#000000\"><b>%s</b></a></font><br>",
++		"%s</a></li>",
+                   html_text[77]);
+               }
+ 
+               if (*EZMLMDIR != 'n' && MaxMailingLists != 0) {
+-                printh ("<a href=\"%s\">", cgiurl("showmailinglists")); 
++                printh ("<li><a href=\"%s\">", cgiurl("showmailinglists")); 
+                 printf (
+-       "<font size=\"2\" color=\"#000000\"><b>%s</b></font></a><br>",
++		"%s</a></li>",
+                   html_text[80]);
+               }
++
++	      printf("</ul>");
+             } else {
+               /* the quota code in here is kinda screwy and could use review
+                * then again, with recent changes, the non-admin shouldn't
+@@ -565,53 +566,58 @@
+ 	      char path[256];
+               vpw = vauth_getpw(Username, Domain);
+ 
+-               printh ("<a href=\"%s&moduser=%C\">", cgiurl("moduser"), Username);
++	      printf("<ul>");
++
++               printh ("<li><a href=\"%s&moduser=%C\">", cgiurl("moduser"), Username);
+                printh (
+-       "<font size=\"2\" color=\"#000000\"><b>%s %H</b></font></a><br><br>",
++		 "%s %H</a><li>",
+                  html_text[111], Username);
+               if (strncmp(vpw->pw_shell, "NOQUOTA", 2) != 0) {
+                 quota_to_megabytes(qconvert, vpw->pw_shell);
+               } else {
+                 sprintf(qconvert, "%s", html_text[229]); qnote = "";
+               }
+-              printf ("<font size=\"2\" color=\"#000000\"><b>%s:</b><br>%s %s %s",
++              printf ("<li>%s: <br> %s %s %s",
+                 html_text[249], html_text[253], qconvert, qnote);
+               printf ("<br>%s ", html_text[254]);
+ 	      snprintf(path, sizeof(path), "%s/" MAILDIR, vpw->pw_dir);
+               readuserquota(path, &diskquota, &maxmsg);
+-              printf ("%-2.2lf MB</font><br>", ((double)diskquota)/1048576.0);  /* Convert to MB */
++              printf ("%-2.2lf MB</li>", ((double)diskquota)/1048576.0);  /* Convert to MB */
++
++	      printf("</ul>");
+              }
+ 
+              if (AdminType == DOMAIN_ADMIN) {
+-               printf ("<br>");
++               printf ("<ul>");
+ 
+                if (MaxPopAccounts != 0) {
+-                 printh ("<a href=\"%s\">", cgiurl("adduser"));
++                 printh ("<li><a href=\"%s\">", cgiurl("adduser"));
+                  printf (
+-       "<font size=\"2\" color=\"#000000\"><b>%s</b></font></a><br>",
++		   "%s</a></li>",
+                    html_text[125]);
+                }
+ 
+                if (MaxForwards != 0) {
+-                 printh ("<a href=\"%s\">", cgiurl("adddotqmail"));
++                 printh ("<li><a href=\"%s\">", cgiurl("adddotqmail"));
+                  printf (
+-       "<font size=\"2\" color=\"#000000\"><b>%s</b></font></a><br>",
++		   "%s</a></li>",
+                    html_text[127]);
+                }
+ 
+                if (MaxAutoResponders != 0) {
+-                 printh ("<a href=\"%s\">", cgiurl("addautorespond"));
++                 printh ("<li><a href=\"%s\">", cgiurl("addautorespond"));
+                  printf (
+-       "<font size=\"2\" color=\"#000000\"><b>%s</b></a></font><br>",
++		   "%s</a></li>",
+                    html_text[128]);
+                }
+ 
+                if (*EZMLMDIR != 'n' && MaxMailingLists != 0) {
+-                 printh ("<a href=\"%s\">", cgiurl("addmailinglist"));
++                 printh ("<li><a href=\"%s\">", cgiurl("addmailinglist"));
+                  printf (
+-       "<font size=\"2\" color=\"#000000\"><b>%s</b></font></a><br>",
++		   "%s</a></li>",
+                    html_text[129]);
+                }
++	       printf("</ul>");
+              }
+              break;
+ 
+@@ -633,9 +639,9 @@
+           case 'x':
+             strcpy (value, get_session_val("returntext="));
+             if(strlen(value) > 0) {
+-               printh("<a href=\"%C\">%H", get_session_val("returnhttp="), value);
++               printh("<a class=\"nav-link\" href=\"%C\">%H", get_session_val("returnhttp="), value);
+             } else {
+-               printh("<a href=\"%s\">%s", cgiurl("logout"), html_text[218]);
++               printh("<a class=\"nav-link\" href=\"%s\">%s", cgiurl("logout"), html_text[218]);
+             }
+             printf("</a>\n");
+             break;
+diff -ruN ../qmailadmin-1.2.16-original/user.c qmailadmin-1.2.16/user.c
+--- ../qmailadmin-1.2.16-original/user.c	2011-02-22 15:45:48.000000000 +0100
++++ qmailadmin-1.2.16/user.c	2020-05-05 18:08:40.250213748 +0200
+@@ -47,7 +47,11 @@
+ #include "user.h"
+ #include "util.h"
+ #include "vauth.h"
+-
++/* cracklib patch */
++#ifdef CRACKLIB
++#	include <crack.h>
++#endif
++/* end cracklib patch */
+ 
+ #define HOOKS 1
+ 
+@@ -88,7 +92,7 @@
+   /* Get the default catchall box name */
+   if ((fs=fopen(".qmail-default","r")) == NULL) {
+     /* report error opening .qmail-default and exit */
+-    printf ("<tr><td colspan=\"%i\">%s .qmail-default</tr></td>", 
++    printf ("<tr><td colspan=\"%i\">%s .qmail-default</td></tr>\n", 
+       colspan, html_text[144]);
+     vclose();
+     exit(0);
+@@ -160,8 +164,8 @@
+   }
+ 
+   if (pw == NULL) {
+-    printf ("<tr><td colspan=\"%i\" bgcolor=%s>%s</td></tr>\n", 
+-      colspan, get_color_text("000"), html_text[131]);
++    printf ("<tr><td colspan=\"%i\">%s</td></tr>\n", 
++      colspan, html_text[131]);
+       moreusers = 0;
+     } else {
+       char path[256];
+@@ -174,28 +178,28 @@
+           storage_t maxmsg = 0;
+ 
+           /* display account name and user name */
+-          printf ("<tr bgcolor=%s>", get_color_text("000"));
+-          printh ("<td align=\"left\">%H</td>", pw->pw_name);
+-          printh ("<td align=\"left\">%H</td>", pw->pw_gecos);
++          printf ("<tr>\n");
++          printh ("<td>%H</td>\n", pw->pw_name);
++          printh ("<td>%H</td>\n", pw->pw_gecos);
+ 
+           /* display user's quota */
+ 	  snprintf(path, sizeof(path), "%s/" MAILDIR, pw->pw_dir);
+           readuserquota(path, &diskquota, &maxmsg);
+-          printf ("<td align=\"right\">%-2.2lf&nbsp;/&nbsp;</td>", ((double)diskquota)/1048576.0);  /* Convert to MB */
++          printf ("<td>%-2.2lf&nbsp;/&nbsp;</td>\n", ((double)diskquota)/1048576.0);  /* Convert to MB */
+           if (strncmp(pw->pw_shell, "NOQUOTA", 2) != 0) {
+               if(quota_to_megabytes(qconvert, pw->pw_shell)) {
+-                  printf ("<td align=\"left\">(BAD)</td>");
++                  printf ("<td>(BAD)</td>\n");
+               }
+-              else { printf ("<td align=\"left\">%s</td>", qconvert); }
++              else { printf ("<td>%s</td>\n", qconvert); }
+           }
+-          else { printf ("<td align=\"left\">%s</td>", html_text[229]); }
++          else { printf ("<td>%s</td>", html_text[229]); }
+ 
+           /* display button to modify user */
+-          printf ("<td align=\"center\">");
++          printf ("<td>");
+           printh ("<a href=\"%s&moduser=%C\">", cgiurl("moduser"), pw->pw_name);
+-          printf ("<img src=\"%s/modify.png\" border=\"0\"></a>", IMAGEURL);
+-          printf ("</td>");
+-            
++          printf ("<span class=\"material-icons\">create</span></a>");
++          printf ("</td>\n");
++
+           /* if the user has admin privileges and pw->pw_name is not 
+            * the user or postmaster, allow deleting 
+            */
+@@ -210,32 +214,29 @@
+           }
+ 
+           /* display trashcan for delete, or nothing if delete not allowed */
+-          printf ("<td align=\"center\">");
++          printf ("<td>");
+           if (allowdelete) {
+             printh ("<a href=\"%s&deluser=%C\">", cgiurl("deluser"), pw->pw_name);
+-            printf ("<img src=\"%s/trash.png\" border=\"0\"></a>", IMAGEURL);
++            printf ("<span class=\"material-icons\">delete_forever</span></a>");
+           } else {
+-            /* printf ("<img src=\"%s/disabled.png\" border=\"0\">", IMAGEURL); */
++            /* printf ("<span class=\"material-icons\">flash_off</span>"); */
+           }
+-          printf ("</td>");
++          printf ("</td>\n");
+ 
+           /* display button in the 'set catchall' column */
+-          printf ("<td align=\"center\">");
++          printf ("<td>");
+           if (bounced==0 && strncmp(pw->pw_name,TmpBuf3,sizeof(TmpBuf3)) == 0) {
+-            printf ("<img src=\"%s/radio-on.png\" border=\"0\"></a>", 
+-              IMAGEURL);
++            printf ("<span class=\"material-icons\">radio_button_checked</span></a>");
+ #ifdef CATCHALL_ENABLED
+           } else if (AdminType==DOMAIN_ADMIN) {
+             printh ("<a href=\"%s&deluser=%C&page=%s\">",
+               cgiurl("setdefault"), pw->pw_name, Pagenumber);
+-            printf ("<img src=\"%s/radio-off.png\" border=\"0\"></a>",
+-              IMAGEURL);
++            printf ("<span class=\"material-icons\">radio_button_unchecked</span></a>");
+ #endif
+           } else {
+-            printf ("<img src=\"%s/disabled.png\" border=\"0\">",
+-              IMAGEURL);
++            printf ("<span class=\"material-icons\">flash_off</span>");
+           }
+-          printf ("</td>");
++          printf ("</td>\n");
+           printf ("</tr>\n");
+         }        
+         pw = vauth_getall(dom,0,0);
+@@ -246,9 +247,8 @@
+     if (AdminType == DOMAIN_ADMIN) {
+       print_user_index ("showusers", colspan, user, dom, mytime);
+ 
+-      printf ("<tr bgcolor=%s>", get_color_text("000"));
+-      printf ("<td colspan=\"%i\" align=\"right\">", colspan);
+-      printf ("<font size=\"2\"><b>");
++      printf ("<tr>\n");
++      printf ("<td class=\"text-center\" colspan=\"%i\">", colspan);
+       printf ("[&nbsp;");
+       bars = 0;
+ #ifdef USER_INDEX
+@@ -276,8 +276,7 @@
+       printh ("<a href=\"%s\">%s</a>", cgiurl("setremotecatchall"), html_text[206]);
+ #endif
+       printf ("&nbsp;]");
+-      printf ("</b></font>");
+-      printf ("</td></tr>\n");
++      printf ("</td>\n</tr>\n");
+   }
+   return 0;
+ }
+@@ -318,6 +317,7 @@
+ 
+ void addusernow()
+ {
++ char *tmpstr;
+  int cnt=0, num;
+  char *c_num;
+  char **mailingListNames;
+@@ -394,6 +394,16 @@
+     exit(0);
+   }
+ #endif
++/* cracklib patch */
++#ifdef CRACKLIB
++    if ((tmpstr = FascistCheck(Password1, CRACKLIB)) != NULL ) {
++       sprintf(StatusMessage, "Bad password - %s\n", tmpstr);
++       adduser();
++       vclose();
++       exit(0);
++    }
++#endif
++/* end cracklib */
+ 
+ #ifndef ENABLE_LEARN_PASSWORDS
+   if ( strlen(Password1) <= 0 ) {
+@@ -491,7 +501,7 @@
+ 
+   } else {
+     /* otherwise, report error */
+-    snprinth (StatusMessage, sizeof(StatusMessage), "<font color=\"red\">%s %H@%H (%H) %s</font>", 
++    snprinth (StatusMessage, sizeof(StatusMessage), "%s %H@%H (%H) %s",
+       html_text[2], Newu, Domain, Gecos, html_text[120]);
+   }
+ 
+@@ -673,7 +683,7 @@
+ 
+   /* Get the default catchall box name */
+   if ((fs=fopen(".qmail-default","r")) == NULL) {
+-    printf ("<tr><td colspan=\"5\">%s %s</td><tr>\n", 
++    printf ("<tr><td colspan=\"5\">%s %s</td></tr>\n", 
+       html_text[144], ".qmail-default");
+     vclose();
+     exit(0);
+@@ -682,19 +692,19 @@
+   fclose(fs);
+ 
+   if (strstr(TmpBuf, " bounce-no-mailbox\n") != NULL) {
+-    printf ("<b>%s</b>", html_text[130]);
++    printf ("%s", html_text[130]);
+ 
+   } else if (strstr(TmpBuf, " delete\n") != NULL) {
+-    printf ("<b>%s</b>", html_text[236]);
++    printf ("%s", html_text[236]);
+ 
+   } else if ( strstr(TmpBuf, "@") != NULL ) {
+     i=strlen(TmpBuf);
+     for(;TmpBuf[i-1]!=' ';--i);
+     if (strncmp (&TmpBuf[i], "$EXT@", 5) == 0) {
+       /* forward to an entire domain */
+-      printh ("<b>%s <I>user</I>%H</b>", html_text[62], &TmpBuf[i+4]);
++      printh ("%s user%H", html_text[62], &TmpBuf[i+4]);
+     } else {
+-      printh ("<b>%s %H</b>", html_text[62], &TmpBuf[i]);
++      printh ("%s %H", html_text[62], &TmpBuf[i]);
+     }
+   } else {
+     i = strlen(TmpBuf) - 1;
+@@ -704,7 +714,7 @@
+ 
+     /* take off newline */
+     i = strlen(TmpBuf2); --i; TmpBuf2[i] = 0;/* take off newline */
+-    printh ("<b>%s %H</b>", html_text[62], TmpBuf2);
++    printh ("%s %H", html_text[62], TmpBuf2);
+   }
+   return 0;
+ }
+@@ -796,6 +806,16 @@
+        exit(0);
+      }
+ #endif
++/* cracklib patch */
++#ifdef CRACKLIB
++    if ((tmpstr = FascistCheck(Password1, CRACKLIB)) != NULL ) {
++       sprintf(StatusMessage, "Bad password - %s\n", tmpstr);
++       moduser();
++       vclose();
++       exit(0);
++    }
++#endif
++/* end cracklib */
+     ret_code = vpasswd( ActionUser, Domain, Password1, USE_POP);
+     if ( ret_code != VA_SUCCESS ) {
+       snprintf (StatusMessage, sizeof(StatusMessage), "%s (%s)", html_text[140], 
+diff -ruN ../qmailadmin-1.2.16-original/util.c qmailadmin-1.2.16/util.c
+--- ../qmailadmin-1.2.16-original/util.c	2011-02-22 15:45:47.000000000 +0100
++++ qmailadmin-1.2.16/util.c	2020-05-03 12:36:59.000000000 +0200
+@@ -123,9 +123,10 @@
+ 
+ void qmail_button(char *modu, char *command, char *user, char *dom, time_t mytime, char *png)    
+ {
+-  printf ("<td align=center>");
++  printf ("<td>");
+   printh ("<a href=\"%s&modu=%C\">", cgiurl(command), modu);
+-  printf ("<img src=\"%s/%s\" border=0></a>", IMAGEURL, png);
++/*  printf ("<img src=\"%s/%s\" border=0></a>", IMAGEURL, png); */
++  printf ("<span class=\"material-icons\">%s</span></a>", png);
+   printf ("</td>\n");
+ }
+ 
+@@ -160,10 +161,10 @@
+   count_autoresponders();
+   count_mailinglists();
+ 
+-  printf ("%s = %d<BR>\n", html_text[61], CurPopAccounts);
+-  printf ("%s = %d<BR>\n", html_text[74], CurForwards);
+-  printf ("%s = %d<BR>\n", html_text[77], CurAutoResponders);
+-  printf ("%s = %d<BR>\n", html_text[80], CurMailingLists);
++  printf ("%s = %d<br>\n", html_text[61], CurPopAccounts);
++  printf ("%s = %d<br>\n", html_text[74], CurForwards);
++  printf ("%s = %d<br>\n", html_text[77], CurAutoResponders);
++  printf ("%s = %d<br>\n", html_text[80], CurMailingLists);
+ }
+ 
+ /* check_email_addr( char *addr )
+@@ -232,7 +233,7 @@
+  char *extra;
+ {
+   printf ("%s %s\n", get_html_text(msg), extra);
+-  printf ("</BODY></HTML>\n");
++  printf ("</body></html>\n");
+   vclose();
+   exit(0);
+ }
+@@ -399,10 +400,10 @@
+ #ifdef USER_INDEX
+   int k;
+ 
+-  printf ("<tr bgcolor=%s>", get_color_text("000"));
+-  printf ("<td colspan=%d align=\"center\">", colspan);
++  printf ("<tr>");
++  printf ("<td class=\"text-center\" colspan=\"%d\">", colspan);
+   printf ("<hr>");
+-  printf ("<b>%s</b> &nbsp; ", html_text[133]);
++  printf ("%s ", html_text[133]);
+   for (k = 0; k < 10; k++) {
+ 	printh ("<a href=\"%s&searchuser=%d\">%d</a>\n", cgiurl(action), k, k);
+   }
+@@ -412,17 +413,15 @@
+   printf ("</td>");
+   printf ("</tr>\n");
+ 
+-  printf ("<tr bgcolor=%s>", get_color_text("000"));
+-  printf ("<td colspan=%d>", colspan);
+-  printf ("<table border=0 cellpadding=3 cellspacing=0 width=\"100%%\"><tr><td align=\"center\"><br>");
++  printf ("<tr>");
++  printf ("<td class=\"text-center\" colspan=\"%d\">", colspan);
+   printf ("<form method=\"get\" action=\"%s/com/%s\">", CGIPATH, action);
+   printh ("<input type=\"hidden\" name=\"user\" value=\"%H\">", user);
+   printh ("<input type=\"hidden\" name=\"dom\" value=\"%H\">", dom);
+   printf ("<input type=\"hidden\" name=\"time\" value=\"%u\">", (unsigned int) mytime);
+-  printh ("<input type=\"text\" name=\"searchuser\" value=\"%H\">&nbsp;", SearchUser);
+-  printf ("<input type=\"submit\" value=\"%s\">", html_text[204]);
++  printh ("<input class=\"my-input\" type=\"text\" name=\"searchuser\" value=\"%H\">&nbsp;", SearchUser);
++  printf ("<input class=\"btn btn-primary btn-sm\" type=\"submit\" value=\"%s\">", html_text[204]);
+   printf ("</form>");
+-  printf ("</td></tr></table>");
+   printf ("<hr>");
+   printf ("</td></tr>\n");
+ 

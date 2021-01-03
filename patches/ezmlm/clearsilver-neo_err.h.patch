@@ -1,0 +1,23 @@
+tx Ricardo Brisighelli
+
+diff -ruN clearsilver-0.10.5/util/neo_err.h clearsilver-0.10.5-patched/util/neo_err.h
+--- clearsilver-0.10.5/util/neo_err.h	2007-07-12 05:09:09.000000000 +0200
++++ clearsilver-0.10.5-patched/util/neo_err.h	2021-04-08 17:55:17.763136699 +0200
+@@ -85,7 +85,7 @@
+  */
+ #if defined(USE_C99_VARARG_MACROS)
+ #define nerr_raise(e,f,...) \
+-   nerr_raisef(__PRETTY_FUNCTION__,__FILE__,__LINE__,e,f,__VA_ARGS__)
++   nerr_raisef(__PRETTY_FUNCTION__,__FILE__,__LINE__,e,f,##__VA_ARGS__)
+ #elif defined(USE_GNUC_VARARG_MACROS)
+ #define nerr_raise(e,f,a...) \
+    nerr_raisef(__PRETTY_FUNCTION__,__FILE__,__LINE__,e,f,##a)
+@@ -99,7 +99,7 @@
+ 
+ #if defined(USE_C99_VARARG_MACROS)
+ #define nerr_raise_errno(e,f,...) \
+-   nerr_raise_errnof(__PRETTY_FUNCTION__,__FILE__,__LINE__,e,f,__VA_ARGS__)
++   nerr_raise_errnof(__PRETTY_FUNCTION__,__FILE__,__LINE__,e,f,##__VA_ARGS__)
+ #elif defined(USE_GNUC_VARARG_MACROS)
+ #define nerr_raise_errno(e,f,a...) \
+    nerr_raise_errnof(__PRETTY_FUNCTION__,__FILE__,__LINE__,e,f,##a)
