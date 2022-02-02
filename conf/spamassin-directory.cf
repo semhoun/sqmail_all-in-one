@@ -1,0 +1,3 @@
+#Directory
+auto_whitelist_path /var/spamassassin/auto-whitelist/auto-whitelist
+bayes_path /var/spamassassin/bayes/bayes

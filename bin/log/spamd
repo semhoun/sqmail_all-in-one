@@ -1,0 +1,2 @@
+#!/bin/sh
+exec setuidgid qmaill multilog t s2000000 /log/spamd

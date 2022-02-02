@@ -1,0 +1,2 @@
+#!/bin/sh
+exec setuidgid dovecot multilog t s2000000 /log/dovecot

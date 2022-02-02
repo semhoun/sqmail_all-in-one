@@ -13,22 +13,26 @@ ARG DAEMONTOOLS_TAG
 ARG UCSPISSL_TAG
 ARG UCSPITCP6_TAG
 ARG DOVECOT_TAG
+ARG CLAMAV_TAG
+ARG SPAMASSASSIN_TAG
 
-# Base install
-RUN apt-get update \
-	&& apt-get -y install build-essential dnsutils unzip git curl wget equivs bash \
-    && mkdir -p /qmail-src /qmail-patches
+########################	
+# Base intall
+########################
 COPY patches /qmail-patches
 WORKDIR "/qmail-src"
 
-# Add MTA Local (equivs is needed)
-COPY src/mail-transport-agent.ctl /qmail-src/mail-transport-agent.ctl
-RUN equivs-build mail-transport-agent.ctl \
-	&& dpkg -i mta-local*.deb
-	
+RUN apt-get update \
+	&& apt-get -y install build-essential equivs bash dnsutils unzip git curl wget sudo ksh \
+## Add docker group for logs
+	&& groupadd -g 998 docker \
+## Add MTA Local (equivs is needed)
+	&& equivs-build /qmail-patches/mail-transport-agent.ctl \
+	&& dpkg -i mta-local*.deb \
+	&& rm -f /qmail-src/* \
 # Fixes for slim install
-RUN mkdir -p /usr/share/man/man1 /usr/share/man/man5 /usr/share/man/man7 /usr/share/man/man8 \
-    && touch /usr/share/man/man1/maildirmake.1.gz \
+	&& mkdir -p /usr/share/man/man1 /usr/share/man/man5 /usr/share/man/man7 /usr/share/man/man8 \
+  && touch /usr/share/man/man1/maildirmake.1.gz \
 	&& touch /usr/share/man/man8/deliverquota.8.gz \
 	&& touch /usr/share/man/man1/lockmail.1.gz \
 	&& touch /usr/share/man/man5/maildir.maildrop.5.gz \
@@ -39,7 +43,9 @@ RUN mkdir -p /usr/share/man/man1 /usr/share/man/man5 /usr/share/man/man7 /usr/sh
 # Additionnals packages
 ########################
 RUN apt-get -y install bsd-mailx \
-	libperl-dev libmariadb-dev libmariadb-dev-compat csh maildrop bzip2 razor pyzor ksh libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev
+	libperl-dev libmariadb-dev libmariadb-dev-compat csh maildrop bzip2 razor pyzor ksh libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
+  lighttpd \
+	cron
     
 ########################
 # SQMail
@@ -87,6 +93,8 @@ RUN mkdir -p /package \
     && package/install; echo "Otherwise return 1" \
 ## cleaning
     && rm -rf /qmail-src/*
+# SSL Config
+COPY conf/ssl_env /var/qmail/ssl_env
     
 ########################
 # VPopMail
@@ -165,37 +173,250 @@ RUN groupadd -g 2111 dovecot \
     && make \
     && make install \
     && mkdir -p /etc/dovecot/ \
+# Config
+		&& openssl dhparam -out /etc/dovecot/dh.pem 2048 \
+		&& cp -r /usr/local/share/doc/dovecot/example-config/* /etc/dovecot/ \
+		&& sed -i 's@#!include auth-sql.conf.ext@!include auth-sql.conf.ext@' /etc/dovecot/conf.d/10-auth.conf \
+		&& sed -i 's@!include auth-system.conf.ext@#!include auth-system.conf.ext@' /etc/dovecot/conf.d/10-auth.conf \
+		&& sed -i 's@#disable_plaintext_auth = yes@disable_plaintext_auth = no@' /etc/dovecot/conf.d/10-auth.conf \
+		&& sed -i 's@#log_path = syslog@log_path = /dev/stderr@' /etc/dovecot/conf.d/10-logging.conf \
+		&& sed -i "s|#mail_max_userip_connections.*|mail_max_userip_connections = 25|" /etc/dovecot/conf.d/20-imap.conf \
+		&& sed -i "s|#mail_max_userip_connections.*|mail_max_userip_connections = 25|" /etc/dovecot/conf.d/20-pop3.conf \
 # cleaning
     && rm -rf /qmail-src/*
+# Config files
+COPY conf/dovecot-ssl.conf /etc/dovecot/conf.d/10-ssl.conf
+COPY conf/dovecot-stats.conf /etc/dovecot/conf.d/90-stats.conf
 
+########################
+# Autorespond
+########################
+RUN wget http://qmail.ixip.net/download/autorespond-2.0.5.tar.gz \
+	&& tar xvzf autorespond-2.0.5.tar.gz \
+	&& cd autorespond-2.0.5 \
+	&& make \
+	&& cp autorespond /usr/local/bin \
+	&& chown root.root /usr/local/bin/autorespond \
+# cleaning
+	&& rm -rf /qmail-src/*
+
+########################
+# ezmlm-idx
+########################
+RUN wget https://qmailrocks.thibs.com/downloads/ezmlm-idx-7.2.2.tar.gz \
+	&& tar xvzf ezmlm-idx-7.2.2.tar.gz \
+	&& cd ezmlm-idx-7.2.2 \
+	&& make && make man && make install \
+# cleaning
+	&& rm -rf /qmail-src/*
+	
+########################
+# QmailAdmin
+########################
+RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qmailadmin-1.2.16.tar.gz \
+	&& tar xvzf qmailadmin-1.2.16.tar.gz\
+	&& cd qmailadmin-1.2.16 \
+	&& ./configure --enable-cgibindir=/var/www/cgi-bin --enable-htmldir=/var/www/html --enable-imagedir=/var/www/html/www/images/qmailadmin --disable-ezmlm-mysql --enable-modify-quota --enable-domain-autofill --enable-modify-spam --enable-spam-command="|/var/qmail/bin/preline /usr/bin/maildrop /var/qmail/bin/maildrop-filter" --enable-help \
+	&& make \
+	&& make install \
+# cleaning
+	&& rm -rf /qmail-src/*
+
+########################
+# vqadmin
+########################
+RUN wget https://qmailrocks.thibs.com/downloads/vqadmin-2.3.7.tar.gz \
+	&& tar xvzf vqadmin-2.3.7.tar.gz \
+	&& cd vqadmin-2.3.7 \
+	&& patch -p0 < /qmail-patches/vqadmin-2.3.7.patch \
+	&& make \
+	&& make install \
+	&& make install-data-local \
+# cleaning
+	&& rm -rf /qmail-src/*
+	
+########################
+# clamav
+########################
+RUN groupadd -g 5010 clamav \
+	&& useradd -g clamav -u 5010 -s /usr/sbin/nologin -c "Clam AntiVirus" -d /var/empty clamav \
+	&& wget https://www.clamav.net/downloads/production/clamav-${CLAMAV_TAG}.tar.gz \
+	&& tar xvzf clamav-${CLAMAV_TAG}.tar.gz \
+	&& cd clamav-${CLAMAV_TAG} \
+	&& ./configure --sysconfdir=/etc \
+	&& make \
+	&& make install \
+	&& sed -e "s/Example/#Exemple/" \
+    -e "s/#PidFile .*/PidFile \/var\/run\/freshclam.pid/" \
+    -e "s/#DNSDatabaseInfo .*/DNSDatabaseInfo current.cvd.clamav.net/" \
+    -e "s/#DatabaseMirror .*/DatabaseMirror database.clamav.net" \
+    /etc/freshclam.conf.sample > /etc/freshclam.conf \
+	&& sed -e "s/Example/#Exemple/" \
+    -e "s/#LogVerbose .*/LogVerbose yes/" \
+    -e "s/#LogClean .*/LogClean yes/" \
+    -e "s/#LocalSocket .*/LocalSocket \/tmp\/clamd.socket/" \
+    -e "s/#TCPSocket .*/TCPSocket 3310/" \
+    -e "s/#TCPAddr .*/TCPAddr 127.0.0.1/" \
+    -e "s/#ScanOLE2 .*/ScanOLE2 yes/" \
+    -e "s/#OLE2BlockMacros .*/OLE2BlockMacros yes/" \
+    -e "s/#ScanPDF .*/ScanPDF yes/" \
+    -e "s/#ScanSWF .*/ScanSWF yes/" \
+    -e "s/#ScanXMLDOCS .*/ScanXMLDOCS yes/" \
+    -e "s/#ScanMail .*/ScanMail yes/" \
+    -e "s/#Foreground .*/Foreground yes/" \
+    /etc/clamd.conf.sample > /etc/clamd.conf \
+	&& mkdir /usr/local/share/clamav \
+	&& chown clamav.clamav /usr/local/share/clamav \
+	&& echo "Html.Exploit.CVE_2016_0228-6327291-1" > /usr/local/share/clamav/whitelist-web.ign2 \
+	&& ldconfig -v \
+# cleaning
+	&& rm -rf /qmail-src/*
+
+########################
+# DCC
+########################
+RUN wget https://www.dcc-servers.net/dcc/source/dcc.tar.Z \
+	&& tar xvzf dcc.tar.Z \
+	&& cd dcc-2.3.167 \
+	&& ./configure --disable-dccm \
+	&& make \
+	&& make install \
+# cleaning
+	&& rm -rf /qmail-src/*
+
+########################
+# SpamAssassin
+########################
+RUN wget http://miroir.univ-lorraine.fr/apache/spamassassin/source/Mail-SpamAssassin-${SPAMASSASSIN_TAG}.tar.gz \
+	&& tar xvzf Mail-SpamAssassin-${SPAMASSASSIN_TAG}.tar.gz \
+	&& cd Mail-SpamAssassin-${SPAMASSASSIN_TAG} \
+	&& perl Makefile.PL \
+	&& make \
+	&& make install \
+	&& mv /etc/mail/spamassassin/local.cf /etc/mail/spamassassin/local.cf.dist \
+	&& sed -i \
+			-e "s/#loadplugin Mail::SpamAssassin::Plugin::DCC/loadplugin Mail::SpamAssassin::Plugin::DCC/" \
+			-e "s/#loadplugin Mail::SpamAssassin::Plugin::AWL/loadplugin Mail::SpamAssassin::Plugin::AWL/" \
+			-e "s/#loadplugin Mail::SpamAssassin::Plugin::TextCat/loadplugin Mail::SpamAssassin::Plugin::TextCat/" \
+			/etc/mail/spamassassin/v310.pre \
+# cleaning
+	&& rm -rf /qmail-src/*
+# Config files
+COPY conf/spamassin-local.cf /etc/dovecot/conf.d/10-ssl.conf
+COPY conf/spamassin-directory.cf /etc/mail/spamassassin/directory.cf 
+# Binary
+COPY bin/learnSpam.sh /var/qmail/bin/learnSpam
+
+########################
+# DKIM
+########################
+RUN wget http://www.memoryhole.net/qmail/dkimsign.pl \
+	&& wget http://www.memoryhole.net/qmail/qmail-remote.sh \
+	&& wget https://downloads.sourceforge.net/project/domainkeys/libdomainkeys/0.69/libdomainkeys-0.69.tar.gz \
+	&& wget https://notes.sagredo.eu/files/qmail/patches/libdomainkeys/libdomainkeys-openssl-1.1.patch \
+	&& wget https://notes.sagredo.eu/files/qmail/patches/libdomainkeys/libdomainkeys-0.69.diff \
+	&& tar xvzf libdomainkeys-0.69.tar.gz \
+	&& cd libdomainkeys-0.69 \
+	&& patch -p1 < /qmail-src/libdomainkeys-openssl-1.1.patch \
+	&& patch < /qmail-src/backup-qmail/libdomainkeys-0.69.diff \
+	&& make \
+	&& cp dktest /usr/local/bin/ \
+	&& install /qmail-src/dkimsign.pl /usr/local/bin/ \
+	&& mv /var/qmail/bin/qmail-remote /var/qmail/bin/qmail-remote.orig \
+	&& install -T /qmail-src/qmail-remote.sh /var/qmail/bin/qmail-remote \
+# cleaning
+	&& rm -rf /qmail-src/*
+
+########################
+# Qmail Remove https://www.fehcom.de/sqmail/man/qmail-qmaint.html
+########################
+RUN wget http://www.linuxmagic.com/opensource/qmail/qmail-remove/qmail-remove-0.95.tar.gz \
+	&& tar xvzf qmail-remove-0.95.tar.gz \
+	&& cd qmail-remove-0.95 \
+	&& make \
+	&& make install \
+# cleaning
+	&& rm -rf /qmail-src/*
+	
+########################
+# qmHandle  https://www.fehcom.de/sqmail/man/qmail-qmaint.html
+########################
+RUN wget http://downloads.sourceforge.net/project/qmhandle/qmhandle-1.3/qmhandle-1.3.2/qmhandle-1.3.2.tar.gz \
+	&& tar xvzf qmhandle-1.3.2.tar.gz \
+	&& cd qmhandle-1.3.2 \
+	&& install qmHandle /usr/local/bin\
+# cleaning
+	&& rm -rf /qmail-src/*
+	
+########################
+# mess822
+########################
+RUN wget http://cr.yp.to/software/mess822-0.58.tar.gz mess822x \
+	&& tar xvzf mess822-0.58.tar.gz \
+	&& cd mess822-0.58 \
+	&& sed -i "s#extern int errno;#\#include <errno.h>#" error.h \
+	&& make \
+	&& make setup \
+
+###########################
 # Binaries
-COPY bin/qmail-smtpd /var/qmail/svc/qmail-smtpd/run
-COPY bin/qmail-smtpsd /var/qmail/svc/qmail-smtpsd/run
-COPY bin/qmail-smtpsub /var/qmail/svc/qmail-smtpsub/run
-COPY bin/qmail-send /var/qmail/svc/qmail-send/run
+###########################
+COPY bin/maildrop-filter /var/qmail/bin/maildrop-filter
+COPY bin/qmailctl /var/qmail/bin/qmailctl
+COPY bin/qmail-queuescan /var/qmail/bin/qmail-queuescan
+RUN chown vpopmail.vchkpw /var/qmail/bin/maildrop-filter \
+	&& chmod 600 /var/qmail/bin/maildrop-filter \
+	&& install /var/qmail/bin/qmailctl /usr/local/bin \
+	&& chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
+	&& chmod 1755 /var/qmail/bin/qmail-queuescan
 
-# Messages
-COPY message/quotawarn.msg /var/vpopmail/domains/quotawarn.msg
+###########################
+# SVC Binaries
+###########################
+COPY bin/run/qmail-smtpd /service/qmail-smtpd/run
+COPY bin/log/qmail /service/qmail-smtpd/log/run
+COPY bin/run/qmail-smtpsd /service/qmail-smtpsd/run
+COPY bin/log/qmail /service/qmail-smtpsd/log/run
+COPY bin/run/qmail-smtpsub /service/qmail-smtpsub/run
+COPY bin/log/qmail /service/qmail-smtpsub/log/run
+COPY bin/run/qmail-send /service/qmail-send/run
+COPY bin/log/qmail /service/qmail-send/log/run
+COPY bin/run/dovecot /service/dovecot/run
+COPY bin/log/dovecot /service/dovecot/log/run
+COPY bin/run/clamd /service/clamd/run
+COPY bin/log/clamd /service/clamd/log/run
+COPY bin/run/spamd /service/spamd/run
+COPY bin/log/spamd /service/spamd/log/run
     
-# Config cleaning
-RUN rm -rf /service/qmail-pop3* \
+###########################
+# Templates
+###########################
+RUN mkdir /var/tpl \
+	&& mv /var/qmail/control/ /var/tpl/qmail
+COPY message/quotawarn.msg /var/vpopmail/domains.tpl/quotawarn.msg
+	
+###########################
+# Final cleaning
+###########################
+RUN rm -rf /qmail-patches /qmail-src \
+		&& rm -rf /service/qmail-pop3* \
     && rm -rf /var/log/qmail-pop3* \
     && cp /var/qmail/bin/sendmail /usr/sbin/sendmail \
     && rm -f /service/*/down
 
+###########################
+# Docker final parms
+###########################
 EXPOSE 25 465 587
 EXPOSE 110 995
 EXPOSE 143 993
 EXPOSE 80
 
-# Move qmail config to default config
-RUN mv /var/qmail/control/ /var/qmail/control.tmpl
+WORKDIR "/log"
 
-# Add entrypoint
 COPY bin/docker-entrypoint.sh /bin/
-RUN chmod +x /bin/docker-entrypoint.sh
 ENTRYPOINT ["/bin/docker-entrypoint.sh"]
 
 CMD ["/command/svscanboot"]
 
-VOLUME ["/var/vpopmail/domains/", "/ssl", "/var/qmail/control"]
+VOLUME ["/var/vpopmail/domains/", "/ssl", "/var/vpopmail/etc", "/var/qmail/control", "/log/", "/var/spamassassin", "/var/qmail/tmp"]

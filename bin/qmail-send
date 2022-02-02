@@ -1,3 +1,0 @@
-#!/bin/sh
-exec env - PATH="/var/qmail/bin:$PATH" \
-    qmail-start ./Maildir/

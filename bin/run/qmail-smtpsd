@@ -5,12 +5,12 @@ HOSTNAME=`cat /etc/mailname | head -1`
 CONCURRENCY=`cat /var/qmail/control/concurrencyincoming`
 export SMTPAUTH=""
 export UCSPITLS=""
-. /var/qmail/ssl/env
+. /var/qmail/ssl_env
 exec env PATH="/var/qmail/bin:$PATH" \
     sslserver \
     -4 -6 \
     -seVn -Rp -l $HOSTNAME -c $CONCURRENCY \
-    -Xx /var/qmail/control/rules.smtpd.cdb \
-    -u $QMAILDUID -g $QMAILDGID :0 smtp \
+    -Xx /var/qmail/control/rules.smtpsd.cdb \
+    -u $QMAILDUID -g $QMAILDGID :0 smtps \
     /usr/local/bin/rblsmtpd -W -C -r sbl-xbl.spamhaus.org \
     /var/qmail/bin/qmail-smtpd /var/vpopmail/bin/vchkpw true maildir  2>&1

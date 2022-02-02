@@ -1,20 +1,17 @@
 #!/bin/bash
 
-set -e
-
-if [ ! -f "/var/qmail/control/docker_config_done" ]; then
-    # QMAIL
-    echo "${QMAIL_NB_REMOTE}" > /var/qmail/control/concurrencyremote
-    echo -n "${QMAIL_NB_INCOMING}" > /var/qmail/control/concurrencyincoming
-    
-    # VPopmail
-    echo "default_quota ${VPOPMAIL_QUOTA}" > /var/vpopmail/etc/vlimits.default
-    echo "${VPOPMAIL_MYSQL_HOST}|0|${VPOPMAIL_MYSQL_USER}|${VPOPMAIL_MYSQL_PASS}|${VPOPMAIL_MYSQL_DB}" > /var/vpopmail/etc/vpopmail.mysql
-    echo "${VPOPMAIL_DEFAULT_DOMAIN}" > /var/vpopmail/etc/defaultdomain
-    chown 644 /var/vpopmail/etc/*
-    
-    # Dovecot
-    openssl dhparam -out /etc/dovecot/dh.pem 2048
+if [ ! -f "/var/qmail/control" ]; then
+	init_sqmail.sh
 fi
+
+# Create log directories
+mkdir -p /log/dovecot
+chown dovecot:docker /log/dovecot
+mkdir -p /log/clamd
+chown clamav:docker /log/clamd 
+mkdir -p /log/spamd /log/qmail-send /log/ /log/ /log/
+chown qmaill:docker /log/spamd /log/qmail-send /log/ /log/ /log/
+
+cp /var/qmail/control/spamassassin_sql.cf /etc/mail/spamassassin/sql.cf
 
 $@

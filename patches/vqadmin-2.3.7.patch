@@ -1,62 +1,24 @@
-==========================================================================================================
-Combined patch for vqadmin-2.3.7
-v. 2020.02.26
-by Roberto Puzzanghera - https://notes.sagredo.eu
-
-This patch modifies the following:
-
-* lang.c to lowercase the language file to solve compatibility issues with google-chrome and to avoid
-  errors due to "invalid language file" in some browsers.
-* replace the files config.sub and config.guess (copied from vpopmail dir) to allow compilation on 64b
-  platforms as well.
-* user.c to avoid that the clear pwd field will be shown (delete that part if you compiled vpopmail
-  with --enable-clear-password)
-* html/mod_user.html to prevent the erase of the password when modifying a user in case clear passwords
-  are disabled. Now the password field is not shown anymore.
-* user.c and domain.c to make the dynamic web page retrieve the vqadmin.css style sheet
-* Makefile.in to solve a bug that caused me a missing vqadmin.css file
-==========================================================================================================
-
-diff -ruN vqadmin-2.3.7-original/Makefile.in vqadmin-2.3.7/Makefile.in
---- vqadmin-2.3.7-original/Makefile.in	2005-01-11 21:36:55.000000000 +0100
-+++ vqadmin-2.3.7/Makefile.in	2020-02-26 17:21:12.180599205 +0100
-@@ -510,14 +510,14 @@
- 	$(mkinstalldirs)  @cgibindir@
- 	$(mkinstalldirs)  @cgibindir@/vqadmin
- 	$(mkinstalldirs)  @cgibindir@/vqadmin/html
--	$(mkinstalldirs)  @wwwroot@/images/vqadmin
-+	$(mkinstalldirs)  @cgibindir@/vqadmin/images/vqadmin
+diff -u -r ../vqadmin-2.3.7.orig/cgi.c ./cgi.c
+--- ../vqadmin-2.3.7.orig/cgi.c	2003-01-27 19:25:59.000000000 +0100
++++ ./cgi.c	2022-02-01 23:05:32.055700510 +0100
+@@ -227,13 +227,7 @@
  
- install-data-local:
- 	cp vqadmin         @cgibindir@/vqadmin/vqadmin.cgi
- 	strip              @cgibindir@/vqadmin/vqadmin.cgi
- 	cp -R html/*       @cgibindir@/vqadmin/html
- 	cp -R html/en      @cgibindir@/vqadmin/html/en-us
--	cp html/vqadmin.css   @wwwroot@/images/vqadmin
-+	cp html/vqadmin.css   @cgibindir@/vqadmin/images/vqadmin
- 	rm @cgibindir@/vqadmin/html/vqadmin.css
+   cgi_env();
  
- 	if test -f @cgibindir@/vqadmin/vqadmin.acl ; then \
-@@ -536,11 +536,11 @@
- 	chmod 755          @cgibindir@/vqadmin
- 	chmod 755          @cgibindir@/vqadmin/html
+-  env = cgi_is_env("REMOTE_USER");
+-  if (!env) {
+-    global_error("Username unknown", 0, 1);
+-    t_open(T_AUTH_FAILED, 1);
+-  }
+-
+-  memcpy((char *)vqa_user, (char *)env, MAX_GLOBAL_LENGTH);
++  memcpy((char *)vqa_user, "admin", MAX_GLOBAL_LENGTH);
+    
+   acl_init();
  
--	chown              @vpopuser@ @wwwroot@/images/vqadmin
--	chgrp              @vpopgroup@ @wwwroot@/images/vqadmin
--	chown -R           @vpopuser@ @wwwroot@/images/vqadmin/*
--	chgrp -R           @vpopgroup@ @wwwroot@/images/vqadmin/*
--	chmod 755          @wwwroot@/images/vqadmin
-+	chown              @vpopuser@ @cgibindir@/vqadmin/images/vqadmin
-+	chgrp              @vpopgroup@ @cgibindir@/vqadmin/images/vqadmin
-+	chown -R           @vpopuser@ @cgibindir@/vqadmin/images/vqadmin/*
-+	chgrp -R           @vpopgroup@ @cgibindir@/vqadmin/images/vqadmin/*
-+	chmod 755          @cgibindir@/vqadmin/images/vqadmin
- 
- 	if test -f @cgibindir@/vqadmin/.htaccess ; then \
- 		echo ".htaccess file already in place" ; \
-diff -ruN vqadmin-2.3.7-original/config.guess vqadmin-2.3.7/config.guess
---- vqadmin-2.3.7-original/config.guess	2002-05-21 15:36:38.000000000 +0200
-+++ vqadmin-2.3.7/config.guess	2020-02-26 17:21:12.181599194 +0100
+diff -u -r ../vqadmin-2.3.7.orig/config.guess ./config.guess
+--- ../vqadmin-2.3.7.orig/config.guess	2002-05-21 15:36:38.000000000 +0200
++++ ./config.guess	2022-02-01 23:03:25.877561435 +0100
 @@ -1,7 +1,10 @@
  #! /bin/sh
  # Attempt to guess a canonical system name.
@@ -1386,9 +1348,9 @@ diff -ruN vqadmin-2.3.7-original/config.guess vqadmin-2.3.7/config.guess
 +# time-stamp-format: "%:y-%02m-%02d"
 +# time-stamp-end: "'"
 +# End:
-diff -ruN vqadmin-2.3.7-original/config.sub vqadmin-2.3.7/config.sub
---- vqadmin-2.3.7-original/config.sub	2002-05-21 15:36:38.000000000 +0200
-+++ vqadmin-2.3.7/config.sub	2020-02-26 17:21:12.182599184 +0100
+diff -u -r ../vqadmin-2.3.7.orig/config.sub ./config.sub
+--- ../vqadmin-2.3.7.orig/config.sub	2002-05-21 15:36:38.000000000 +0200
++++ ./config.sub	2022-02-01 23:03:25.881561377 +0100
 @@ -1,9 +1,13 @@
  #! /bin/sh
 -# Configuration validation subroutine script, version 1.1.
@@ -2603,9 +2565,9 @@ diff -ruN vqadmin-2.3.7-original/config.sub vqadmin-2.3.7/config.sub
 +# time-stamp-format: "%:y-%02m-%02d"
 +# time-stamp-end: "'"
 +# End:
-diff -ruN vqadmin-2.3.7-original/domain.c vqadmin-2.3.7/domain.c
---- vqadmin-2.3.7-original/domain.c	2005-01-11 21:48:03.000000000 +0100
-+++ vqadmin-2.3.7/domain.c	2020-02-26 17:21:12.183599174 +0100
+diff -u -r ../vqadmin-2.3.7.orig/domain.c ./domain.c
+--- ../vqadmin-2.3.7.orig/domain.c	2005-01-11 21:48:03.000000000 +0100
++++ ./domain.c	2022-02-01 23:03:25.881561377 +0100
 @@ -446,9 +446,8 @@
    strncpy( face, get_lang_code("057"), 30);
    strncpy( size, get_lang_code("058"), 30);
@@ -2618,9 +2580,9 @@ diff -ruN vqadmin-2.3.7-original/domain.c vqadmin-2.3.7/domain.c
    printf("<FONT face=\"%s\" SIZE=\"%s\" color=\"%s\">\n",
      face, size, fgcolor);
  
-diff -ruN vqadmin-2.3.7-original/html/mod_user.html vqadmin-2.3.7/html/mod_user.html
---- vqadmin-2.3.7-original/html/mod_user.html	2005-01-11 21:42:28.000000000 +0100
-+++ vqadmin-2.3.7/html/mod_user.html	2020-02-26 17:22:06.420028560 +0100
+diff -u -r ../vqadmin-2.3.7.orig/html/mod_user.html ./html/mod_user.html
+--- ../vqadmin-2.3.7.orig/html/mod_user.html	2005-01-11 21:42:28.000000000 +0100
++++ ./html/mod_user.html	2022-02-01 23:04:28.616636134 +0100
 @@ -32,7 +32,6 @@
  <tr><td><INPUT TYPE="CHECKBOX" NAME="udisable" id="udisable" $-UP title="#-042"><label for="udisable" title="#-042">#-042</label></td></tr>
  <tr><td><INPUT TYPE="CHECKBOX" NAME="uweb" id="uweb" $-UW title="#-043"><label for="uweb" title="#-043">#-043</label></td></tr>
@@ -2629,9 +2591,10 @@ diff -ruN vqadmin-2.3.7-original/html/mod_user.html vqadmin-2.3.7/html/mod_user.
  <tr><td><INPUT TYPE="CHECKBOX" NAME="ubounce" id="ubounce" $-UB title="#-046"><label for="ubounce" title="#-046">#-046</label></td> </tr>
  <tr><td><INPUT TYPE="CHECKBOX" NAME="urelay" id="urelay" $-US title="#-047"><label for="urelay" title="#-047">#-047</label></td> </tr>
  <tr><td><INPUT TYPE="CHECKBOX" NAME="uspam" id="uspam" $-UF title="#-069"><label for="uspam" title="#-069">#-069</label></td> </tr>
-diff -ruN vqadmin-2.3.7-original/lang.c vqadmin-2.3.7/lang.c
---- vqadmin-2.3.7-original/lang.c	2002-08-09 01:27:07.000000000 +0200
-+++ vqadmin-2.3.7/lang.c	2020-02-26 17:21:12.183599174 +0100
+Only in ./html: mod_user.html.orig
+diff -u -r ../vqadmin-2.3.7.orig/lang.c ./lang.c
+--- ../vqadmin-2.3.7.orig/lang.c	2002-08-09 01:27:07.000000000 +0200
++++ ./lang.c	2022-02-01 23:03:25.885561317 +0100
 @@ -25,6 +25,9 @@
  #include <sys/types.h>
  #include <sys/stat.h>
@@ -2657,9 +2620,46 @@ diff -ruN vqadmin-2.3.7-original/lang.c vqadmin-2.3.7/lang.c
    }
  
    if ( lang_fs == NULL ) {
-diff -ruN vqadmin-2.3.7-original/user.c vqadmin-2.3.7/user.c
---- vqadmin-2.3.7-original/user.c	2005-01-11 22:10:35.000000000 +0100
-+++ vqadmin-2.3.7/user.c	2020-02-26 17:21:12.183599174 +0100
+diff -u -r ../vqadmin-2.3.7.orig/Makefile.in ./Makefile.in
+--- ../vqadmin-2.3.7.orig/Makefile.in	2005-01-11 21:36:55.000000000 +0100
++++ ./Makefile.in	2022-02-01 23:03:25.873561494 +0100
+@@ -510,14 +510,14 @@
+ 	$(mkinstalldirs)  @cgibindir@
+ 	$(mkinstalldirs)  @cgibindir@/vqadmin
+ 	$(mkinstalldirs)  @cgibindir@/vqadmin/html
+-	$(mkinstalldirs)  @wwwroot@/images/vqadmin
++	$(mkinstalldirs)  @cgibindir@/vqadmin/images/vqadmin
+ 
+ install-data-local:
+ 	cp vqadmin         @cgibindir@/vqadmin/vqadmin.cgi
+ 	strip              @cgibindir@/vqadmin/vqadmin.cgi
+ 	cp -R html/*       @cgibindir@/vqadmin/html
+ 	cp -R html/en      @cgibindir@/vqadmin/html/en-us
+-	cp html/vqadmin.css   @wwwroot@/images/vqadmin
++	cp html/vqadmin.css   @cgibindir@/vqadmin/images/vqadmin
+ 	rm @cgibindir@/vqadmin/html/vqadmin.css
+ 
+ 	if test -f @cgibindir@/vqadmin/vqadmin.acl ; then \
+@@ -536,11 +536,11 @@
+ 	chmod 755          @cgibindir@/vqadmin
+ 	chmod 755          @cgibindir@/vqadmin/html
+ 
+-	chown              @vpopuser@ @wwwroot@/images/vqadmin
+-	chgrp              @vpopgroup@ @wwwroot@/images/vqadmin
+-	chown -R           @vpopuser@ @wwwroot@/images/vqadmin/*
+-	chgrp -R           @vpopgroup@ @wwwroot@/images/vqadmin/*
+-	chmod 755          @wwwroot@/images/vqadmin
++	chown              @vpopuser@ @cgibindir@/vqadmin/images/vqadmin
++	chgrp              @vpopgroup@ @cgibindir@/vqadmin/images/vqadmin
++	chown -R           @vpopuser@ @cgibindir@/vqadmin/images/vqadmin/*
++	chgrp -R           @vpopgroup@ @cgibindir@/vqadmin/images/vqadmin/*
++	chmod 755          @cgibindir@/vqadmin/images/vqadmin
+ 
+ 	if test -f @cgibindir@/vqadmin/.htaccess ; then \
+ 		echo ".htaccess file already in place" ; \
+diff -u -r ../vqadmin-2.3.7.orig/user.c ./user.c
+--- ../vqadmin-2.3.7.orig/user.c	2005-01-11 22:10:35.000000000 +0100
++++ ./user.c	2022-02-01 23:03:25.889561258 +0100
 @@ -315,9 +315,8 @@
    strncpy( face, get_lang_code("057"), 29);
    strncpy( size, get_lang_code("058"), 29);
@@ -2700,3 +2700,21 @@ diff -ruN vqadmin-2.3.7-original/user.c vqadmin-2.3.7/user.c
        printf("<td align=middle><FONT face=%s color=\"%s\">", face, fgcolor );
        snprintf(workdir, 156, "%s/.qmail", vpw->pw_dir);
        fs=fopen(workdir,"r");
+diff -u -r ../vqadmin-2.3.7.orig/vqadmin.acl ./vqadmin.acl
+--- ../vqadmin-2.3.7.orig/vqadmin.acl	2002-08-07 00:48:57.000000000 +0200
++++ ./vqadmin.acl	2022-02-01 23:05:53.711381123 +0100
+@@ -34,13 +34,4 @@
+ # them.
+ #
+ 
+-tech VI tech1user
+-admin VIMUDCA admin1user
+-
+-#
+-# An asterisk in the features field specifies that you
+-# want all users in this group to have access to
+-# all features.
+-#
+-
+-senior * admin
++admin * admin

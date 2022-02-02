@@ -1,0 +1,62 @@
+#!/bin/ksh
+QMAIL="/var/qmail"
+#
+alias -x SCANNER='/usr/local/bin/clamdscan'
+alias -x SPAMMER='/usr/local/bin/spamc'
+alias -x 822FIELD='/usr/local/bin/822field'
+#
+SCANNERARGS="--no-summary"
+SPAMMERARGS="-u $RCPTTO"
+VERBOSE=0
+#
+## No code change necessary from here
+#
+typeset SPAM
+integer SPAMC=0
+integer SPAMTHRESHOLD=-1
+integer SPAMTH
+typeset SPAMDOMAINS
+
+ID="${RANDOM}$$"
+MESSAGE="${QMAIL}/tmp/msg.${ID}"
+export DTLINE="spam-queue"
+
+#
+[[ ! -d ${QMAIL}/tmp ]] && exit 53
+cat > ${MESSAGE} || exit 53
+
+#
+## Check Spamlevel for each domain
+#
+DOMAIN=$(echo ${RCPTTO} | cut -d '@' -f 2)
+SPAMTHRESHOLD=$(echo "SELECT value FROM spam_prefs WHERE (username = '${RCPTTO}' OR username = '$GLOBAL' OR username = '%${DOMAIN}') AND preference = 'refuse_threshold' ORDER BY username DESC LIMIT 1;"  | mysql -N -B -u vpopmail -p85p45r28zj654Vkp -h localhost vpopmail)
+
+[[ ${VERBOSE} -gt 0 ]] && print -u2 "User ${RCPTTO} / Domain ${DOMAIN} -- Threshold: {$SPAMTHRESHOLD}"
+
+if [[ ${SPAMTHRESHOLD} -ge 0 ]]; then
+#
+## Spam recognition -- the following codes is only useful for SpamAssassins spamc version 3.x
+#
+        SPAM=$(SPAMMER ${SPAMMERARGS} < ${MESSAGE} > ${MESSAGE}_$$ && mv ${MESSAGE}_$$ ${MESSAGE} || exit 53)
+        SPAM=$(822FIELD "X-Spam-Level" < ${MESSAGE} | head -1)
+        SPAM=${SPAM# }
+
+        if [[ "x${SPAM}" != "x" ]]; then
+                [[ $(echo "${SPAM}" | grep -c "\*") -gt 0 ]] && SPAMC=$(echo "${SPAM}" | wc -c)
+        else
+                SPAMC=$(echo "${SPAM}" | awk -F"/" '{print $1}' | awk -F"." '{print $1}')
+        fi
+        [[ ${VERBOSE} -gt 0 ]] && print -u2 "Spam: $SPAM - Spamc: $SPAMC"
+#
+## Spam rejection
+#
+        if [[ ${SPAMTHRESHOLD} -gt 0 && ${SPAMC} -gt 0 && ${SPAMC} -gt ${SPAMTHRESHOLD} ]]; then
+            export SPAMSCORE="${SPAMC}"
+            RC=33
+        fi
+fi
+
+[[ ${RC} -eq 0 ]] && ${QMAIL}/bin/qmail-queue < ${MESSAGE}
+
+rm ${MESSAGE}
+exit ${RC}

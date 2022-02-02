@@ -1,0 +1,2 @@
+#!/bin/sh
+exec setuidgid clamav multilog t s2000000 /log/clamd

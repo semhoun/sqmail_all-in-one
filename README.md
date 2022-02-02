@@ -19,6 +19,18 @@ This docker use sources and patches from
 
 
 
+Current Links
+
+https://notes.sagredo.eu/files/qmail/patches/
+
+https://notes.sagredo.eu/en/qmail-notes-185/installing-and-configuring-vpopmail-81.html
+
+https://wiki2.dovecot.org/HowTo/ConvertPasswordSchemes
+
+https://notes.sagredo.eu/en/qmail-notes-185/installing-dovecot-and-sieve-on-a-vpopmail-qmail-server-28.html#sql
+
+
+
 # Upgrade to try
 
 - https://github.com/bruceg/qmail-autoresponder
