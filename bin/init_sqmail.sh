@@ -58,39 +58,5 @@ EOF
 /usr/local/bin/freshclam 
 sa-update
 
-# Import
-	cd /var
-	tar xvzf /tmp/oldLeto/var.spamassassin.tgz
-	chmod -R 777 /var/
 	
-	sed -i "s/$OLDIP/$NEWIP/g" /var/qmail/control/rules.smtpd
-sed -i "s#$OLDIP#$NEWIP#g" /var/qmail/control/badhelo
-qmailctl cdb
-
-cd /tmp/
-tar xvzf /tmp/oldLeto/var.qmail.tgz
-rm -f /var/qmail/control/*
-cp /tmp/qmail/control/* /var/qmail/control/
-cp /tmp/qmail/etc/* /var/qmail/control/
-rm -f /var/qmail/control/*.lock
-cp /tmp/qmail/users/assign /var/qmail/users/
-/var/qmail/bin/qmail-newu #Eventuellement vérifier les users uid:gid
-rm -f /var/qmail/alias/.qmail-*
-cp -p /tmp/qmail/alias/.qmail* /var/qmail/alias/
-cd /tmp/
-cat /tmp/oldLeto/var.vpopmail.tgz.* | tar xvzfp -
-mv /tmp/vpopmail/domains/* /var/vpopmail/domains
-mv /tmp/vpopmail/domains/.dir-control /var/vpopmail/domains
-
-########################
-# Ram Disk pour QMAIL
-########################
-echo -e "tmpfs /var/qmail/tmp tmpfs defaults,size=256M,uid=qmaill,gid=sqmail,mode=777 0 0" >> /etc/fstab
-mkdir -p /var/qmail/tmp
-chown qmaill.sqmail /var/qmail/tmp
-mount /var/qmail/tmp
-
-##CHecker
-sed -i 's/selector=default/selector=leto/' http://www.memoryhole.net/qmail/qmail-remote.sh
-
 

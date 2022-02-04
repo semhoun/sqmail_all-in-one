@@ -12,6 +12,8 @@ services:
                 - UCSPISSL_TAG=${UCSPISSL_TAG}
                 - UCSPITCP6_TAG=${UCSPITCP6_TAG}
                 - DOVECOT_TAG=${DOVECOT_TAG}
+                - CLAMAV_TAG=${CLAMAV_TAG}
+                - SPAMASSASSIN_TAG=${SPAMASSASSIN_TAG}
         container_name: sqmail
         image: semhoun/sqmail:${SQMAIL_VERSION}
         environment:
@@ -25,8 +27,12 @@ services:
             - VPOPMAIL_DEFAULT_DOMAIN=semhoun.net
         volumes:
             - ./data/qcontrol:/var/qmail/control
-            - ./data/ssl:/var/qmail/ssl
-            - ./data/domains:/var/vpopmail/domains/"
+            - ./data/ssl:/ssl
+            - ./data/domains:/var/vpopmail/domains"
+            - ./data/vpopmail_etc:/var/vpopmail/etc"
+            - ./data/log:/log/"
+            - ./data/spamassassin:/var/spamassassin"
+            - ./data/tmp:"/var/qmail/tmp"
         ports:
             - 8090:80
             - 25:25
