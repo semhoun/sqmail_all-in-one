@@ -17,7 +17,7 @@ ARG CLAMAV_TAG
 ARG SPAMASSASSIN_TAG
 
 ########################  
-# Base intall
+# Base install
 ########################
 COPY patches /qmail-patches
 WORKDIR "/qmail-src"
@@ -42,6 +42,19 @@ RUN echo "deb http://deb.debian.org/debian buster-backports main contrib non-fre
   && touch /usr/share/man/man7/maildirquota.maildrop.7.gz
 
 ########################  
+# Encoding fix
+########################
+RUN apt-get -y install locales \
+	&& sed \
+			-e 's/# fr_FR.UTF-8 UTF-8/fr_FR.UTF-8 UTF-8/' \
+			-e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' \
+			-i /etc/locale.gen \
+  && /usr/sbin/locale-gen	en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
+
+########################  
 # Additionnals packages
 ########################
 RUN apt-get -y install bsd-mailx \
@@ -60,7 +73,7 @@ RUN mkdir -p /package \
     && chmod 1755 /package \
 ## fehQlibs
     && cd /qmail-src \
-    && wget http://www.fehcom.de/ipnet/fehQlibs/fehQlibs-${FEHQLIBS_TAG}.tgz \
+    && wget https://www.fehcom.de/ipnet/fehQlibs/fehQlibs-${FEHQLIBS_TAG}.tgz \
     && cd /usr/local \
     && tar xvzf /qmail-src/fehQlibs-${FEHQLIBS_TAG}.tgz \
     && mv fehQlibs-${FEHQLIBS_TAG} qlibs  \
@@ -68,7 +81,7 @@ RUN mkdir -p /package \
     && make \
 ## Daemontools
     && cd /qmail-src \
-    && wget http://cr.yp.to/daemontools/daemontools-${DAEMONTOOLS_TAG}.tar.gz \
+    && wget https://cr.yp.to/daemontools/daemontools-${DAEMONTOOLS_TAG}.tar.gz \
     && cd /package \
     && tar xvzf /qmail-src/daemontools-${DAEMONTOOLS_TAG}.tar.gz \
     && cd admin \
@@ -78,27 +91,28 @@ RUN mkdir -p /package \
     && package/install \
 ## ucspi-ssl    
     && cd /qmail-src \
-    && wget http://www.fehcom.de/ipnet/ucspi-ssl/ucspi-ssl-${UCSPISSL_TAG}.tgz \
+    && wget https://www.fehcom.de/ipnet/ucspi-ssl/ucspi-ssl-${UCSPISSL_TAG}.tgz \
     && cd /package \
     && tar xvzf /qmail-src/ucspi-ssl-${UCSPISSL_TAG}.tgz \
     && cd host/superscript.com/net/ucspi-ssl-${UCSPISSL_TAG} \
     && package/install \
 ## ucspi-tcp6
     && cd /qmail-src \
-    && wget http://www.fehcom.de/ipnet/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
+    && wget https://www.fehcom.de/ipnet/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
     && cd /package \
     && tar xvzf /qmail-src/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
     && cd net/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG} \
     && package/install \
 ## sqmail
     && cd /qmail-src \
-    && wget http://www.fehcom.de/sqmail/sqmail-${SQMAIL_TAG}.tgz \
+    && wget https://www.fehcom.de/sqmail/sqmail-${SQMAIL_TAG}.tgz \
     && cd /package \
     && tar xvzf /qmail-src/sqmail-${SQMAIL_TAG}.tgz \
     && cd mail/sqmail/sqmail-${SQMAIL_TAG} \
     && package/install; echo "Otherwise return 1" \
 ## cleaning
-    && rm -rf /qmail-src/*
+    && rm -rf /qmail-src/* \
+		&& rm -rf /var/qmail/svc /service/*
 # SSL Config
 COPY conf/ssl_env /var/qmail/ssl_env
     
@@ -116,8 +130,8 @@ RUN wget  http://dist.schmorp.de/libev/libev-4.33.tar.gz \
 # vpopmail
     && cd /qmail-src \
     && mkdir -p /var/vpopmail \
-    && groupadd -g 2110 vchkpw \
-    && useradd -g vchkpw -u 7800 -s /usr/sbin/nologin -d /var/vpopmail vpopmail \
+    && groupadd -g 89 vchkpw \
+    && useradd -g vchkpw -u 89 -s /usr/sbin/nologin -d /var/vpopmail vpopmail \
     && chown -R vpopmail.vchkpw /var/vpopmail \
     && wget http://downloads.sourceforge.net/project/vpopmail/vpopmail-stable/5.4.33/vpopmail-5.4.33.tar.gz \
     && tar xzf vpopmail-5.4.33.tar.gz \
@@ -125,28 +139,26 @@ RUN wget  http://dist.schmorp.de/libev/libev-4.33.tar.gz \
     && patch -p1 < /qmail-patches/roberto_vpopmail-5.4.33.patch \
     && autoreconf -f -i \
     && ./configure \
-        --enable-tcpserver-file=/var/qmail/control/relays.cdb \
-        --enable-incdir=/usr/include/mysql \
-        --enable-libdir=/usr/lib \
         --enable-qmaildir=/var/qmail/ \
         --enable-qmail-newu=/var/qmail/bin/qmail-newu \
         --enable-qmail-inject=/var/qmail/bin/qmail-inject \
         --enable-qmail-newmrh=/var/qmail/bin/qmail-newmrh \
+        --enable-tcpserver-file=/var/qmail/control/relays.cdb \
         --disable-roaming-users \
         --enable-auth-module=mysql \
-        --enable-logging=p \
+        --enable-incdir=/usr/include/mariadb \
+        --enable-libdir=/usr/lib \
+        --enable-logging=n \
         --disable-clear-passwd \
         --enable-auth-logging \
-        --enable-sql-logging \
-        --disable-valias \
+        --enable-sql-logging=e \
         --disable-passwd \
         --enable-qmail-ext \
-        --enable-learn-passwords \
         --enable-mysql-limits \
         --enable-sql-aliasdomains \
         --enable-defaultdelivery \
-    && make \
-    && make install \
+				--enable-valias \
+    && make install-strip \
 # vusaged
     && cd vusaged \
     && ./configure \
@@ -160,13 +172,16 @@ RUN wget  http://dist.schmorp.de/libev/libev-4.33.tar.gz \
 ########################
 # Dovecot
 ########################
-RUN groupadd -g 2111 dovecot \
-    && useradd -g dovecot -u 7801 -s /usr/sbin/nologin -d /var/run dovenull \
-    && useradd -g dovecot -u 7802 -s /usr/sbin/nologin -d /var/run dovecot \
+RUN groupadd -g 2110 dovecot \
+    && useradd -g dovecot -u 7798 -s /usr/sbin/nologin -d /var/run dovenull \
+    && useradd -g dovecot -u 7799 -s /usr/sbin/nologin -d /var/run dovecot \
     && wget https://dovecot.org/releases/2.3/dovecot-${DOVECOT_TAG}.tar.gz \
     && tar xvzf dovecot-${DOVECOT_TAG}.tar.gz \
     && cd dovecot-${DOVECOT_TAG} \
     && ./configure \
+        --prefix=/usr \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
         --with-sql \
         --with-mysql \
         --with-docs \
@@ -178,21 +193,11 @@ RUN groupadd -g 2111 dovecot \
         --without-sqlite \
     && make \
     && make install \
-    && mkdir -p /etc/dovecot/ \
-# Config
-    && openssl dhparam -out /etc/dovecot/dh.pem 2048 \
-    && cp -r /usr/local/share/doc/dovecot/example-config/* /etc/dovecot/ \
-    && sed -i 's@#!include auth-sql.conf.ext@!include auth-sql.conf.ext@' /etc/dovecot/conf.d/10-auth.conf \
-    && sed -i 's@!include auth-system.conf.ext@#!include auth-system.conf.ext@' /etc/dovecot/conf.d/10-auth.conf \
-    && sed -i 's@#disable_plaintext_auth = yes@disable_plaintext_auth = no@' /etc/dovecot/conf.d/10-auth.conf \
-    && sed -i 's@#log_path = syslog@log_path = /dev/stderr@' /etc/dovecot/conf.d/10-logging.conf \
-    && sed -i "s|#mail_max_userip_connections.*|mail_max_userip_connections = 25|" /etc/dovecot/conf.d/20-imap.conf \
-    && sed -i "s|#mail_max_userip_connections.*|mail_max_userip_connections = 25|" /etc/dovecot/conf.d/20-pop3.conf \
+    && mkdir -p /etc/dovecot/ /var/run/dovecot \
 # cleaning
     && rm -rf /qmail-src/*
 # Config files
-COPY conf/dovecot-ssl.conf /etc/dovecot/conf.d/10-ssl.conf
-COPY conf/dovecot-stats.conf /etc/dovecot/conf.d/90-stats.conf
+COPY conf/dovecot-etc/ /etc/
 
 ########################
 # Autorespond
@@ -374,6 +379,19 @@ RUN wget http://cr.yp.to/software/mess822-0.58.tar.gz \
   && rm -rf /qmail-src/*
 	
 ###########################
+# lighttpd
+###########################
+COPY conf/lighttpd.conf /etc/lighttpd/lighttpd.conf
+
+###########################
+# swaks (for test)
+###########################
+RUN wget http://www.jetmore.org/john/code/swaks/latest/swaks \
+	&& install swaks /usr/local/bin \
+# cleaning
+  && rm -rf /qmail-src/*	
+	
+###########################
 # Binaries
 ###########################
 COPY bin/maildrop-filter /var/qmail/bin/maildrop-filter
@@ -402,34 +420,38 @@ COPY bin/run/clamd /service/clamd/run
 COPY bin/log/clamd /service/clamd/log/run
 COPY bin/run/spamd /service/spamd/run
 COPY bin/log/spamd /service/spamd/log/run
+COPY bin/run/lighttpd /service/lighttpd/run
+COPY bin/log/lighttpd /service/lighttpd/log/run
     
 ###########################
 # Templates
 ###########################
 RUN mkdir /var/tpl \
   && mv /var/qmail/control/ /var/tpl/qmail
-COPY message/quotawarn.msg /var/vpopmail/domains.tpl/quotawarn.msg
+COPY message/quotawarn.msg /var/tpl/vpopmail/quotawarn.msg
+COPY conf/dovecot-sql.conf.ext /var/tpl/qmail
 
 ###########################
 # Volumes
 ###########################
 RUN mkdir -p \
-	/var/vpopmail/domains/ \
-	/ssl \
-	/var/vpopmail/etc \
-	/var/qmail/control \
-	/log \
-	/var/spamassassin \
-	/var/qmail/tmp
+  /var/vpopmail/domains/ \
+  /ssl \
+  /var/vpopmail/etc \
+  /var/qmail/control \
+  /log \
+  /var/spamassassin \
+  /var/qmail/tmp
 
 VOLUME [ \
-	"/var/vpopmail/domains/",\
-	"/ssl",\
-	"/var/vpopmail/etc",\
-	"/var/qmail/control",\
-	"/log",\
-	"/var/spamassassin",\
-	"/var/qmail/tmp" \
+  "/var/vpopmail/domains",\
+  "/ssl",\
+  "/var/vpopmail/etc",\
+  "/var/qmail/control",\
+  "/log",\
+  "/var/spamassassin",\
+  "/var/qmail/tmp", \
+	"/var/qmail/users" \
 ]
 
 
@@ -454,5 +476,5 @@ EXPOSE 80
 COPY bin/docker-entrypoint.sh /bin/
 ENTRYPOINT ["/bin/docker-entrypoint.sh"]
 
-CMD ["/command/svscanboot"]
+CMD ["/command/svscan", "/service", "2>&1"]
 

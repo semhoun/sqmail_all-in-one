@@ -1,0 +1,34 @@
+# Authentication for SQL users. Included from 10-auth.conf.
+#
+# <doc/wiki/AuthDatabase.SQL.txt>
+
+passdb {
+  driver = sql
+
+  # Path for SQL configuration file, see example-config/dovecot-sql.conf.ext
+  args = /var/qmail/control/dovecot-sql.conf.ext
+}
+
+# "prefetch" user database means that the passdb already provided the
+# needed information and there's no need to do a separate userdb lookup.
+# <doc/wiki/UserDatabase.Prefetch.txt>
+userdb {
+  driver = prefetch
+}
+
+#
+# This is for LDA. It will do a passdb query in any case.
+# But using the prefetch driver will speed up our normal imap operations and
+# this is more important.
+userdb {
+  driver = static
+  args = uid=89 gid=89 home=/var/vpopmail/domains/%d/%n
+}
+
+# This is needed for the iteration feature. It needs a userdb sql query.
+# The order of the declared drivers is important. Leave this at the end, otherwise
+# it will be used also for the login instead of the prefetch, which is faster.
+userdb {
+  driver = sql
+  args = /var/qmail/control/dovecot-sql.conf.ext
+}

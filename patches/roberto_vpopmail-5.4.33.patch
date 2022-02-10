@@ -1,5 +1,4 @@
-v. 2021.04.18
-
+v. 2021.10.30
 Combined patch for vpopmail-5.4.33 by Roberto Puzzanghera
 
 More info here:
@@ -14,6 +13,7 @@ https://notes.sagredo.eu/en/qmail-notes-185/dovecot-vpopmail-auth-driver-removal
   aware of domain aliases, provided that you modify the sql query accordingly.
   More info here https://notes.sagredo.eu/en/qmail-notes-185/dovecot-vpopmail-auth-driver-removal-241.html
   See doc/README.sql-aliasdomains for more info.
+  https://notes.sagredo.eu/files/qmail/patches/vpopmail/vpopmail-5.4.33_sql-aliasdomains.patch
 
 * A patch which installs the sql procedure needed for the dovecot's password_query for servers
   with one table for each domains (--disable-many-domains).
@@ -22,14 +22,30 @@ https://notes.sagredo.eu/en/qmail-notes-185/dovecot-vpopmail-auth-driver-removal
   It supports aliasdomains and user/domain limits.
   This feature does nothing if you have all domains in the vpopmail table (--enable-many-domains).
   See doc/README.dovecot-pwd-query for more info.
+  https://notes.sagredo.eu/files/qmail/patches/vpopmail/vpopmail-5.4.33_dovecot-pwd_query.patch
 
 * A patch which makes vpopmail to copy your favourite delivery agent (stored in QMAILDIR/control/defauldelivery)
   into the .qmail-default file of any newly created domain, overriding the default vpopmail's behaviour,
   where vpopmail copies its delivery agent vdelivermail.
   configure --enable-defaultdelivery (default is OFF) to enable this functionality.
   See doc/README.defaultdelivery for more info.
+  https://notes.sagredo.eu/files/qmail/patches/vpopmail/vpopmail-5.4.33-defaultdelivery.patch
+
+* vusaged-configure patch
+  It seems that at least on Debian 11 vusaged refuses to run the configure successfully, as the mysql libraries
+  are not linked with this error: configure: error: No vauth_getpw in libvpopmail
+  After some inspection, I noticed that avoiding the break of the configure command, the
+  following make command will find libmysqlclient and compile with no problems, and the program works as expected.
+  NB: an "autoreconf -f -i" into the vusaged directory is needed before configuring, as the configure.ac was
+  modified.
+  https://notes.sagredo.eu/files/qmail/patches/vpopmail/vpopmail-5.4.33-vusaged-configure.patch
+
+* A "recipient check" program to be used with E. Hoffmann's s/qmail.
+  Look at doc/README.vrcptcheck for more info.
+  https://notes.sagredo.eu/files/qmail/patches/vpopmail/vpopmail-5.4.33_vrcptcheck.patch
 
 * A patch which gets vpopmail to compile with gcc-10
+  https://notes.sagredo.eu/files/qmail/patches/vpopmail/vpopmail-5.4.33_gcc-10-compat.patch
 
 === Settings
 
@@ -39,11 +55,11 @@ https://notes.sagredo.eu/en/qmail-notes-185/dovecot-vpopmail-auth-driver-removal
 
 * Browse the doc/ directory for more info
 
-=================================================================================================
+================================================================================================
 
 diff -ruN ../vpopmail-5.4.33-original/Makefile.am vpopmail-5.4.33/Makefile.am
 --- ../vpopmail-5.4.33-original/Makefile.am	2011-02-28 18:00:45.000000000 +0100
-+++ vpopmail-5.4.33/Makefile.am	2021-03-09 11:07:39.138178123 +0100
++++ vpopmail-5.4.33/Makefile.am	2021-10-30 19:33:38.141169429 +0200
 @@ -19,6 +19,7 @@
  MYSQLCONF=$(DESTDIR)@vpopmaildir@/etc/vpopmail.mysql
  VLIMITS=$(DESTDIR)@vpopmaildir@/etc/vlimits.default
@@ -57,21 +73,24 @@ diff -ruN ../vpopmail-5.4.33-original/Makefile.am vpopmail-5.4.33/Makefile.am
   vpopbull vdeloldusers vmoduser valias vuserinfo vmkpasswd vipmap \
   vdominfo vconvert vkill vmoddomlimits vchangepw dotqmail2valias \
 - vpopmaild vlist authvchkpw vusagec
-+ vpopmaild vlist authvchkpw vusagec vsavealiasdomains
++ vpopmaild vlist authvchkpw vusagec vsavealiasdomains vrcptcheck
  
  vusagec_SOURCES = vusagec.c client.c conf.c ippp.c
  vusagec_LDADD = libvpopmail.a @auth_libs@
-@@ -114,6 +115,9 @@
+@@ -114,6 +115,12 @@
  vmoddomlimits_SOURCES = vmoddomlimits.c
  vmoddomlimits_LDADD = libvpopmail.a  @auth_libs@
  
 +vsavealiasdomains_SOURCES = vsavealiasdomains.c
 +vsavealiasdomains_LDADD = libvpopmail.a  @auth_libs@
 +
++vrcptcheck_SOURCES = vrcptcheck.c
++vrcptcheck_LDADD = libvpopmail.a @auth_libs@
++
  DEFS=-I. @auth_inc@ 
  
  install: install-recursive vusage-msg
-@@ -149,6 +153,13 @@
+@@ -149,6 +156,13 @@
  	echo "-L@vpopmaildir@/lib -lvpopmail @auth_libs@ @LIBS@" > \
  	 $(DESTDIR)@vpopmaildir@/etc/lib_deps
  
@@ -87,7 +106,7 @@ diff -ruN ../vpopmail-5.4.33-original/Makefile.am vpopmail-5.4.33/Makefile.am
  		vusagec.conf $(VUSAGECCONF); \
 diff -ruN ../vpopmail-5.4.33-original/configure.in vpopmail-5.4.33/configure.in
 --- ../vpopmail-5.4.33-original/configure.in	2011-02-28 18:00:45.000000000 +0100
-+++ vpopmail-5.4.33/configure.in	2021-04-06 20:00:32.358213810 +0200
++++ vpopmail-5.4.33/configure.in	2021-10-30 19:33:38.135169483 +0200
 @@ -1454,6 +1454,29 @@
          ;;
  esac
@@ -122,11 +141,45 @@ diff -ruN ../vpopmail-5.4.33-original/configure.in vpopmail-5.4.33/configure.in
  
  #----------------------------------------------------------------------
  
++AC_MSG_CHECKING(whether sql-aliasdomains is enabled)
++AC_ARG_ENABLE(sql-aliasdomains,
++        [  --enable-sql-aliasdomains  Saves the domain aliases to database. Only valid for MySQL auth module.],
++        SQL_ALIASDOMAINS=$enableval,
++                [
++	                if [[ "$AUTH_MODULE" != "mysql" ]];
++		        then
++	                        SQL_ALIASDOMAINS=n
++	                else
++				SQL_ALIASDOMAINS=y
++				AC_DEFINE_UNQUOTED(SQL_ALIASDOMAINS,$SQL_ALIASDOMAINS,"")
++	                fi
++                ]
++)
++
++case $SQL_ALIASDOMAINS in
++  1*|y*|Y*)
++                AC_MSG_RESULT(yes)
++		if [[ "$AUTH_MODULE" != "mysql" ]];
++                then
++			AC_MSG_ERROR(sql-aliasdomains is only supported in the MySQL authentication module.)
++                else
++			SQL_ALIASDOMAINS=1
++			AC_DEFINE_UNQUOTED(SQL_ALIASDOMAINS,$SQL_ALIASDOMAINS,"")
++                fi
++        ;;
++  *)
++                AC_MSG_RESULT(no)
++                SQL_ALIASDOMAINS=0
++        ;;
++esac
++
++#----------------------------------------------------------------------
++
 +# MySQL binary is needed because we have to create the procedure calling an sql file via command line
 +# This is only with --disable-many-domains
 +AC_SUBST(MANY_DOMAINS)
 +
-+if test $MANY_DOMAINS = 0
++if test $MANY_DOMAINS = 0 && test $SQL_ALIASDOMAINS = 1
 +then
 +
 +  AC_MSG_CHECKING(whether we can locate the MySQL binary)
@@ -174,40 +227,6 @@ diff -ruN ../vpopmail-5.4.33-original/configure.in vpopmail-5.4.33/configure.in
 +
 +#----------------------------------------------------------------------
 +
-+AC_MSG_CHECKING(whether sql-aliasdomains is enabled)
-+AC_ARG_ENABLE(sql-aliasdomains,
-+        [  --enable-sql-aliasdomains  Saves the domain aliases to database. Only valid for MySQL auth module.],
-+        SQL_ALIASDOMAINS=$enableval,
-+                [
-+	                if [[ "$AUTH_MODULE" != "mysql" ]];
-+		        then
-+	                        SQL_ALIASDOMAINS=n
-+	                else
-+				SQL_ALIASDOMAINS=y
-+				AC_DEFINE_UNQUOTED(SQL_ALIASDOMAINS,$SQL_ALIASDOMAINS,"")
-+	                fi
-+                ]
-+)
-+
-+case $SQL_ALIASDOMAINS in
-+  1*|y*|Y*)
-+                AC_MSG_RESULT(yes)
-+		if [[ "$AUTH_MODULE" != "mysql" ]];
-+                then
-+			AC_MSG_ERROR(sql-aliasdomains is only supported in the MySQL authentication module.)
-+                else
-+			SQL_ALIASDOMAINS=1
-+			AC_DEFINE_UNQUOTED(SQL_ALIASDOMAINS,$SQL_ALIASDOMAINS,"")
-+                fi
-+        ;;
-+  *)
-+                AC_MSG_RESULT(no)
-+                SQL_ALIASDOMAINS=0
-+        ;;
-+esac
-+
-+#----------------------------------------------------------------------
-+
  AC_MSG_CHECKING(whether any discontinued --enable commands have been used)
  
  AC_ARG_ENABLE(mysql-logging, [],
@@ -247,7 +266,7 @@ diff -ruN ../vpopmail-5.4.33-original/configure.in vpopmail-5.4.33/configure.in
      echo "      spamassassin = ON  --enable-spamassassin"
 diff -ruN ../vpopmail-5.4.33-original/doc/README.defaultdelivery vpopmail-5.4.33/doc/README.defaultdelivery
 --- ../vpopmail-5.4.33-original/doc/README.defaultdelivery	1970-01-01 01:00:00.000000000 +0100
-+++ vpopmail-5.4.33/doc/README.defaultdelivery	2021-03-30 10:55:44.036836446 +0200
++++ vpopmail-5.4.33/doc/README.defaultdelivery	2021-10-30 19:33:38.137169465 +0200
 @@ -0,0 +1,19 @@
 +vpopmail-defaultdelivery patch for vpopmail-5.4.33 by Roberto Puzzanghera
 +More info here https://notes.sagredo.eu/en/qmail-notes-185/installing-and-configuring-vpopmail-81.html
@@ -270,8 +289,9 @@ diff -ruN ../vpopmail-5.4.33-original/doc/README.defaultdelivery vpopmail-5.4.33
 +installed with the "delete" option instead of "bounce-no-mailbox", which is not reasonable anymore.
 diff -ruN ../vpopmail-5.4.33-original/doc/README.dovecot-pwd-query vpopmail-5.4.33/doc/README.dovecot-pwd-query
 --- ../vpopmail-5.4.33-original/doc/README.dovecot-pwd-query	1970-01-01 01:00:00.000000000 +0100
-+++ vpopmail-5.4.33/doc/README.dovecot-pwd-query	2021-03-27 12:30:31.588286092 +0100
-@@ -0,0 +1,26 @@
++++ vpopmail-5.4.33/doc/README.dovecot-pwd-query	2021-10-30 19:33:38.139169447 +0200
+@@ -0,0 +1,29 @@
++v. 2021.07.08
 +vpopmail-dovecot-pwd_query patch for vpopmail-5.4.33 by Roberto Puzzanghera
 +More info here https://notes.sagredo.eu/en/qmail-notes-185/installing-and-configuring-vpopmail-81.html
 +
@@ -292,15 +312,17 @@ diff -ruN ../vpopmail-5.4.33-original/doc/README.dovecot-pwd-query vpopmail-5.4.
 +
 +== Settings
 +
++This patch must be installed over the "sql-aliasdomains" patch.
++
 +An autoreconf is needed as I modified the original configure.in and Makefile.am files.
 +
 +Configure as follows:
 +
 +autoreconf -f -i
-+./configure --disable-many-domains --enable-mysql-bin=PATH
++./configure --disable-many-domains --enable-sql-aliasdomains --enable-mysql-bin=PATH
 diff -ruN ../vpopmail-5.4.33-original/doc/README.sql-aliasdomains vpopmail-5.4.33/doc/README.sql-aliasdomains
 --- ../vpopmail-5.4.33-original/doc/README.sql-aliasdomains	1970-01-01 01:00:00.000000000 +0100
-+++ vpopmail-5.4.33/doc/README.sql-aliasdomains	2021-03-27 12:30:18.988411946 +0100
++++ vpopmail-5.4.33/doc/README.sql-aliasdomains	2021-10-30 19:33:38.139169447 +0200
 @@ -0,0 +1,61 @@
 +sql-aliasdomains patch for vpopmail-5.4.33 by Roberto Puzzanghera
 +More info here https://notes.sagredo.eu/en/qmail-notes-185/dovecot-vpopmail-auth-driver-removal-241.html
@@ -363,9 +385,21 @@ diff -ruN ../vpopmail-5.4.33-original/doc/README.sql-aliasdomains vpopmail-5.4.3
 +  to save all your domain aliases to MySQL.
 +  Type "vsavealiasadomains -A" to save all your domain aliases to MySQL.
 +  Type "vsavealiasadomains -h" for more options.
+diff -ruN ../vpopmail-5.4.33-original/doc/README.vrcptcheck vpopmail-5.4.33/doc/README.vrcptcheck
+--- ../vpopmail-5.4.33-original/doc/README.vrcptcheck	1970-01-01 01:00:00.000000000 +0100
++++ vpopmail-5.4.33/doc/README.vrcptcheck	2021-10-30 19:33:38.139169447 +0200
+@@ -0,0 +1,8 @@
++vrcptcheck is a recipient check for s/qmail
++
++Just call this program within /var/qmail/control/recipients as follows:
++
++cat /home/vpopmail/bin/vrcptcheck > /var/qmail/control/recipients
++
++You have to provide an "autoreconf -f -i" before configuring, as the original
++Makefiele.am has been modified.
 diff -ruN ../vpopmail-5.4.33-original/dovecot/pwd-query_disable-many-domains.sql vpopmail-5.4.33/dovecot/pwd-query_disable-many-domains.sql
 --- ../vpopmail-5.4.33-original/dovecot/pwd-query_disable-many-domains.sql	1970-01-01 01:00:00.000000000 +0100
-+++ vpopmail-5.4.33/dovecot/pwd-query_disable-many-domains.sql	2021-03-09 09:19:03.530730837 +0100
++++ vpopmail-5.4.33/dovecot/pwd-query_disable-many-domains.sql	2021-10-30 19:33:38.141169429 +0200
 @@ -0,0 +1,141 @@
 +/************************************************************************************************
 +  password_query procedure for dovecot's sql auth in case of --disable-many-domains.
@@ -510,7 +544,7 @@ diff -ruN ../vpopmail-5.4.33-original/dovecot/pwd-query_disable-many-domains.sql
 +DELIMITER ;
 diff -ruN ../vpopmail-5.4.33-original/vmysql.c vpopmail-5.4.33/vmysql.c
 --- ../vpopmail-5.4.33-original/vmysql.c	2011-02-28 18:00:45.000000000 +0100
-+++ vpopmail-5.4.33/vmysql.c	2021-04-18 12:59:51.847675065 +0200
++++ vpopmail-5.4.33/vmysql.c	2021-10-30 19:33:38.141169429 +0200
 @@ -96,6 +96,20 @@
  void vcreate_lastauth_table();
  #endif
@@ -532,11 +566,13 @@ diff -ruN ../vpopmail-5.4.33-original/vmysql.c vpopmail-5.4.33/vmysql.c
  
  /************************************************************************/
  /* 
-@@ -356,13 +370,17 @@
+@@ -356,13 +370,19 @@
  int vauth_adddomain( char *domain )
  {
  #ifndef MANY_DOMAINS
++#ifdef SQL_ALIASDOMAINS
 +  vcreate_pwd_query_proc();
++#endif
    vset_default_domain( domain );
    return (vauth_create_table (vauth_munch_domain( domain ), TABLE_LAYOUT, 1));
  #else
@@ -551,7 +587,7 @@ diff -ruN ../vpopmail-5.4.33-original/vmysql.c vpopmail-5.4.33/vmysql.c
  }
  
  
-@@ -1866,3 +1884,79 @@
+@@ -1866,3 +1886,79 @@
  
    return(strcmp(crypt(clear_pass,vpw->pw_passwd),vpw->pw_passwd));
  }
@@ -633,7 +669,7 @@ diff -ruN ../vpopmail-5.4.33-original/vmysql.c vpopmail-5.4.33/vmysql.c
 +
 diff -ruN ../vpopmail-5.4.33-original/vmysql.h vpopmail-5.4.33/vmysql.h
 --- ../vpopmail-5.4.33-original/vmysql.h	2011-02-28 18:00:45.000000000 +0100
-+++ vpopmail-5.4.33/vmysql.h	2021-04-18 13:02:45.147955369 +0200
++++ vpopmail-5.4.33/vmysql.h	2021-10-30 19:33:38.132169510 +0200
 @@ -41,21 +41,6 @@
     
   */
@@ -671,7 +707,7 @@ diff -ruN ../vpopmail-5.4.33-original/vmysql.h vpopmail-5.4.33/vmysql.h
 +int vcreate_pwd_query_proc();
 diff -ruN ../vpopmail-5.4.33-original/vpgsql.c vpopmail-5.4.33/vpgsql.c
 --- ../vpopmail-5.4.33-original/vpgsql.c	2011-02-28 18:00:45.000000000 +0100
-+++ vpopmail-5.4.33/vpgsql.c	2021-02-14 18:03:15.812565902 +0100
++++ vpopmail-5.4.33/vpgsql.c	2021-10-30 19:33:38.131169519 +0200
 @@ -392,10 +392,10 @@
  #endif
  
@@ -701,7 +737,7 @@ diff -ruN ../vpopmail-5.4.33-original/vpgsql.c vpopmail-5.4.33/vpgsql.c
  #endif
 diff -ruN ../vpopmail-5.4.33-original/vpopmail.c vpopmail-5.4.33/vpopmail.c
 --- ../vpopmail-5.4.33-original/vpopmail.c	2011-02-28 18:00:45.000000000 +0100
-+++ vpopmail-5.4.33/vpopmail.c	2021-04-06 16:46:23.869331004 +0200
++++ vpopmail-5.4.33/vpopmail.c	2021-10-30 19:33:38.131169519 +0200
 @@ -147,7 +147,16 @@
   char Dir[MAX_BUFF];
   int call_dir;
@@ -779,7 +815,7 @@ diff -ruN ../vpopmail-5.4.33-original/vpopmail.c vpopmail-5.4.33/vpopmail.c
  
 diff -ruN ../vpopmail-5.4.33-original/vpopmail.h vpopmail-5.4.33/vpopmail.h
 --- ../vpopmail-5.4.33-original/vpopmail.h	2011-02-28 18:00:45.000000000 +0100
-+++ vpopmail-5.4.33/vpopmail.h	2021-02-26 20:43:41.036073594 +0100
++++ vpopmail-5.4.33/vpopmail.h	2021-10-30 19:33:38.136169474 +0200
 @@ -372,3 +372,6 @@
  #ifdef USERS_BIG_DIR
  char *backfill(char *, char *, char *, int);
@@ -787,9 +823,91 @@ diff -ruN ../vpopmail-5.4.33-original/vpopmail.h vpopmail-5.4.33/vpopmail.h
 +
 +int vcreate_sql_aliasdomain(char *domain, char *alias);
 +int vdelete_sql_aliasdomain(char *alias);
+diff -ruN ../vpopmail-5.4.33-original/vrcptcheck.c vpopmail-5.4.33/vrcptcheck.c
+--- ../vpopmail-5.4.33-original/vrcptcheck.c	1970-01-01 01:00:00.000000000 +0100
++++ vpopmail-5.4.33/vrcptcheck.c	2021-10-30 19:33:38.141169429 +0200
+@@ -0,0 +1,78 @@
++/*
++ * $Id: vrcptcheck.c 2021-09-23
++ * Roberto Puzzanghera - https://notes.sagredo.eu
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
++ */
++
++/*
++ * Recipient check for s/qmail.
++ * Just call this program within /var/qmail/control/recipients as follows:
++ * cat /home/vpopmail/bin/vrcptcheck > /var/qmail/control/recipients
++
++ * @file vrcptcheck.c
++   @return 0: virtual user exists
++           1: virtual user does not exist
++           111: temporary problem
++ */
++
++#include <dirent.h>
++#include <memory.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include "vpopmail.h"
++
++#define FDAUTH 3
++char inputbuf[MAX_BUFF];
++
++void pam_exit(int fail, DIR *dir)
++{
++	int i;
++	close(FDAUTH);
++	for (i = 0; i < sizeof(inputbuf); ++i) inputbuf[i] = 0;
++	if (dir != NULL) closedir(dir);
++	vexit(fail);
++}
++
++void main(int argc, char *argv[])
++{
++	char path[MAX_BUFF];
++	DIR *dir;
++
++        /* read input */
++        if (read(FDAUTH, inputbuf, sizeof(inputbuf)) == -1)
++        {
++                fprintf(stderr, "qmail-smtpd: Error while reading file descriptor in vrcptcheck\n");
++                pam_exit(111,NULL);
++        }
++        close(FDAUTH);
++
++        /* retrieve username/domain (assuming that MAV has already been done) */
++        int i = 0;
++        char *p = strtok (inputbuf, "@");
++        char *recipient[2];
++        while (p != NULL)
++        {
++                recipient[i++] = p;
++                p = strtok (NULL, "@");
++        }
++
++	/* recipient check */
++	snprintf(path, MAX_BUFF, "%s/%s", vget_assign(recipient[1], NULL, 0, NULL, NULL), recipient[0]);
++	dir = opendir(path);
++	if (dir) pam_exit(0, dir);
++	else pam_exit(1, dir);
++}
 diff -ruN ../vpopmail-5.4.33-original/vsavealiasdomains.c vpopmail-5.4.33/vsavealiasdomains.c
 --- ../vpopmail-5.4.33-original/vsavealiasdomains.c	1970-01-01 01:00:00.000000000 +0100
-+++ vpopmail-5.4.33/vsavealiasdomains.c	2021-04-14 20:46:37.266080059 +0200
++++ vpopmail-5.4.33/vsavealiasdomains.c	2021-10-30 19:33:38.136169474 +0200
 @@ -0,0 +1,251 @@
 +/*
 + * $Id: vsavealiasdomains.c 2021-02-15
@@ -1042,3 +1160,27 @@ diff -ruN ../vpopmail-5.4.33-original/vsavealiasdomains.c vpopmail-5.4.33/vsavea
 +        }
 +}
 +#endif
+diff -ruN ../vpopmail-5.4.33-original/vusaged/configure.ac vpopmail-5.4.33/vusaged/configure.ac
+--- ../vpopmail-5.4.33-original/vusaged/configure.ac	2011-02-28 18:00:45.000000000 +0100
++++ vpopmail-5.4.33/vusaged/configure.ac	2021-10-30 19:33:38.141169429 +0200
+@@ -392,17 +392,17 @@
+ 
+ if test x"$ac_cv_lib_vpopmail_vauth_getpw" = xno
+ then
+-   AC_MSG_ERROR([No vauth_getpw in libvpopmail])
++   AC_MSG_RESULT([No vauth_getpw in libvpopmail])
+ fi
+ 
+ if test x"$ac_cv_lib_vpopmail_vauth_getall" = xno
+ then
+-   AC_MSG_ERROR([No vauth_getall in libvpopmail])
++   AC_MSG_RESULT([No vauth_getall in libvpopmail])
+ fi
+ 
+ if test x"$ac_cv_lib_vpopmail_get_domain_entries" = xno
+ then
+-   AC_MSG_ERROR([No get_domain_entires in libvpopmail])
++   AC_MSG_RESULT([No get_domain_entires in libvpopmail])
+ fi
+ 
+ if test x"$ac_cv_lib_vpopmail_client_query_quick" = xno

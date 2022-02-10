@@ -50,14 +50,7 @@ https://notes.sagredo.eu/en/qmail-notes-185/installing-dovecot-and-sieve-on-a-vp
 
 
 
-########################
 
-# Ram Disk pour QMAIL
-########################
-echo -e "tmpfs /var/qmail/tmp tmpfs defaults,size=256M,uid=qmaill,gid=sqmail,mode=777 0 0" >> /etc/fstab
-mkdir -p /var/qmail/tmp
-chown qmaill.sqmail /var/qmail/tmp
-mount /var/qmail/tmp
 
 
 
@@ -67,3 +60,9 @@ Now copy the startup script ro */etc/rc.d* (Slackware) or *init.d* and run it. T
 cp contrib/rc.vusaged /etc/rc.d/
 /etc/rc.d/rc.vusaged start
 ```
+
+
+
+TODO:
+
+https://notes.sagredo.eu/en/qmail-notes-185/sieve-interpreter-dovecot-managesieve-31.html

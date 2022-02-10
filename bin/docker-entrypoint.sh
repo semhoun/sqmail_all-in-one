@@ -1,20 +1,20 @@
 #!/bin/bash
 
-if [ ! -f "/var/qmail/control" ]; then
-	init_sqmail.sh
-fi
-
-# Create log directories
-mkdir -p /log/dovecot
-chown dovecot:docker /log/dovecot
-mkdir -p /log/clamd
-chown clamav:docker /log/clamd 
-mkdir -p /log/spamd /log/qmail-send /log/ /log/ /log/
-chown qmaill:docker /log/spamd /log/qmail-send /log/ /log/ /log/
-
 # Fix qmail tmp permissions
 chown qmaill.sqmail -R /var/qmail/tmp
 
+# Fix some config file who was not in volumes
 cp /var/qmail/control/spamassassin_sql.cf /etc/mail/spamassassin/sql.cf
+cp /var/qmail/control/mailname /etc/mailname
+
+if [ ! -s "/var/lib/clamav" ]; then
+	echo "[CLAMAV] Lanching first time freshclam ..."
+	/usr/bin/freshclam 
+fi
+
+if [ ! -s "/var/lib/spamassassin/" ]; then
+	echo "[SPAMASSASSIN] Lanching first time sa-update ..."
+	/usr/local/bin/sa-update
+fi
 
 $@

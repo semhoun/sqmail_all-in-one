@@ -3,8 +3,6 @@ version: "3.2"
 services:
     sqmail:
         build:
-            context: .
-            dockerfile: dockerfile
             args:
                 - SQMAIL_TAG=${SQMAIL_TAG}
                 - FEHQLIBS_TAG=${FEHQLIBS_TAG}
@@ -14,7 +12,6 @@ services:
                 - DOVECOT_TAG=${DOVECOT_TAG}
                 - CLAMAV_TAG=${CLAMAV_TAG}
                 - SPAMASSASSIN_TAG=${SPAMASSASSIN_TAG}
-        container_name: sqmail
         image: semhoun/sqmail:${SQMAIL_VERSION}
         environment:
             - QMAIL_NB_REMOTE=5
@@ -26,13 +23,14 @@ services:
             - VPOPMAIL_MYSQL_PASS=vpopmail_pwd
             - VPOPMAIL_DEFAULT_DOMAIN=semhoun.net
         volumes:
-            - ./data/qcontrol:/var/qmail/control
-            - ./data/ssl:/ssl
-            - ./data/domains:/var/vpopmail/domains"
-            - ./data/vpopmail_etc:/var/vpopmail/etc"
-            - ./data/log:/log/"
-            - ./data/spamassassin:/var/spamassassin"
-            - ./data/tmp:"/var/qmail/tmp"
+            - ../mail_data/qcontrol:/var/qmail/control
+            - ../mail_data/ssl:/ssl
+            - ../mail_data/domains:/var/vpopmail/domains
+            - ../mail_data/vpopmail_etc:/var/vpopmail/etc
+            - ../mail_data/log:/log
+            - ../mail_data/spamassassin:/var/spamassassin
+            - ../mail_data/tmp:/var/qmail/tmp
+            - ../mail_data/qusers:/var/qmail/users
         ports:
             - 8090:80
             - 25:25
@@ -50,12 +48,22 @@ services:
         restart: always
         environment:
             - MYSQL_ROOT_PASSWORD=mariadb_root
-            - MYSQL_DATABASES=vpopmail
+            - MARIADB_DATABASE=vpopmail
             - MYSQL_USER=vpopmail
             - MYSQL_PASSWORD=vpopmail_pwd
+        volumes:
+            - ../mail_data/mariadb:/var/lib/mysql
 
     adminer:
         image: adminer
+        depends_on:
+            - mariadb
+        environment:
+            ADMINER_DEFAULT_DB_DRIVER: mysql
+            ADMINER_DEFAULT_DB_HOST: mariadb
+            ADMINER_DEFAULT_DB_NAME: vpopmail
+            ADMINER_DESIGN: nette
+            ADMINER_PLUGINS: tables-filter tinymce
         restart: always
         ports:
-          - 8091:8080
+            - 8091:8080

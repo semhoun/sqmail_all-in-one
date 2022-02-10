@@ -1,2 +1,2 @@
 #!/bin/sh
-exec /usr/local/sbin/clamd 2>&1
+exec /usr/sbin/clamd 2>&1

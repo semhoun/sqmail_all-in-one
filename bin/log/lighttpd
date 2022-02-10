@@ -1,5 +1,5 @@
 #!/bin/sh
-LOG_USER="clamav"
+LOG_USER="www-data"
 LOG_GROUP=`id -g ${LOG_USER}`
 LOG_NAME=`basename ${PWD%/log}`
 LOG_DIR="/log/${LOG_NAME}"
@@ -9,5 +9,13 @@ if [ ! -d "${LOG_DIR}" ]; then
 		echo "Creating log dir for ${LOG_NAME}:"
 		ls -ld "${LOG_DIR}"
 fi
+
+LOG_PIPE="/var/run/lighttpd-log.pipe"
+if [ ! -p $LOG_PIPE ]; then
+	mkfifo -m0640 "$LOG_PIPE"
+	chown www-data.www-data "$LOG_PIPE"
+fi
+
 exec 2>&1
+exec <> $LOG_PIPE
 exec setuidgid ${LOG_USER} multilog t s2000000 "${LOG_DIR}"

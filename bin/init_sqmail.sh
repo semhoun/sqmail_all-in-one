@@ -11,12 +11,13 @@ echo "${VPOPMAIL_MYSQL_HOST}|0|${VPOPMAIL_MYSQL_USER}|${VPOPMAIL_MYSQL_PASS}|${V
 echo "${VPOPMAIL_DEFAULT_DOMAIN}" > /var/vpopmail/etc/defaultdomain
 chown 644 /var/vpopmail/etc/*
 
-
 ####################################### TODO
+### https://notes.sagredo.eu/en/qmail-notes-185/configuring-qmail-83.html
+### https://notes.sagredo.eu/en/qmail-notes-185/testing-qmail-smtp-and-auth-22.html
 
-cat > /var/qmail/control/spamassassin_sql.cf << 'EOF'
+cat > /var/mail/control/spamassassin_sql.cf << 'EOF'
 # User prefs
-user_scores_dsn DBI:mysql:vpopmail:localhost
+user_scores_dsn DBI:mysql:vpopmail:mariadb
 user_scores_sql_username vpopmail
 user_scores_sql_password 85p45r28zj654Vkp
 user_scores_sql_custom_query     SELECT preference, value FROM spam_prefs WHERE username = _USERNAME_ OR username = '$GLOBAL' OR username = CONCAT('%',_DOMAIN_) ORDER BY username ASC
@@ -32,6 +33,9 @@ mkdir -p /var/spamassassin/auto-whitelist
 mkdir -p /var/spamassassin/bayes
 mkdir -p /var/spamassassin/razor
 chown -R vpopmail.vchkpw /var/spamassassin
+
+
+/var/qmail/control/mailname 
 
 
 cat > /etc/cron.d/clamav << EOF
@@ -51,12 +55,6 @@ cat >> /etc/cron.d/spamassassin << 'EOF'
 # learnSpam
 0 2 * * * root sudo -u vpopmail -H /var/qmail/bin/learnSpam >/dev/null
 EOF
-
-# Fichier de conf dans /var/spamassassin/*
-
-!!!!!!!!!!!!!! ca fait quoi:
-/usr/local/bin/freshclam 
-sa-update
 
 	
 
