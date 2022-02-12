@@ -36,25 +36,3 @@ chown -R vpopmail.vchkpw /var/spamassassin
 
 
 /var/qmail/control/mailname 
-
-
-cat > /etc/cron.d/clamav << EOF
-00 08 * * * root /usr/local/bin/freshclam --quiet
-EOF
-cat > /etc/cron.d/dccd << 'EOF'
-15 02 * * * root /var/dcc/libexec/cron-dccd
-EOF
-cat >> /etc/cron.d/spamassassin << 'EOF'
-# learnSpam
-0 2 * * * root sudo -u vpopmail -H /var/qmail/bin/learnSpam >/dev/null
-EOF
-echo "# sa-update
-11 03 */10 * * root /usr/local/bin/sa-update > /dev/null
-" > /etc/cron.d/spamassassin
-cat >> /etc/cron.d/spamassassin << 'EOF'
-# learnSpam
-0 2 * * * root sudo -u vpopmail -H /var/qmail/bin/learnSpam >/dev/null
-EOF
-
-	
-

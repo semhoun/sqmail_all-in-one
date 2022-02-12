@@ -15,6 +15,7 @@ ARG UCSPITCP6_TAG
 ARG DOVECOT_TAG
 ARG CLAMAV_TAG
 ARG SPAMASSASSIN_TAG
+ARG FCRON_TAG
 
 ########################  
 # Base install
@@ -45,11 +46,11 @@ RUN echo "deb http://deb.debian.org/debian buster-backports main contrib non-fre
 # Encoding fix
 ########################
 RUN apt-get -y install locales \
-	&& sed \
-			-e 's/# fr_FR.UTF-8 UTF-8/fr_FR.UTF-8 UTF-8/' \
-			-e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' \
-			-i /etc/locale.gen \
-  && /usr/sbin/locale-gen	en_US.UTF-8
+  && sed \
+      -e 's/# fr_FR.UTF-8 UTF-8/fr_FR.UTF-8 UTF-8/' \
+      -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' \
+      -i /etc/locale.gen \
+  && /usr/sbin/locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
@@ -62,7 +63,6 @@ RUN apt-get -y install bsd-mailx \
     lighttpd \
     check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
     libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
-    cron \
   && cpan -i IP::Country::DB_File Digest::SHA1 \
   && rm -rf /root/.local
 
@@ -85,8 +85,8 @@ RUN mkdir -p /package \
     && cd /package \
     && tar xvzf /qmail-src/daemontools-${DAEMONTOOLS_TAG}.tar.gz \
     && cd admin \
-    && patch -p0 < /qmail-patches/daemontools/daemontools-0.76.errno.patch \
-    && patch -p0 < /qmail-patches/daemontools/daemontools-0.76-localtime.patch \
+    && patch -p0 < /qmail-patches/daemontools-0.76.errno.patch \
+    && patch -p0 < /qmail-patches/daemontools-0.76-localtime.patch \
     && cd daemontools-${DAEMONTOOLS_TAG} \
     && package/install \
 ## ucspi-ssl    
@@ -112,7 +112,7 @@ RUN mkdir -p /package \
     && package/install; echo "Otherwise return 1" \
 ## cleaning
     && rm -rf /qmail-src/* \
-		&& rm -rf /var/qmail/svc /service/*
+    && rm -rf /var/qmail/svc /service/*
 # SSL Config
 COPY conf/ssl_env /var/qmail/ssl_env
     
@@ -157,7 +157,7 @@ RUN wget  http://dist.schmorp.de/libev/libev-4.33.tar.gz \
         --enable-mysql-limits \
         --enable-sql-aliasdomains \
         --enable-defaultdelivery \
-				--enable-valias \
+        --enable-valias \
     && make install-strip \
 # vusaged
     && cd vusaged \
@@ -227,7 +227,21 @@ RUN wget https://qmailrocks.thibs.com/downloads/ezmlm-idx-7.2.2.tar.gz \
 RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qmailadmin-1.2.16.tar.gz \
   && tar xvzf qmailadmin-1.2.16.tar.gz\
   && cd qmailadmin-1.2.16 \
-  && ./configure --enable-cgibindir=/var/www/cgi-bin --enable-htmldir=/var/www/html --enable-imagedir=/var/www/html/images/qmailadmin --disable-ezmlm-mysql --enable-modify-quota --enable-domain-autofill --enable-modify-spam --enable-spam-command="|/var/qmail/bin/preline /usr/bin/maildrop /var/qmail/bin/maildrop-filter" --enable-help \
+	&& patch -p1 < /qmail-patches/roberto-qmailadmin-1.2.16.patch \
+	&& cp /qmail-patches/qmailadmin/* images/ \
+  && ./configure \
+		--enable-cgibindir=/var/www/cgi-bin \
+		--enable-htmldir=/var/www/html \
+		--enable-imagedir=/var/www/html/images/qmailadmin \
+		--disable-ezmlm-mysql \
+		--enable-modify-quota \
+		--enable-domain-autofill \
+		--enable-modify-spam \
+		--enable-spam-command="|/var/qmail/bin/preline /usr/bin/maildrop /var/qmail/bin/maildrop-filter" \
+		--enable-help \
+		--enable-vpopuser=vpopmail \
+		--enable-vpopgroup=vchkpw \
+	 --enable-domain-autofill \
   && make \
   && make install \
 # cleaning
@@ -377,20 +391,40 @@ RUN wget http://cr.yp.to/software/mess822-0.58.tar.gz \
   && make setup \
 # cleaning
   && rm -rf /qmail-src/*
-	
+  
 ###########################
 # lighttpd
 ###########################
 COPY conf/lighttpd.conf /etc/lighttpd/lighttpd.conf
 
 ###########################
+# FCRON
+###########################
+#http://fcron.free.fr/download.php
+RUN wget http://fcron.free.fr/archives/fcron-${FCRON_TAG}.src.tar.gz \
+  && tar xvzf fcron-${FCRON_TAG}.src.tar.gz \
+  && cd fcron-${FCRON_TAG} \
+  && ./configure \
+    --prefix=/usr \
+    --sysconfdir=/etc \
+    --localstatedir=/var \
+    --with-sysfcrontab=no \
+    --with-answer-all \
+		--with-sendmail=/var/qmail/bin/sendmail \
+  && make \
+  && make install \
+# cleaning
+  && rm -rf /qmail-src/*
+COPY conf/fcron-root /var/spool/fcron/root
+
+###########################
 # swaks (for test)
 ###########################
 RUN wget http://www.jetmore.org/john/code/swaks/latest/swaks \
-	&& install swaks /usr/local/bin \
+  && install swaks /usr/local/bin \
 # cleaning
-  && rm -rf /qmail-src/*	
-	
+  && rm -rf /qmail-src/*  
+  
 ###########################
 # Binaries
 ###########################
@@ -422,6 +456,8 @@ COPY bin/run/spamd /service/spamd/run
 COPY bin/log/spamd /service/spamd/log/run
 COPY bin/run/lighttpd /service/lighttpd/run
 COPY bin/log/lighttpd /service/lighttpd/log/run
+COPY bin/run/fcron /service/fcron/run
+COPY bin/log/fcron /service/fcron/log/run
     
 ###########################
 # Templates
@@ -451,9 +487,8 @@ VOLUME [ \
   "/log",\
   "/var/spamassassin",\
   "/var/qmail/tmp", \
-	"/var/qmail/users" \
+  "/var/qmail/users" \
 ]
-
 
 ###########################
 # Final cleaning
@@ -475,6 +510,4 @@ EXPOSE 80
 
 COPY bin/docker-entrypoint.sh /bin/
 ENTRYPOINT ["/bin/docker-entrypoint.sh"]
-
 CMD ["/command/svscan", "/service", "2>&1"]
-

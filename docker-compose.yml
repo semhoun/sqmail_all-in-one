@@ -12,6 +12,7 @@ services:
                 - DOVECOT_TAG=${DOVECOT_TAG}
                 - CLAMAV_TAG=${CLAMAV_TAG}
                 - SPAMASSASSIN_TAG=${SPAMASSASSIN_TAG}
+                - FCRON_TAG=${FCRON_TAG}
         image: semhoun/sqmail:${SQMAIL_VERSION}
         environment:
             - QMAIL_NB_REMOTE=5

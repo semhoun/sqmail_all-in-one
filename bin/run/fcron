@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/sbin/fcron -f -y 2>&1

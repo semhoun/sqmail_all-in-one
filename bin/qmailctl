@@ -2,13 +2,11 @@
 PATH=/var/qmail/bin:/bin:/usr/bin:/usr/local/bin:/usr/local/sbin
 export PATH
 
-QMAILDUID=`id -u qmaild`
-NOFILESGID=`id -g qmaild`
-svclist="qmail-send qmail-smtpd qmail-smtpsd qmail-smtpsub spamd clamd dovecot"
+svclist="qmail-send qmail-smtpd qmail-smtpsd qmail-smtpsub spamd clamd dovecot lighttpd fcron"
 
 case "$1" in
   start)
-    echo "Starting qmail"
+    echo "Starting qmail..."
     for svc in $svclist ; do
         if svok /service/$svc ; then
             svc -u /service/$svc
@@ -92,13 +90,8 @@ case "$1" in
     alrm -- same as doqueue
    flush -- same as doqueue
      hup -- same as reload
-   clear -- clear the readproctitle service errors with ............
     kill -- svc -d processes in svclist, the do 'killall -KILL '
 HELP
-    ;;
-  clear)
-    echo "Clearing readproctitle service errors with ................."
-    svc -o /service/clear
     ;;
   kill)
     echo "First stopping services ... "
