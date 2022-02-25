@@ -2,7 +2,7 @@
 #  - https://www.fehcom.de/sqmail/sqmail.html
 #  - https://notes.sagredo.eu/
 #  - https://notes.sagredo.eu/files/qmail/patches/
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM=linux
@@ -20,19 +20,18 @@ ARG FCRON_TAG
 ########################  
 # Base install
 ########################
-COPY patches /qmail-patches
-WORKDIR "/qmail-src"
+COPY patches /sqmail/patches
+WORKDIR "/sqmail/src"
 
-RUN echo "deb http://deb.debian.org/debian buster-backports main contrib non-free" > /etc/apt/sources.list.d/backports.list \
-  && apt-get update \
-  && apt-get -y install build-essential equivs bash dnsutils unzip git curl wget sudo ksh vim \
-  && apt-get -t buster-backports -y install cmake \
+RUN mkdir -p /sqmail/src /sqmail/bin /sqmail/conf \
+	&& apt-get update \
+  && apt-get -y install build-essential equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake \
 ## Add docker group for logs
   && groupadd -g 998 docker \
 ## Add MTA Local (equivs is needed)
-  && equivs-build /qmail-patches/mail-transport-agent.ctl \
+  && equivs-build /sqmail/patches/mail-transport-agent.ctl \
   && dpkg -i mta-local*.deb \
-  && rm -f /qmail-src/* \
+  && rm -f /sqmail/src/* \
 # Fixes for slim install
   && mkdir -p /usr/share/man/man1 /usr/share/man/man5 /usr/share/man/man7 /usr/share/man/man8 \
   && touch /usr/share/man/man1/maildirmake.1.gz \
@@ -72,46 +71,46 @@ RUN apt-get -y install bsd-mailx \
 RUN mkdir -p /package \
     && chmod 1755 /package \
 ## fehQlibs
-    && cd /qmail-src \
+    && cd /sqmail/src \
     && wget https://www.fehcom.de/ipnet/fehQlibs/fehQlibs-${FEHQLIBS_TAG}.tgz \
     && cd /usr/local \
-    && tar xvzf /qmail-src/fehQlibs-${FEHQLIBS_TAG}.tgz \
+    && tar xvzf /sqmail/src/fehQlibs-${FEHQLIBS_TAG}.tgz \
     && mv fehQlibs-${FEHQLIBS_TAG} qlibs  \
     && cd qlibs \
     && make \
 ## Daemontools
-    && cd /qmail-src \
+    && cd /sqmail/src \
     && wget https://cr.yp.to/daemontools/daemontools-${DAEMONTOOLS_TAG}.tar.gz \
     && cd /package \
-    && tar xvzf /qmail-src/daemontools-${DAEMONTOOLS_TAG}.tar.gz \
+    && tar xvzf /sqmail/src/daemontools-${DAEMONTOOLS_TAG}.tar.gz \
     && cd admin \
-    && patch -p0 < /qmail-patches/daemontools-0.76.errno.patch \
-    && patch -p0 < /qmail-patches/daemontools-0.76-localtime.patch \
+    && patch -p0 < /sqmail/patches/daemontools-0.76.errno.patch \
+    && patch -p0 < /sqmail/patches/daemontools-0.76-localtime.patch \
     && cd daemontools-${DAEMONTOOLS_TAG} \
     && package/install \
 ## ucspi-ssl    
-    && cd /qmail-src \
+    && cd /sqmail/src \
     && wget https://www.fehcom.de/ipnet/ucspi-ssl/ucspi-ssl-${UCSPISSL_TAG}.tgz \
     && cd /package \
-    && tar xvzf /qmail-src/ucspi-ssl-${UCSPISSL_TAG}.tgz \
+    && tar xvzf /sqmail/src/ucspi-ssl-${UCSPISSL_TAG}.tgz \
     && cd host/superscript.com/net/ucspi-ssl-${UCSPISSL_TAG} \
     && package/install \
 ## ucspi-tcp6
-    && cd /qmail-src \
+    && cd /sqmail/src \
     && wget https://www.fehcom.de/ipnet/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
     && cd /package \
-    && tar xvzf /qmail-src/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
+    && tar xvzf /sqmail/src/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
     && cd net/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG} \
     && package/install \
 ## sqmail
-    && cd /qmail-src \
+    && cd /sqmail/src \
     && wget https://www.fehcom.de/sqmail/sqmail-${SQMAIL_TAG}.tgz \
     && cd /package \
-    && tar xvzf /qmail-src/sqmail-${SQMAIL_TAG}.tgz \
+    && tar xvzf /sqmail/src/sqmail-${SQMAIL_TAG}.tgz \
     && cd mail/sqmail/sqmail-${SQMAIL_TAG} \
     && package/install; echo "Otherwise return 1" \
 ## cleaning
-    && rm -rf /qmail-src/* \
+    && rm -rf /sqmail/src/* \
     && rm -rf /var/qmail/svc /service/*
 # SSL Config
 COPY conf/ssl_env /var/qmail/ssl_env
@@ -128,7 +127,7 @@ RUN wget  http://dist.schmorp.de/libev/libev-4.33.tar.gz \
     && make install \
     && ldconfig \
 # vpopmail
-    && cd /qmail-src \
+    && cd /sqmail/src \
     && mkdir -p /var/vpopmail \
     && groupadd -g 89 vchkpw \
     && useradd -g vchkpw -u 89 -s /usr/sbin/nologin -d /var/vpopmail vpopmail \
@@ -136,7 +135,7 @@ RUN wget  http://dist.schmorp.de/libev/libev-4.33.tar.gz \
     && wget http://downloads.sourceforge.net/project/vpopmail/vpopmail-stable/5.4.33/vpopmail-5.4.33.tar.gz \
     && tar xzf vpopmail-5.4.33.tar.gz \
     && cd vpopmail-5.4.33 \
-    && patch -p1 < /qmail-patches/roberto_vpopmail-5.4.33.patch \
+    && patch -p1 < /sqmail/patches/roberto_vpopmail-5.4.33.patch \
     && autoreconf -f -i \
     && ./configure \
         --enable-qmaildir=/var/qmail/ \
@@ -161,13 +160,13 @@ RUN wget  http://dist.schmorp.de/libev/libev-4.33.tar.gz \
     && make install-strip \
 # vusaged
     && cd vusaged \
-    && ./configure \
+		&& LIBS=`head -1 /var/vpopmail/etc/lib_deps` ./configure \
         --with-vpopmail=/var/vpopmail \
     && make \
     && cp -f vusaged /var/vpopmail/bin \
     && cp -f etc/vusaged.conf /var/vpopmail/etc \
 # cleaning
-    && rm -rf /qmail-src/*
+    && rm -rf /sqmail/src/*
     
 ########################
 # Dovecot
@@ -195,7 +194,7 @@ RUN groupadd -g 2110 dovecot \
     && make install \
     && mkdir -p /etc/dovecot/ /var/run/dovecot \
 # cleaning
-    && rm -rf /qmail-src/*
+    && rm -rf /sqmail/src/*
 # Config files
 COPY conf/dovecot-etc/ /etc/
 
@@ -209,7 +208,7 @@ RUN wget http://qmail.ixip.net/download/autorespond-2.0.5.tar.gz \
   && cp autorespond /usr/local/bin \
   && chown root.root /usr/local/bin/autorespond \
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
 
 ########################
 # ezmlm-idx
@@ -219,7 +218,7 @@ RUN wget https://qmailrocks.thibs.com/downloads/ezmlm-idx-7.2.2.tar.gz \
   && cd ezmlm-idx-7.2.2 \
   && make && make man && make install \
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
   
 ########################
 # QmailAdmin
@@ -227,8 +226,8 @@ RUN wget https://qmailrocks.thibs.com/downloads/ezmlm-idx-7.2.2.tar.gz \
 RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qmailadmin-1.2.16.tar.gz \
   && tar xvzf qmailadmin-1.2.16.tar.gz\
   && cd qmailadmin-1.2.16 \
-	&& patch -p1 < /qmail-patches/roberto-qmailadmin-1.2.16.patch \
-	&& cp /qmail-patches/qmailadmin/* images/ \
+	&& patch -p1 < /sqmail/patches/roberto-qmailadmin-1.2.16.patch \
+	&& cp /sqmail/patches/qmailadmin/* images/ \
   && ./configure \
 		--enable-cgibindir=/var/www/cgi-bin \
 		--enable-htmldir=/var/www/html \
@@ -245,7 +244,7 @@ RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qm
   && make \
   && make install \
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
 
 ########################
 # vqadmin
@@ -253,14 +252,14 @@ RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qm
 RUN wget https://qmailrocks.thibs.com/downloads/vqadmin-2.3.7.tar.gz \
   && tar xvzf vqadmin-2.3.7.tar.gz \
   && cd vqadmin-2.3.7 \
-  && patch -p0 < /qmail-patches/vqadmin-2.3.7.patch \
+  && patch -p0 < /sqmail/patches/vqadmin-2.3.7.patch \
   && ./configure --enable-cgibindir=/var/www/cgi-bin --build=i386 \
   && make \
   && make install \
   && mkdir -p /var/www/html/images/vqadmin \
   && cp html/vqadmin.css /var/www/html/images/vqadmin \
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
   
 ########################
 # clamav
@@ -302,7 +301,7 @@ RUN groupadd -g 5010 clamav \
     -e "s/#Foreground .*/Foreground yes/" \
     /etc/clamav/clamd.conf.sample > /etc/clamav/clamd.conf \
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
 
 ########################
 # DCC
@@ -314,7 +313,7 @@ RUN wget https://www.dcc-servers.net/dcc/source/dcc.tar.Z \
   && make \
   && make install \
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
 
 ########################
 # SpamAssassin
@@ -332,7 +331,7 @@ RUN wget https://dlcdn.apache.org//spamassassin/source/Mail-SpamAssassin-${SPAMA
       -e "s/#loadplugin Mail::SpamAssassin::Plugin::TextCat/loadplugin Mail::SpamAssassin::Plugin::TextCat/" \
       /etc/mail/spamassassin/v310.pre \
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
 # Config files
 COPY conf/spamassin-local.cf /etc/mail/spamassassin/local.conf
 COPY conf/spamassin-directory.cf /etc/mail/spamassassin/directory.cf 
@@ -349,15 +348,15 @@ RUN wget http://www.memoryhole.net/qmail/dkimsign.pl \
   && wget https://notes.sagredo.eu/files/qmail/patches/libdomainkeys/libdomainkeys-0.69.diff \
   && tar xvzf libdomainkeys-0.69.tar.gz \
   && cd libdomainkeys-0.69 \
-  && patch -p1 < /qmail-src/libdomainkeys-openssl-1.1.patch \
-  && patch < /qmail-src/libdomainkeys-0.69.diff \
+  && patch -p1 < /sqmail/src/libdomainkeys-openssl-1.1.patch \
+  && patch < /sqmail/src/libdomainkeys-0.69.diff \
   && make \
   && cp dktest /usr/local/bin/ \
-  && install /qmail-src/dkimsign.pl /usr/local/bin/ \
+  && install /sqmail/src/dkimsign.pl /usr/local/bin/ \
   && mv /var/qmail/bin/qmail-remote /var/qmail/bin/qmail-remote.orig \
-  && install -T /qmail-src/qmail-remote.sh /var/qmail/bin/qmail-remote \
+  && install -T /sqmail/src/qmail-remote.sh /var/qmail/bin/qmail-remote \
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
 
 ########################
 # Qmail Remove https://www.fehcom.de/sqmail/man/qmail-qmaint.html
@@ -368,7 +367,7 @@ RUN wget http://www.linuxmagic.com/opensource/qmail/qmail-remove/qmail-remove-0.
   && make \
   && make install \
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
   
 ########################
 # qmHandle  https://www.fehcom.de/sqmail/man/qmail-qmaint.html
@@ -378,7 +377,7 @@ RUN wget http://downloads.sourceforge.net/project/qmhandle/qmhandle-1.3/qmhandle
   && cd qmhandle-1.3.2 \
   && install qmHandle /usr/local/bin\
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
   
 ########################
 # mess822
@@ -390,7 +389,7 @@ RUN wget http://cr.yp.to/software/mess822-0.58.tar.gz \
   && make \
   && make setup \
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
   
 ###########################
 # lighttpd
@@ -414,7 +413,7 @@ RUN wget http://fcron.free.fr/archives/fcron-${FCRON_TAG}.src.tar.gz \
   && make \
   && make install \
 # cleaning
-  && rm -rf /qmail-src/*
+  && rm -rf /sqmail/src/*
 COPY conf/fcron-root /var/spool/fcron/root
 
 ###########################
@@ -423,11 +422,13 @@ COPY conf/fcron-root /var/spool/fcron/root
 RUN wget http://www.jetmore.org/john/code/swaks/latest/swaks \
   && install swaks /usr/local/bin \
 # cleaning
-  && rm -rf /qmail-src/*  
+  && rm -rf /sqmail/src/*  
   
 ###########################
 # Binaries
 ###########################
+COPY bin/init_sqmail.sh /sqmail/bin/init.sh
+COPY bin/test_sqmail.sh /sqmail/bin/test.sh
 COPY bin/maildrop-filter /var/qmail/bin/maildrop-filter
 COPY bin/qmailctl /var/qmail/bin/qmailctl
 COPY bin/qmail-queuescan /var/qmail/bin/qmail-queuescan
@@ -494,7 +495,7 @@ VOLUME [ \
 # Final cleaning
 ###########################
 WORKDIR "/log"
-RUN rm -rf /qmail-patches /qmail-src \
+RUN rm -rf /sqmail/patches /sqmail/src \
     && rm -rf /service/qmail-pop3* \
     && rm -rf /var/log/qmail-pop3* \
     && cp /var/qmail/bin/sendmail /usr/sbin/sendmail \

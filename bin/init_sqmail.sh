@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+#https://en.wikibooks.org/wiki/Bash_Shell_Scripting/Whiptail
+whiptail --title "Semhoun's SQMail" --msgbox "Welcome in the SQMail first time configuration" 8 78
+
+
 # QMAIL
 echo "${QMAIL_NB_REMOTE}" > /var/qmail/control/concurrencyremote
 echo -n "${QMAIL_NB_INCOMING}" > /var/qmail/control/concurrencyincoming
@@ -12,9 +16,7 @@ echo "${VPOPMAIL_DEFAULT_DOMAIN}" > /var/vpopmail/etc/defaultdomain
 chown 644 /var/vpopmail/etc/*
 
 ####################################### TODO
-### https://notes.sagredo.eu/en/qmail-notes-185/configuring-qmail-83.html
-### https://notes.sagredo.eu/en/qmail-notes-185/testing-qmail-smtp-and-auth-22.html
-
+#
 cat > /var/mail/control/spamassassin_sql.cf << 'EOF'
 # User prefs
 user_scores_dsn DBI:mysql:vpopmail:mariadb
