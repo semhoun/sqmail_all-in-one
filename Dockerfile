@@ -1,7 +1,3 @@
-# Use patch and sources from:
-#  - https://www.fehcom.de/sqmail/sqmail.html
-#  - https://notes.sagredo.eu/
-#  - https://notes.sagredo.eu/files/qmail/patches/
 FROM debian:bullseye-slim
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -62,6 +58,7 @@ RUN apt-get -y install bsd-mailx \
     lighttpd \
     check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
     libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
+		mariadb-client \
   && cpan -i IP::Country::DB_File Digest::SHA1 \
   && rm -rf /root/.local
 

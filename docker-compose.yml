@@ -15,14 +15,14 @@ services:
         - FCRON_TAG=${FCRON_TAG}
     image: semhoun/sqmail:${SQMAIL_VERSION}
     volumes:
-      - ../mail_data/qcontrol:/var/qmail/control
-      - ../mail_data/ssl:/ssl
-      - ../mail_data/domains:/var/vpopmail/domains
-      - ../mail_data/vpopmail_etc:/var/vpopmail/etc
-      - ../mail_data/log:/log
-      - ../mail_data/spamassassin:/var/spamassassin
-      - ../mail_data/tmp:/var/qmail/tmp
-      - ../mail_data/qusers:/var/qmail/users
+      - ./data/qcontrol:/var/qmail/control
+      - ./data/ssl:/ssl
+      - ./data/domains:/var/vpopmail/domains
+      - ./data/vpopmail_etc:/var/vpopmail/etc
+      - ./data/log:/log
+      - ./data/spamassassin:/var/spamassassin
+      - ./data/tmp:/var/qmail/tmp
+      - ./data/qusers:/var/qmail/users
     ports:
       - 8090:80
       - 25:25

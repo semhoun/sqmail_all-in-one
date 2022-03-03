@@ -9,9 +9,16 @@ whiptail --title "Semhoun's SQMail" --msgbox "Welcome in the SQMail first time c
 echo "${QMAIL_NB_REMOTE}" > /var/qmail/control/concurrencyremote
 echo -n "${QMAIL_NB_INCOMING}" > /var/qmail/control/concurrencyincoming
 
+cat > /var/qmail/control/mysql.conf << EOF
+MYSQL_USER=${MYSQL_USER}
+MYSQL_PASS=${MYSQL_PASS}
+MYSQL_DB=${MYSQL_DB}
+MYSQL_HOST=${MYSQL_HOST}
+EOF
+
 # VPopmail
 echo "default_quota ${VPOPMAIL_QUOTA}" > /var/vpopmail/etc/vlimits.default
-echo "${VPOPMAIL_MYSQL_HOST}|0|${VPOPMAIL_MYSQL_USER}|${VPOPMAIL_MYSQL_PASS}|${VPOPMAIL_MYSQL_DB}" > /var/vpopmail/etc/vpopmail.mysql
+echo "${MYSQL_HOST}|0|${MYSQL_USER}|${MYSQL_PASS}|${MYSQL_DB}" > /var/vpopmail/etc/vpopmail.mysql
 echo "${VPOPMAIL_DEFAULT_DOMAIN}" > /var/vpopmail/etc/defaultdomain
 chown 644 /var/vpopmail/etc/*
 

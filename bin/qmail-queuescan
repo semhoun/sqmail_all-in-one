@@ -8,6 +8,7 @@ alias -x 822FIELD='/usr/local/bin/822field'
 SCANNERARGS="--no-summary"
 SPAMMERARGS="-u $RCPTTO"
 VERBOSE=0
+
 #
 ## No code change necessary from here
 #
@@ -16,6 +17,8 @@ integer SPAMC=0
 integer SPAMTHRESHOLD=-1
 integer SPAMTH
 typeset SPAMDOMAINS
+
+. ${QMAIL}/control/mysql.conf
 
 ID="${RANDOM}$$"
 MESSAGE="${QMAIL}/tmp/msg.${ID}"
@@ -29,7 +32,7 @@ cat > ${MESSAGE} || exit 53
 ## Check Spamlevel for each domain
 #
 DOMAIN=$(echo ${RCPTTO} | cut -d '@' -f 2)
-SPAMTHRESHOLD=$(echo "SELECT value FROM spam_prefs WHERE (username = '${RCPTTO}' OR username = '$GLOBAL' OR username = '%${DOMAIN}') AND preference = 'refuse_threshold' ORDER BY username DESC LIMIT 1;"  | mysql -N -B -u vpopmail -p85p45r28zj654Vkp -h localhost vpopmail)
+SPAMTHRESHOLD=$(echo "SELECT value FROM spam_prefs WHERE (username = '${RCPTTO}' OR username = '$GLOBAL' OR username = '%${DOMAIN}') AND preference = 'refuse_threshold' ORDER BY username DESC LIMIT 1;"  | mysql -N -B -u ${MYSQL_USER} -p${MYSQL_PASS} -h ${MYSQL_HOST} ${MYSQL_DB})
 
 [[ ${VERBOSE} -gt 0 ]] && print -u2 "User ${RCPTTO} / Domain ${DOMAIN} -- Threshold: {$SPAMTHRESHOLD}"
 
