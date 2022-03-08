@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ -n "${SKIP_INIT}" ]; then
+  exec $@
+  exit
+fi
+
 if [ ! -s "/var/lib/clamav" ]; then
 	echo "[CLAMAV] Lanching first time freshclam ..."
 	/usr/bin/freshclam 

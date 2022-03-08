@@ -1,6 +1,6 @@
-# SQMail
+# QMail All-In-One
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)  ![Docker Size](https://img.shields.io/docker/image-size/semhoun/sqmail)  ![Docker Pull](https://img.shields.io/docker/pulls/semhoun/sqmail)
+[![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT) ![OpenIssues](https://img.shields.io/github/issues-raw/semhoun/docker_sqmail) ![Docker Size](https://img.shields.io/docker/image-size/semhoun/sqmail)  ![Docker Pull](https://img.shields.io/docker/pulls/semhoun/sqmail)
 
 
 This docker is a full qmail server with
@@ -9,6 +9,8 @@ This docker is a full qmail server with
 - vpopmail
 - dovecot
 - spamassain
+- vqamin/ qmailadmin
+- clamav
 
 ## Getting Started
 
@@ -55,14 +57,15 @@ services:
   sqmail:
     image: semhoun/sqmail
     volumes:
-      - ./mail_data/qcontrol:/var/qmail/control
-      - ./mail_data/ssl:/ssl
-      - ./mail_data/domains:/var/vpopmail/domains
-      - ./mail_data/vpopmail_etc:/var/vpopmail/etc
-      - ./mail_data/log:/log
-      - ./mail_data/spamassassin:/var/spamassassin
-      - ./mail_data/tmp:/var/qmail/tmp
-      - ./mail_data/qusers:/var/qmail/users
+      - ./data/qcontrol:/var/qmail/control
+      - ./data/ssl:/ssl
+      - ./data/domains:/var/vpopmail/domains
+      - ./data/vpopmail_etc:/var/vpopmail/etc
+      - ./data/log:/log
+      - ./data/spamassassin:/var/spamassassin
+      - ./data/tmp:/var/qmail/tmp
+      - ./data/qusers:/var/qmail/users
+      - ./data/queue:/var/qmail/queue
     ports:
       - 8090:80
       - 25:25
@@ -79,23 +82,34 @@ services:
 
 #### Volumes
 
-* `/your/file/location` - File location
+* `/ssl` - SSL Certificates
+* `/var/qmail/control`- QMail config files
+* `/var/vpopmail/domains` - Domains (mail) data
+* `/var/vpopmail/etc`- vpopmail config files 
+* `/log` - Log directoy
+* `/var/spamassassin`- SpamAssassin
+* `/var/qmail/tmp`- QMail temporary directory (best if tmpfs)
+* `/var/qmail/users` - QMail user file
+* `/var/qmail/queue` - QMail queue
 
 #### Useful File Locations
-
-* `/some/special/script.sh` - List special scripts
-  
-* `/magic/dir` - And also directories
+* `/ssl` - SSL Certificates
+  * `/ssl/imap.key` - IMAP Key
+  * `/ssl/imap.crt` - IMAP Certificate
+  * `/ssl/pop.key` - POP3 Key
+  * `/ssl/pop.crt` - POP3 Certificate
+  * `/ssl/smtp.key` - SMTP Key
+  * `/ssl/smtp.crt` - SMTP Certificate
+* `/sqmail/bin/init.sh` - Initialisation script
 
 ## Built With
 
-* SQMail v4.1.13
+* SQMail v4.1.15
 * VPopMail v5.4.33
 
 ## Find Us
 
 * [GitHub](https://github.com/semhoun/)
-* [GitLab](https://gitlab.com/semhoun/docker_sqmail)
 * [DockerHub](https://hub.docker.com/repository/docker/semhoun/sqmail)
 
 ## Authors

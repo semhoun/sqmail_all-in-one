@@ -1,7 +1,7 @@
 version: '3.2'
 
 services:
-  sqmail:
+  qmail_aio:
     build:
       args:
         - SQMAIL_TAG=${SQMAIL_TAG}
@@ -13,7 +13,9 @@ services:
         - CLAMAV_TAG=${CLAMAV_TAG}
         - SPAMASSASSIN_TAG=${SPAMASSASSIN_TAG}
         - FCRON_TAG=${FCRON_TAG}
-    image: semhoun/sqmail:${SQMAIL_VERSION}
+    extra_hosts:
+      - mariadb:192.168.13.1
+    image: semhoun/qmail_all-in-one:${QMAIL_AIO_VERSION}
     volumes:
       - ./data/qcontrol:/var/qmail/control
       - ./data/ssl:/ssl
@@ -23,6 +25,7 @@ services:
       - ./data/spamassassin:/var/spamassassin
       - ./data/tmp:/var/qmail/tmp
       - ./data/qusers:/var/qmail/users
+      - ./data/queue:/var/qmail/queue
     ports:
       - 8090:80
       - 25:25
