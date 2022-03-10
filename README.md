@@ -156,3 +156,4 @@ This docker use sources and patches from
 - https://www.fehcom.de/sqmail/sqmail.html
 - https://notes.sagredo.eu/
 - https://www.inter7.com/vpopmail-virtualized-email/
+- http://skarnet.org/software/s6/index.html
