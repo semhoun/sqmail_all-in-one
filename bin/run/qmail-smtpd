@@ -1,6 +1,6 @@
 #!/bin/sh
-QMAILDUID=`id -u vpopmail`
-QMAILDGID=`id -g vpopmail`
+QMAILDUID=`id -u qmaild`
+QMAILDGID=`id -g qmaild`
 HOSTNAME=`cat /var/qmail/control/me`
 CONCURRENCY=`cat /var/qmail/control/concurrencyincoming`
 export SMTPAUTH=""

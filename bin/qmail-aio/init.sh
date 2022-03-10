@@ -2,6 +2,10 @@
 RESUME=$(mktemp /tmp/sqmail.XXXXXX)
 > ${RESUME}
 
+#########################
+# Gui for params
+#########################
+
 #https://en.wikibooks.org/wiki/Bash_Shell_Scripting/Whiptail
 whiptail --title "Semhoun's SQMail" --msgbox "Welcome in the SQMail first time configuration\MariaDB database must already been created" 8 78
 
@@ -43,6 +47,8 @@ SPFBEHAVIOR=$(whiptail --title "Menu example" --menu "QMail/SMTP configuration" 
   "6" "Reject mails when SPF does not resolve to pass" \
 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
+RELAY_IPS=$(whiptail --inputbox "IP or network to relay (separated by coma)" 8 39 "127.0.0.1,::1,192.168.1." --title "QMail/SMTP configuration" 3>&1 1>&2 2>&3)
+if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 
 cat >> "${RESUME}" << EOF
 QMail/SMTP configuration will be:
@@ -51,10 +57,24 @@ QMail/SMTP configuration will be:
   - database : ${DATABYTES}
   - queue life time : ${QUEUELIFETIME}
   - spf behavior : ${SPFBEHAVIOR}
+  - relay allowed	: ${RELAY_IPS}
   
 EOF
 
 SMTP_SERVER=$(whiptail --inputbox "SMTP server hostname" 8 39 "smtp.exemple.net" --title "Domain configuration" 3>&1 1>&2 2>&3)
+if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
+DEFAULT_DOMAIN=$(whiptail --inputbox "Default domain" 8 39 "exemple.net" --title "Domain configuration" 3>&1 1>&2 2>&3)
+if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
+POSTMASTER_PWD=$(whiptail --inputbox "Postmaster password" 8 39 "" --title "Domain configuration" 3>&1 1>&2 2>&3)
+if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
+cat >> "${RESUME}" << EOF
+Domain configuration will be:
+  - smtp server : ${SMTP_SERVER}
+  - default domain : ${DEFAULT_DOMAIN}
+  - postmaster password : ${POSTMASTER_PWD}
+  
+EOF
+
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 DEFAULT_DOMAIN=$(whiptail --inputbox "Default domain" 8 39 "exemple.net" --title "Domain configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
@@ -78,11 +98,14 @@ if !(whiptail --title "Set configuration" --yesno "Apply the configuration." 8 7
 fi
 
 #-----------------------------------------------------------------------------#
+#########################
+# Create config
+#########################
 
 # Default config
 echo "MAILER-DAEMON" > /var/qmail/control/bouncefrom
 echo postmaster > /var/qmail/control/doublebounceto
-echo "| /home/vpopmail/bin/vdelivermail '' delete" > /var/qmail/control/defaultdelivery
+echo "| /var/vpopmail/bin/vdelivermail '' delete" > /var/qmail/control/defaultdelivery
 
 # SSL base Config
 openssl dhparam -out /ssl/qmail-dhparam 2048
@@ -249,6 +272,21 @@ INSERT INTO spam_prefs (id, username, preference, value, added, modified) VALUES
 (6, '\$GLOBAL', 'ok_languages', 'en fr', '2003-10-11 00:00:00', '2013-09-10 00:00:00'),
 (7, '\$GLOBAL', 'refuse_threshold', '9', '2003-10-11 00:00:00', '2013-09-10 00:00:00');
 " | mysql -h ${MARIADB_HOST} -u ${MARIADB_USER} -p"${MARIADB_PASS}" ${MARIADB_DB}
+
+# Rules cdb
+cat > /var/qmail/control/rules.smtpsub << EOF
+:allow,RELAYCLIENT=''
+EOF
+> /var/qmail/control/rules.smtpd
+> /var/qmail/control/rules.smtpsd
+IPS=$(echo $RELAY_IPS | tr "," "\n")
+for ip in ${IPS}; do
+	echo "${ip}:allow,RELAYCLIENT=''" >> /var/qmail/control/rules.smtpd
+	echo "${ip}:allow,RELAYCLIENT=''" >> /var/qmail/control/rules.smtpsd
+done
+echo ":allow,QHPSI='clamdscan',QHPSIARG1='--no-summary',MFDNSCHECK='',BADMIMETYPE='',BADLOADERTYPE='M',HELOCHECK='.',TARPITCOUNT='5',TARPITDELAY='20',QMAILQUEUE='bin/qmail-queuescan'" >> /var/qmail/control/rules.smtpd
+echo ":allow,QHPSI='clamdscan',QHPSIARG1='--no-summary',MFDNSCHECK='',BADMIMETYPE='',BADLOADERTYPE='M',HELOCHECK='.',TARPITCOUNT='5',TARPITDELAY='20',QMAILQUEUE='bin/qmail-queuescan'" >> /var/qmail/control/rules.smtpsd
+/usr/local/bin/qmailctl cdb
 
 echo "============================"
 echo " QMail AllInOne initialized"

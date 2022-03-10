@@ -8,8 +8,8 @@ case "$1" in
   start)
     echo "Starting qmail..."
     for svc in $svclist ; do
-        if svok /service/$svc ; then
-            svc -u /service/$svc
+        if s6-svc /service/$svc ; then
+            s6-svc -u /service/$svc
         else
             echo $svc service not running
         fi
@@ -19,51 +19,51 @@ case "$1" in
     echo "Stopping qmail..."
     for svc in $svclist ; do
       echo " $svc"
-      svc -d /service/$svc
+      s6-svc -d /service/$svc
     done
     ;;
   stat)
     for svc in $svclist ; do
-      svstat /service/$svc
-      svstat /service/$svc/log
+      s6-svc /service/$svc
+      s6-svc /service/$svc/log
     done
     qmail-qstat
     ;;
-  doqueue|alrm|flush)
+  doqueue)
     echo "Sending ALRM signal to qmail-send."
-    svc -a /service/qmail-send
+    s6-svc -a /service/qmail-send
     ;;
   queue)
     qmail-qstat
     qmail-qread
     ;;
-  reload|hup)
+  reload)
     echo "Sending HUP signal to qmail-send."
-    svc -h /service/qmail-send
+    s6-svc -h /service/qmail-send
     ;;
   pause)
     for svc in $svclist ; do
       echo "Pausing $svc"
-      svc -p /service/$svc
+      s6-svc -p /service/$svc
     done
     ;;
   cont)
     for svc in $svclist ; do
       echo "Continuing $svc"
-      svc -c /service/$svc
+      s6-svc -c /service/$svc
     done
     ;;
   restart)
     echo "Restarting qmail:"
     for svc in $svclist ; do
       echo "* Stopping $svc."
-      svc -d /service/$svc
+      s6-svc -d /service/$svc
     done
     echo "* Sending qmail-send SIGTERM and restarting."
-    svc -t /service/qmail-send
+    s6-svc -t /service/qmail-send
     for svc in $svclist ; do
       echo "* Restarting $svc."
-      svc -u /service/$svc
+      s6-svc -u /service/$svc
     done
     ;;
   cdb)
@@ -73,7 +73,7 @@ case "$1" in
     chmod 644 /var/qmail/control/rules.smtpsd.cdb
     /usr/local/bin/tcprules /var/qmail/control/rules.smtpsub.cdb /var/qmail/control/rules.smtpsub.tmp < /var/qmail/control/rules.smtpsub
     chmod 644 /var/qmail/control/rules.smtpsub.cdb
-    echo "Reloaded rules.smtp(s).cdb ."
+    echo "Reloaded rules.smtp(*).cdb ."
     ;;
   help)
     cat <<HELP
@@ -87,25 +87,24 @@ case "$1" in
  doqueue -- sends qmail-send ALRM, scheduling queued messages for delivery
   reload -- sends qmail-send HUP, rereading locals and virtualdomains
    queue -- shows status of queue
-    alrm -- same as doqueue
-   flush -- same as doqueue
-     hup -- same as reload
     kill -- svc -d processes in svclist, the do 'killall -KILL '
 HELP
     ;;
   kill)
     echo "First stopping services ... "
     for svc in $svclist ; do
-        if svok /service/$svc ; then
-            svc -d /service/$svc
+        if s6-svc /service/$svc ; then
+            s6-svc -d /service/$svc
         fi
     done
     echo "Now sending processes the kill signal ... "
-    killall -KILL qmail-send qmail-lspawn qmail-remote qmail-rspawn qmail-smtpd
+		for svc in $svclist ; do
+			killall -KILL $svc
+    done
     echo "done"
     ;;
   *)
-    echo "Usage: $0 {start|stop|restart|doqueue|flush|reload|stat|pause|cont|cdb|queue|help|clear|kill}"
+    echo "Usage: $0 {start|stop|restart|doqueue|reload|stat|pause|cont|cdb|queue|help|kill}"
     exit 1
     ;;
 esac

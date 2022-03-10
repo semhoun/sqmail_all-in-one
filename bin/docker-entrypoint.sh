@@ -33,7 +33,7 @@ if [ ! -s "/var/lib/spamassassin/" ]; then
 fi
 
 # Fix qmail tmp permissions
-chown qmaill.sqmail -R /var/qmail/tmp
+chown qmaild.sqmail -R /var/qmail/tmp
 
 # Some fixes
 rm -f /var/run/dovecot/master.pid
