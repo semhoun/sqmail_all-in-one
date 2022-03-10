@@ -1,20 +1,16 @@
 # QMail All-In-One
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT) ![OpenIssues](https://img.shields.io/github/issues-raw/semhoun/docker_sqmail) ![Docker Size](https://img.shields.io/docker/image-size/semhoun/sqmail)  ![Docker Pull](https://img.shields.io/docker/pulls/semhoun/sqmail)
+![License](https://img.shields.io/github/license/semhoun/qmail_all-in-one) ![OpenIssues](https://img.shields.io/github/issues-raw/semhoun/qmail_all-in-one) ![Version](https://img.shields.io/github/v/tag/semhoun/qmail_all-in-one) ![Docker Size](https://img.shields.io/docker/image-size/semhoun/qmail_all-in-one)  ![Docker Pull](https://img.shields.io/docker/pulls/semhoun/qmail_all-in-one)
 
 
-This docker is a full qmail server with
-
-- sqmail
-- vpopmail
-- dovecot
-- spamassain
-- vqamin/ qmailadmin
-- clamav
+All-in-one QMail server with
+  - s/qmail
+  - dkim
+  - spam filter
+  - imap/pop3
+  - web admin
 
 ## Getting Started
-
-These instructions will cover usage information and for the docker container 
 
 ### Prerequisities
 
@@ -31,7 +27,7 @@ In order to run this container you'll need docker installed.
 
 ```shell
 docker run \
-  --name sqmail \
+  --name qmail-aio \
   --publish 25:25 \
   --publish 465:465 \
   --publish 587:587 \
@@ -47,15 +43,15 @@ docker run \
   --volume ./mail_data/spamassassin:/var/spamassassin \
   --volume ./mail_data/tmp:/var/qmail/tmp \
   --volume ./mail_data/qusers:/var/qmail/users \
-  semhoun/sqmail
+  semhoun/qmail_all-in-one
 ```
 #### Docker Compose
 ```yaml
 version: '3.2'
 
 services:
-  sqmail:
-    image: semhoun/sqmail
+  qmail-aio:
+    image: semhoun/qmail_all-in-one
     volumes:
       - ./data/qcontrol:/var/qmail/control
       - ./data/ssl:/ssl
@@ -78,7 +74,29 @@ services:
 ```
 
 #### Initialization
+#### Docker
+```shell
+docker run \
+  --rm -it \
+  --env SKIP_INIT_ENV=1 \
+  --volume ./mail_data/qcontrol:/var/qmail/control \
+  --volume ./mail_data/ssl:/ssl \
+  --volume ./mail_data/domains:/var/vpopmail/domains \
+  --volume ./mail_data/vpopmail_etc:/var/vpopmail/etc \
+  --volume ./mail_data/log:/log \
+  --volume ./mail_data/spamassassin:/var/spamassassin \
+  --volume ./mail_data/tmp:/var/qmail/tmp \
+  --volume ./mail_data/qusers:/var/qmail/users \
+  semhoun/qmail_all-in-one /qmail-aio/init.sh
+```
+#### Docker Compose
+```shell
+docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/init.sh
+```
 
+####Environment
+* `SKIP_INIT_ENV`
+* `DEV_MODE`
 
 #### Volumes
 
@@ -104,17 +122,25 @@ services:
 
 ## Built With
 
-* SQMail v4.1.15
-* VPopMail v5.4.33
+* Autorespond 2.0.5
+* clamav 0.104.2
+* dovecot 2.3.18
+* ezmlm-idx 7.2.2
+* fehQlibs 19
+* qmailadmin 1.2.16
+* SpamAssassin 2.4.6
+* SQMail 4.1.15
+* VPopMail 5.4.33
+* vqadmin 2.3.74
 
-## Find Us
+## Find Me
 
 * [GitHub](https://github.com/semhoun/)
 * [DockerHub](https://hub.docker.com/repository/docker/semhoun/sqmail)
 
 ## Authors
 
-* **Nathanaël Semhoun** - *Initial work* - [semhoun](https://gitlab.com/semhoun)
+* **Nathanaël Semhoun** - *Docker creation* - [semhoun](https://gitlab.com/semhoun)
 
 
 ## License
@@ -124,7 +150,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 ## Acknowledgments
 This docker use sources and patches from
 
-- http://cr.yp.to/daemontools.html
+- http://cr.yp.to/
 - https://www.fehcom.de/sqmail/sqmail.html
 - https://notes.sagredo.eu/
 - https://www.inter7.com/vpopmail-virtualized-email/

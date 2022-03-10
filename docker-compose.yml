@@ -1,7 +1,7 @@
 version: '3.2'
 
 services:
-  qmail_aio:
+  qmail-aio:
     build:
       args:
         - SQMAIL_TAG=${SQMAIL_TAG}
@@ -14,7 +14,9 @@ services:
         - SPAMASSASSIN_TAG=${SPAMASSASSIN_TAG}
         - FCRON_TAG=${FCRON_TAG}
     extra_hosts:
-      - mariadb:192.168.13.1
+      - mariadb:host-gateway
+    environment:
+      - DEV_MODE=1
     image: semhoun/qmail_all-in-one:${QMAIL_AIO_VERSION}
     volumes:
       - ./data/qcontrol:/var/qmail/control

@@ -69,7 +69,7 @@ Domain configuration will be:
 EOF
 
 # Resume
-whiptail --textbox "${RESUME}" 20 78
+whiptail --textbox "${RESUME}" 25 78
 rm "${RESUME}"
 
 if !(whiptail --title "Set configuration" --yesno "Apply the configuration." 8 78); then
@@ -173,20 +173,83 @@ ln -s .qmail-postmaster .qmail-mailer-daemon
 ln -s .qmail-postmaster .qmail-root
 chown alias.sqmail .qmail*
 chmod 644 .qmail*
+ 
+# Dovecot
+cat > /var/qmail/control/dovecot-sql.conf.ext << EOF
+driver = mysql
+connect = host=${MARIADB_HOST} dbname=${MARIADB_DB} user=${MARIADB_USER} password=${MARIADB_PASS}
+default_pass_scheme = MD5-CRYPT
+
+#  USER LIMITS via vpopmail.pw_gid filed was currently removed
+password_query = \
+	SELECT \
+		CONCAT(vpopmail.pw_name, '@', vpopmail.pw_domain) AS user, \
+  		vpopmail.pw_passwd AS password, \
+                vpopmail.pw_dir AS userdb_home, \
+                89 AS userdb_uid, \
+                89 AS userdb_gid, \
+                CONCAT('*:bytes=', REPLACE(SUBSTRING_INDEX(vpopmail.pw_shell, 'S', 1), 'NOQUOTA', '0')) AS userdb_quota_rule \
+	FROM vpopmail \
+		LEFT JOIN aliasdomains ON aliasdomains.alias='%d' \
+		LEFT JOIN limits ON limits.domain = '%d' \
+	WHERE \
+		vpopmail.pw_name='%n' \
+		AND \
+		(vpopmail.pw_domain='%d' OR vpopmail.pw_domain=aliasdomains.domain)
+
+user_query = \
+	SELECT \
+		vpopmail.pw_dir AS home, \
+	  	89 AS uid, \
+  		89 AS gid \
+  	FROM vpopmail \
+  	WHERE \
+  		vpopmail.pw_name='%n' \
+		AND \
+		vpopmail.pw_domain='%d'
+
+iterate_query = SELECT CONCAT(pw_name,'@',pw_domain) AS user FROM vpopmail
+EOF
+chown root.root /var/qmail/control/dovecot-sql.conf.ext
+chmod 600 /var/qmail/control/dovecot-sql.conf.ext
 
 # Creation directory and setting permissions
 mkdir -p /var/qmail/control/domainkeys
-chown -R qmailr:qmail /var/qmail/control
+chown -R qmaild:sqmail /var/qmail/control
+chown -R qmailq:sqmail /var/qmail/queue
 chmod 644 /var/qmail/control/*
 mkdir -p /var/spamassassin/auto-whitelist
 mkdir -p /var/spamassassin/bayes
 mkdir -p /var/spamassassin/razor
 chown -R vpopmail.vchkpw /var/spamassassin
 chown 644 /var/vpopmail/etc/*
+chown -R vpopmail.vchkpw /var/vpopmail/domains
 
 # Add domain in vpopmail
 /var/vpopmail/bin/vadddomain ${DEFAULT_DOMAIN} "${POSTMASTER_PWD}"
 
-exit
+# SpamAssassin DB
+echo "CREATE TABLE spam_prefs (
+  id int(8) UNSIGNED NOT NULL,
+  username varchar(128) NOT NULL DEFAULT '',
+  preference varchar(64) NOT NULL DEFAULT '',
+  value varchar(128) DEFAULT NULL,
+  added datetime NOT NULL DEFAULT current_timestamp(),
+  modified timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  UNIQUE KEY id (id),
+  KEY preference (preference),
+  KEY username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COMMENT='Spamassassin Preferences';
+INSERT INTO spam_prefs (id, username, preference, value, added, modified) VALUES
+(1, '\$GLOBAL', 'required_hits', '7.0', '2003-10-11 00:00:00', '2013-09-10 00:00:00'),
+(2, '\$GLOBAL', 'report_safe', '0', '2003-10-11 00:00:00', '2013-09-10 00:00:00'),
+(3, '\$GLOBAL', 'fold_headers', '1', '2003-10-11 00:00:00', '2013-09-10 00:00:00'),
+(4, '\$GLOBAL', 'add_header', 'all Level _STARS(*)_', '2003-10-11 00:00:00', '2013-09-10 00:00:000'),
+(5, '\$GLOBAL', 'rewrite_header', 'Subject [SPAM]', '2003-10-11 00:00:00', '2013-09-10 00:00:00'),
+(6, '\$GLOBAL', 'ok_languages', 'en fr', '2003-10-11 00:00:00', '2013-09-10 00:00:00'),
+(7, '\$GLOBAL', 'refuse_threshold', '9', '2003-10-11 00:00:00', '2013-09-10 00:00:00');
+" | mysql -h ${MARIADB_HOST} -u ${MARIADB_USER} -p"${MARIADB_PASS}" ${MARIADB_DB}
 
-echo "*:" >> /var/qmail/control/tlsdestinations !!! not in prod
+echo "============================"
+echo " QMail AllInOne initialized"
+echo "============================"
