@@ -17,6 +17,11 @@ ExcludeDatabase daily
 " >> /etc/clamav/freshclam.conf
 fi
 
+if [ ! -s "/var/qmail/queue/lock" ]; then
+	echo "[QMail] Initializing queue directories ..."
+	cp -a /qmail-aio/templates/queue /var/qmail/
+fi
+
 if [ ! -s "/var/lib/clamav" ]; then
 	echo "[CLAMAV] Lanching first time freshclam ..."
 	/usr/bin/freshclam 
@@ -38,4 +43,5 @@ rm -f /var/run/lighttpd-log.pipe
 cp /var/qmail/control/spamassassin_sql.cf /etc/mail/spamassassin/sql.cf
 cp /var/qmail/control/me /etc/mailname
 
-$@
+echo "#> Lauching $@"
+exec $@

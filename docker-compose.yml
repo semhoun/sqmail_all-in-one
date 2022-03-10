@@ -6,7 +6,9 @@ services:
       args:
         - SQMAIL_TAG=${SQMAIL_TAG}
         - FEHQLIBS_TAG=${FEHQLIBS_TAG}
-        - DAEMONTOOLS_TAG=${DAEMONTOOLS_TAG}
+        - EXECLINE_TAG=${EXECLINE_TAG}
+        - SKALIB_TAG=${SKALIB_TAG}
+        - S6_TAG=${S6_TAG}
         - UCSPISSL_TAG=${UCSPISSL_TAG}
         - UCSPITCP6_TAG=${UCSPITCP6_TAG}
         - DOVECOT_TAG=${DOVECOT_TAG}

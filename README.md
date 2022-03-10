@@ -94,9 +94,10 @@ docker run \
 docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/init.sh
 ```
 
-####Environment
-* `SKIP_INIT_ENV`
-* `DEV_MODE`
+#### Environment
+
+* `SKIP_INIT_ENV` - Skip all initialization of docker_entrypoint (like directory, spamassassin, clamav)
+* `DEV_MODE` - Currently remove some clamav databases
 
 #### Volumes
 
@@ -129,6 +130,7 @@ docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/init.sh
 * fehQlibs 19
 * qmailadmin 1.2.16
 * SpamAssassin 2.4.6
+* s6 2.11.1.0
 * SQMail 4.1.15
 * VPopMail 5.4.33
 * vqadmin 2.3.74

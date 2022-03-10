@@ -5,7 +5,9 @@ ENV TERM=linux
 
 ARG SQMAIL_TAG
 ARG FEHQLIBS_TAG
-ARG DAEMONTOOLS_TAG
+ARG EXECLINE_TAG
+ARG SKALIB_TAG
+ARG S6_TAG
 ARG UCSPISSL_TAG
 ARG UCSPITCP6_TAG
 ARG DOVECOT_TAG
@@ -63,6 +65,33 @@ RUN apt-get -y install bsd-mailx \
   && rm -rf /root/.local
 
 ########################
+# Skarnet S6
+########################
+RUN wget -O skalibs-${SKALIB_TAG}.tar.gz https://github.com/skarnet/skalibs/archive/refs/tags/v${SKALIB_TAG}.tar.gz \
+	&& tar xvzf skalibs-${SKALIB_TAG}.tar.gz \
+	&& cd skalibs-${SKALIB_TAG} \
+	&& ./configure \
+	&& make \
+	&& make install \
+	&& cd /qmail-aio/src/ \
+	&& wget -O execline-${EXECLINE_TAG}.tar.gz https://github.com/skarnet/execline/archive/refs/tags/v${EXECLINE_TAG}.tar.gz \
+	&& tar xvzf execline-${EXECLINE_TAG}.tar.gz \
+	&& cd execline-${EXECLINE_TAG} \
+	&& ./configure \
+	&& make \
+	&& make install \
+	&& cd /qmail-aio/src/ \
+	&& wget -O s6-${S6_TAG}.tar.gz https://github.com/skarnet/s6/archive/refs/tags/v${S6_TAG}.tar.gz \
+	&& tar xvzf s6-${S6_TAG}.tar.gz \
+	&& cd s6-${S6_TAG} \
+	&& ./configure \
+	&& make \
+	&& make install \
+## cleaning
+	&& rm -rf /qmail-aio/src/* \
+	&& rm -rf /var/qmail/svc /service/*
+
+########################
 # SQMail
 ########################
 RUN mkdir -p /package \
@@ -75,16 +104,6 @@ RUN mkdir -p /package \
     && mv fehQlibs-${FEHQLIBS_TAG} qlibs  \
     && cd qlibs \
     && make \
-## Daemontools
-    && cd /qmail-aio/src \
-    && wget https://cr.yp.to/daemontools/daemontools-${DAEMONTOOLS_TAG}.tar.gz \
-    && cd /package \
-    && tar xvzf /qmail-aio/src/daemontools-${DAEMONTOOLS_TAG}.tar.gz \
-    && cd admin \
-    && patch -p0 < /qmail-aio/patches/daemontools-0.76.errno.patch \
-    && patch -p0 < /qmail-aio/patches/daemontools-0.76-localtime.patch \
-    && cd daemontools-${DAEMONTOOLS_TAG} \
-    && package/install \
 ## ucspi-ssl    
     && cd /qmail-aio/src \
     && wget https://www.fehcom.de/ipnet/ucspi-ssl/ucspi-ssl-${UCSPISSL_TAG}.tgz \
@@ -169,27 +188,27 @@ RUN wget  http://dist.schmorp.de/libev/libev-4.33.tar.gz \
 # Dovecot
 ########################
 RUN groupadd -g 2110 dovecot \
-    && useradd -g dovecot -u 7798 -s /usr/sbin/nologin -d /var/run dovenull \
-    && useradd -g dovecot -u 7799 -s /usr/sbin/nologin -d /var/run dovecot \
-    && wget https://dovecot.org/releases/2.3/dovecot-${DOVECOT_TAG}.tar.gz \
-    && tar xvzf dovecot-${DOVECOT_TAG}.tar.gz \
-    && cd dovecot-${DOVECOT_TAG} \
-    && ./configure \
-        --prefix=/usr \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --with-sql \
-        --with-mysql \
-        --with-docs \
-        --with-ssl \
-        --without-shadow \
-        --without-pam \
-        --without-ldap \
-        --without-pgsql \
-        --without-sqlite \
-    && make \
-    && make install \
-    && mkdir -p /etc/dovecot/ /var/run/dovecot \
+	&& useradd -g dovecot -u 7798 -s /usr/sbin/nologin -d /var/run dovenull \
+	&& useradd -g dovecot -u 7799 -s /usr/sbin/nologin -d /var/run dovecot \
+	&& wget https://dovecot.org/releases/2.3/dovecot-${DOVECOT_TAG}.tar.gz \
+	&& tar xvzf dovecot-${DOVECOT_TAG}.tar.gz \
+	&& cd dovecot-${DOVECOT_TAG} \
+	&& ./configure \
+			--prefix=/usr \
+			--sysconfdir=/etc \
+			--localstatedir=/var \
+			--with-sql \
+			--with-mysql \
+			--with-docs \
+			--with-ssl \
+			--without-shadow \
+			--without-pam \
+			--without-ldap \
+			--without-pgsql \
+			--without-sqlite \
+	&& make \
+	&& make install \
+	&& mkdir -p /etc/dovecot/ /var/run/dovecot \
 # cleaning
     && rm -rf /qmail-aio/src/*
 # Config files
@@ -296,7 +315,7 @@ RUN groupadd -g 5010 clamav \
     -e "s/#ScanXMLDOCS .*/ScanXMLDOCS yes/" \
     -e "s/#ScanMail .*/ScanMail yes/" \
     -e "s/#Foreground .*/Foreground yes/" \
-    -e "s/#ConcurrentDatabaseReload no/ConcurrentDatabaseReload no/"
+    -e "s/#ConcurrentDatabaseReload no/ConcurrentDatabaseReload no/" \
     /etc/clamav/clamd.conf.sample > /etc/clamav/clamd.conf \
 # cleaning
   && rm -rf /qmail-aio/src/*
@@ -434,28 +453,34 @@ RUN chown vpopmail.vchkpw /var/qmail/bin/maildrop-filter \
   && install /var/qmail/bin/qmailctl /usr/local/bin \
   && chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
   && chmod 1755 /var/qmail/bin/qmail-queuescan
+	
+###########################
+# Templates
+###########################
+RUN mkdir - /qmail-aio/templates \
+	&& cp -a /var/qmail/queue /qmail-aio/templates/
 
 ###########################
 # SVC Binaries
 ###########################
 COPY bin/run/qmail-smtpd /service/qmail-smtpd/run
-COPY bin/log/qmail /service/qmail-smtpd/log/run
+COPY bin/log/default /service/qmail-smtpd/log/run
 COPY bin/run/qmail-smtpsd /service/qmail-smtpsd/run
-COPY bin/log/qmail /service/qmail-smtpsd/log/run
+COPY bin/log/default /service/qmail-smtpsd/log/run
 COPY bin/run/qmail-smtpsub /service/qmail-smtpsub/run
-COPY bin/log/qmail /service/qmail-smtpsub/log/run
+COPY bin/log/default /service/qmail-smtpsub/log/run
 COPY bin/run/qmail-send /service/qmail-send/run
-COPY bin/log/qmail /service/qmail-send/log/run
+COPY bin/log/default /service/qmail-send/log/run
 COPY bin/run/dovecot /service/dovecot/run
-COPY bin/log/dovecot /service/dovecot/log/run
+COPY bin/log/default /service/dovecot/log/run
 COPY bin/run/clamd /service/clamd/run
-COPY bin/log/clamd /service/clamd/log/run
+COPY bin/log/default /service/clamd/log/run
 COPY bin/run/spamd /service/spamd/run
-COPY bin/log/spamd /service/spamd/log/run
+COPY bin/log/default /service/spamd/log/run
 COPY bin/run/lighttpd /service/lighttpd/run
 COPY bin/log/lighttpd /service/lighttpd/log/run
 COPY bin/run/fcron /service/fcron/run
-COPY bin/log/fcron /service/fcron/log/run
+COPY bin/log/default /service/fcron/log/run
     
 ###########################
 # Templates
@@ -508,4 +533,4 @@ EXPOSE 80
 
 COPY bin/docker-entrypoint.sh /bin/
 ENTRYPOINT ["/bin/docker-entrypoint.sh"]
-CMD ["/command/svscan", "/service", "2>&1"]
+CMD ["/bin/s6-svscan", "/service", "2>&1"]

@@ -7,7 +7,6 @@ if [ ! -d "${LOG_DIR}" ]; then
 		mkdir -p "${LOG_DIR}"
 		chown ${LOG_USER}:${LOG_GROUP} "${LOG_DIR}"
 		echo "Creating log dir for ${LOG_NAME}:"
-		ls -ld "${LOG_DIR}"
 fi
 
 LOG_PIPE="/var/run/lighttpd-log.pipe"
@@ -18,4 +17,4 @@ fi
 
 exec 2>&1
 exec <> $LOG_PIPE
-exec setuidgid ${LOG_USER} multilog t s2000000 "${LOG_DIR}"
+exec s6-setuidgid ${LOG_USER} s6-log T s2000000 "${LOG_DIR}"
