@@ -6,7 +6,7 @@ LOG_DIR="/log/${LOG_NAME}"
 if [ ! -d "${LOG_DIR}" ]; then
 		mkdir -p "${LOG_DIR}"
 		chown ${LOG_USER}:${LOG_GROUP} "${LOG_DIR}"
-		echo "Creating log dir for ${LOG_NAME}:"
+		echo "Creating log dir for ${LOG_NAME} : ${LOG_DIR}"
 fi
 
 LOG_PIPE="/var/run/lighttpd-log.pipe"

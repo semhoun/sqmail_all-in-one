@@ -6,8 +6,8 @@ LOG_DIR="/log/${LOG_NAME}"
 if [ ! -d "${LOG_DIR}" ]; then
 		mkdir -p "${LOG_DIR}"
 		chown ${LOG_USER}:${LOG_GROUP} "${LOG_DIR}"
-		echo "Creating log dir for ${LOG_NAME}:"
+		echo "Creating log dir for ${LOG_NAME} : ${LOG_DIR}"
 fi
 
 exec 2>&1
-exec s6-setuidgid ${LOG_USER} s6-log t s2000000 "${LOG_DIR}"
+exec s6-setuidgid ${LOG_USER} s6-log T s2000000 "${LOG_DIR}"

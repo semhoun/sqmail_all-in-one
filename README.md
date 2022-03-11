@@ -62,6 +62,7 @@ services:
       - ./data/tmp:/var/qmail/tmp
       - ./data/qusers:/var/qmail/users
       - ./data/queue:/var/qmail/queue
+      - ./data/qalias:/var/qmail/alias
     ports:
       - 8090:80
       - 25:25
@@ -87,11 +88,11 @@ docker run \
   --volume ./mail_data/spamassassin:/var/spamassassin \
   --volume ./mail_data/tmp:/var/qmail/tmp \
   --volume ./mail_data/qusers:/var/qmail/users \
-  semhoun/qmail_all-in-one /qmail-aio/init.sh
+  semhoun/qmail_all-in-one /qmail-aio/bin/init.sh
 ```
 #### Docker Compose
 ```shell
-docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/init.sh
+docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
 ```
 
 #### Environment
@@ -110,6 +111,7 @@ docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/init.sh
 * `/var/qmail/tmp`- QMail temporary directory (best if tmpfs)
 * `/var/qmail/users` - QMail user file
 * `/var/qmail/queue` - QMail queue
+* `/var/qmail/alias` - QMail alias (for local users) 
 
 #### Useful File Locations
 * `/ssl` - SSL Certificates
@@ -119,7 +121,11 @@ docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/init.sh
   * `/ssl/pop.crt` - POP3 Certificate
   * `/ssl/smtp.key` - SMTP Key
   * `/ssl/smtp.crt` - SMTP Certificate
-* `/sqmail/bin/init.sh` - Initialisation script
+* `/qmail-aio/bin/init.sh` - Initialisation script
+* `/qmail-aio/bin/domainkey.sh` - DKIM key creation
+  * usage `domainkey.sh [-p] domain [selector]`
+  * Print domainkey with -p, without create domain
+
 
 ## Built With
 

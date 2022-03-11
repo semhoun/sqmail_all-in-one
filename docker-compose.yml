@@ -30,6 +30,7 @@ services:
       - ./data/tmp:/var/qmail/tmp
       - ./data/qusers:/var/qmail/users
       - ./data/queue:/var/qmail/queue
+      - ./data/alias:/var/qmail/alias
     ports:
       - 8090:80
       - 25:25

@@ -57,24 +57,11 @@ QMail/SMTP configuration will be:
   - database : ${DATABYTES}
   - queue life time : ${QUEUELIFETIME}
   - spf behavior : ${SPFBEHAVIOR}
-  - relay allowed	: ${RELAY_IPS}
+  - relay allowed : ${RELAY_IPS}
   
 EOF
 
-SMTP_SERVER=$(whiptail --inputbox "SMTP server hostname" 8 39 "smtp.exemple.net" --title "Domain configuration" 3>&1 1>&2 2>&3)
-if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
-DEFAULT_DOMAIN=$(whiptail --inputbox "Default domain" 8 39 "exemple.net" --title "Domain configuration" 3>&1 1>&2 2>&3)
-if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
-POSTMASTER_PWD=$(whiptail --inputbox "Postmaster password" 8 39 "" --title "Domain configuration" 3>&1 1>&2 2>&3)
-if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
-cat >> "${RESUME}" << EOF
-Domain configuration will be:
-  - smtp server : ${SMTP_SERVER}
-  - default domain : ${DEFAULT_DOMAIN}
-  - postmaster password : ${POSTMASTER_PWD}
-  
-EOF
-
+SMTP_SERVER=$(whiptail --inputbox "SMTP server hostname, coud be different of the MX entry (must match the PTR entry or reverse DNS)" 12 50 "smtp.exemple.net" --title "Domain configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 DEFAULT_DOMAIN=$(whiptail --inputbox "Default domain" 8 39 "exemple.net" --title "Domain configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
@@ -237,10 +224,12 @@ chown root.root /var/qmail/control/dovecot-sql.conf.ext
 chmod 600 /var/qmail/control/dovecot-sql.conf.ext
 
 # Creation directory and setting permissions
-mkdir -p /var/qmail/control/domainkeys
-chown -R qmaild:sqmail /var/qmail/control
-chown -R qmailq:sqmail /var/qmail/queue
+chown -R qmailq.sqmail /var/qmail/queue
+chown -R qmaild.sqmail /var/qmail/control
 chmod 644 /var/qmail/control/*
+mkdir -p /var/qmail/control/domainkeys
+chmod 755 /var/qmail/control/domainkeys
+chown qmailr.sqmail /var/qmail/control/domainkeys
 mkdir -p /var/spamassassin/auto-whitelist
 mkdir -p /var/spamassassin/bayes
 mkdir -p /var/spamassassin/razor

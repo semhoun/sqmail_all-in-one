@@ -56,7 +56,7 @@ ENV LC_ALL en_US.UTF-8
 # Additionnals packages
 ########################
 RUN apt-get -y install bsd-mailx \
-    libperl-dev libmariadb-dev libmariadb-dev-compat csh maildrop bzip2 razor pyzor ksh libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
+    libperl-dev libmariadb-dev libmariadb-dev-compat csh maildrop bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
     lighttpd \
     check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
     libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
@@ -461,7 +461,7 @@ RUN mkdir - /qmail-aio/templates \
 	&& cp -a /var/qmail/queue /qmail-aio/templates/
 
 ###########################
-# SVC Binaries
+# Services config
 ###########################
 COPY bin/run/qmail-smtpd /service/qmail-smtpd/run
 COPY bin/log/default /service/qmail-smtpd/log/run
@@ -481,7 +481,7 @@ COPY bin/run/lighttpd /service/lighttpd/run
 COPY bin/log/lighttpd /service/lighttpd/log/run
 COPY bin/run/fcron /service/fcron/run
 COPY bin/log/default /service/fcron/log/run
-    
+  
 ###########################
 # Templates
 ###########################
