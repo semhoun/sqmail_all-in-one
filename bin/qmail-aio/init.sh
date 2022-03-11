@@ -114,7 +114,7 @@ user_scores_sql_password ${MARIADB_PASS}
 user_scores_sql_custom_query     SELECT preference, value FROM spam_prefs WHERE username = _USERNAME_ OR username = '\$GLOBAL' OR username = CONCAT('%',_DOMAIN_) ORDER BY username ASC
 EOF
 echo -n "${CONCURRENCY_INCOMING}" > /var/qmail/control/concurrencyincoming
-echo "${CONCURRENCY_REMOTE}" > /var/qmail/control/concurrencyincoming
+echo "${CONCURRENCY_REMOTE}" > /var/qmail/control/concurrencyremote
 echo "${DATABYTES}" > /var/qmail/control/databytes
 echo "${SPFBEHAVIOR}" > /var/qmail/control/spfbehavior
 echo "${QUEUELIFETIME}" > /var/qmail/control/queuelifetime
