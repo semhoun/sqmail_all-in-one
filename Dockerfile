@@ -491,6 +491,11 @@ COPY message/quotawarn.msg /var/tpl/vpopmail/quotawarn.msg
 COPY conf/dovecot-sql.conf.ext /var/tpl/qmail
 
 ###########################
+# WWW
+###########################
+COPY www/ /var/www/html/
+
+###########################
 # Volumes
 ###########################
 RUN mkdir -p \
