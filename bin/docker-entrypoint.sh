@@ -1,20 +1,20 @@
 #!/bin/bash
 
+function delayedProcess {
+	sleep 5
+	echo "[DELAYED] Set qmail-send supervion perms"
+	/bin/s6-svperms -G www-data /service/qmail-send
+}
+
 if [ -n "${SKIP_INIT_ENV}" ]; then
   exec $@
   exit
 fi
 
 if [ -n "${DEV_MODE}" ]; then
-  sed -e "s/Example/#Exemple/" \
-    -e "s/#PidFile .*/PidFile \/var\/run\/freshclam.pid/" \
-    -e "s/#DNSDatabaseInfo .*/DNSDatabaseInfo current.cvd.clamav.net/" \
-    -e "s/#DatabaseMirror .*/DatabaseMirror database.clamav.net/" \
-    /etc/clamav/freshclam.conf.sample > /etc/clamav/freshclam.conf
-    echo "
-ExcludeDatabase main
-ExcludeDatabase daily
-" >> /etc/clamav/freshclam.conf
+	sed '/^ExcludeDatabase/d' -i /etc/clamav/freshclam.conf
+	echo "ExcludeDatabase main
+ExcludeDatabase daily" >> /etc/clamav/freshclam.conf
 fi
 
 if [ ! -s "/var/qmail/queue/lock" ]; then
@@ -43,6 +43,8 @@ rm -f /var/run/lighttpd-log.pipe
 # Fix some config file who was not in volumes
 cp /var/qmail/control/spamassassin_sql.cf /etc/mail/spamassassin/sql.cf
 cp /var/qmail/control/me /etc/mailname
+
+delayedProcess &
 
 echo "#> Lauching $@"
 exec $@

@@ -4,4 +4,5 @@ exec env - \
     PATH="/var/qmail/bin:$PATH" \
     DKREMOTE="/var/qmail/bin/qmail-remote.orig" \
     DKSIGN="/var/qmail/control/domainkeys/%/default" \
-    qmail-start "`cat /var/qmail/control/defaultdelivery`"
+    qmail-start "`cat /var/qmail/control/defaultdelivery`" \
+		2>&1

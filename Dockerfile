@@ -57,7 +57,7 @@ ENV LC_ALL en_US.UTF-8
 ########################
 RUN apt-get -y install bsd-mailx \
     libperl-dev libmariadb-dev libmariadb-dev-compat csh maildrop bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
-    lighttpd \
+    lighttpd php7.4-fpm \
     check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
     libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
 		mariadb-client \
@@ -245,9 +245,11 @@ RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qm
 	&& patch -p1 < /qmail-aio/patches/roberto-qmailadmin-1.2.16.patch \
 	&& cp /qmail-aio/patches/qmailadmin/* images/ \
   && ./configure \
-		--enable-cgibindir=/var/www/cgi-bin \
-		--enable-htmldir=/var/www/html \
-		--enable-imagedir=/var/www/html/images/qmailadmin \
+		--enable-cgibindir=/var/www/admin/cgi \
+		--enable-htmldir=/var/www/admin/html/ \
+		--enable-imagedir=/var/www/admin/html/images/qmailadmin \
+		--enable-cgipath=/cgi/qmailadmin \
+		--enable-imageurl=/images/qmailadmin \
 		--disable-ezmlm-mysql \
 		--enable-modify-quota \
 		--enable-domain-autofill \
@@ -256,9 +258,10 @@ RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qm
 		--enable-help \
 		--enable-vpopuser=vpopmail \
 		--enable-vpopgroup=vchkpw \
-	 --enable-domain-autofill \
+		--enable-domain-autofill \
   && make \
   && make install \
+	&& cp images/* /var/www/admin/html/images/qmailadmin/ \
 # cleaning
   && rm -rf /qmail-aio/src/*
 
@@ -269,11 +272,11 @@ RUN wget https://qmailrocks.thibs.com/downloads/vqadmin-2.3.7.tar.gz \
   && tar xvzf vqadmin-2.3.7.tar.gz \
   && cd vqadmin-2.3.7 \
   && patch -p0 < /qmail-aio/patches/vqadmin-2.3.7.patch \
-  && ./configure --enable-cgibindir=/var/www/cgi-bin --build=i386 \
+  && ./configure --enable-cgibindir=/var/www/admin/cgi --build=i386 \
   && make \
   && make install \
-  && mkdir -p /var/www/html/images/vqadmin \
-  && cp html/vqadmin.css /var/www/html/images/vqadmin \
+  && mkdir -p /var/www/admin/html/images/vqadmin \
+  && cp html/vqadmin.css /var/www/admin/html/images/vqadmin \
 # cleaning
   && rm -rf /qmail-aio/src/*
   
@@ -283,9 +286,11 @@ RUN wget https://qmailrocks.thibs.com/downloads/vqadmin-2.3.7.tar.gz \
 RUN groupadd -g 5010 clamav \
   && useradd -g clamav -u 5010 -s /usr/sbin/nologin -c "Clam AntiVirus" -d /var/empty clamav \
   && echo "clamav: ${CLAMAV_TAG}" \
-  && wget https://www.clamav.net/downloads/production/clamav-${CLAMAV_TAG}.tar.gz \
+#  && wget https://www.clamav.net/downloads/production/clamav-${CLAMAV_TAG}.tar.gz \
+	&& wget https://github.com/Cisco-Talos/clamav/archive/refs/tags/clamav-${CLAMAV_TAG}.tar.gz \
   && tar xvzf clamav-${CLAMAV_TAG}.tar.gz \
-  && cd clamav-${CLAMAV_TAG} \
+#  && cd clamav-${CLAMAV_TAG} \
+  && cd clamav-clamav-${CLAMAV_TAG} \
   && cmake . \
     -D CMAKE_BUILD_TYPE=Release \
     -D CMAKE_INSTALL_PREFIX=/usr \
@@ -387,16 +392,6 @@ RUN wget http://www.linuxmagic.com/opensource/qmail/qmail-remove/qmail-remove-0.
   && rm -rf /qmail-aio/src/*
   
 ########################
-# qmHandle  https://www.fehcom.de/sqmail/man/qmail-qmaint.html
-########################
-RUN wget http://downloads.sourceforge.net/project/qmhandle/qmhandle-1.3/qmhandle-1.3.2/qmhandle-1.3.2.tar.gz \
-  && tar xvzf qmhandle-1.3.2.tar.gz \
-  && cd qmhandle-1.3.2 \
-  && install qmHandle /usr/local/bin\
-# cleaning
-  && rm -rf /qmail-aio/src/*
-  
-########################
 # mess822
 ########################
 RUN wget http://cr.yp.to/software/mess822-0.58.tar.gz \
@@ -408,11 +403,6 @@ RUN wget http://cr.yp.to/software/mess822-0.58.tar.gz \
 # cleaning
   && rm -rf /qmail-aio/src/*
   
-###########################
-# lighttpd
-###########################
-COPY conf/lighttpd.conf /etc/lighttpd/lighttpd.conf
-
 ###########################
 # FCRON
 ###########################
@@ -440,25 +430,33 @@ RUN wget http://www.jetmore.org/john/code/swaks/latest/swaks \
   && install swaks /usr/local/bin \
 # cleaning
   && rm -rf /qmail-aio/src/*  
+	
+###########################
+# Web parts
+# we have to fix qmail-send s6-svc
+###########################
+COPY conf/lighttpd.conf /etc/lighttpd/lighttpd.conf
+COPY www/ /var/www/
+RUN sed -i 's/;cgi.fix_pathinfo=.*/cgi.fix_pathinfo=1/' /etc/php/7.4/fpm/php.ini \
+	&& mkdir -p /run/php \
+	&& chown -R www-data.www-data /var/www/admin/html/ /var/www/admin/cgi/qmail-queue.php \
+# Admin patches
+	&& cp /usr/bin/php7.4 /usr/bin/qmailq-php \	
+	&& chmod 4755 /usr/bin/qmailq-php
   
 ###########################
 # Binaries
 ###########################
 COPY bin/qmail-aio/ /qmail-aio/bin/
 COPY bin/maildrop-filter /var/qmail/bin/maildrop-filter
-COPY bin/qmailctl /var/qmail/bin/qmailctl
 COPY bin/qmail-queuescan /var/qmail/bin/qmail-queuescan
+COPY bin/qmailctl /usr/local/bin/qmailctl
+COPY bin/qmHandle /usr/local/bin/qmHandle
 RUN chown vpopmail.vchkpw /var/qmail/bin/maildrop-filter \
   && chmod 600 /var/qmail/bin/maildrop-filter \
-  && install /var/qmail/bin/qmailctl /usr/local/bin \
   && chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
-  && chmod 1755 /var/qmail/bin/qmail-queuescan
-	
-###########################
-# Templates
-###########################
-RUN mkdir - /qmail-aio/templates \
-	&& cp -a /var/qmail/queue /qmail-aio/templates/
+  && chmod 1755 /var/qmail/bin/qmail-queuescan \
+	&& chmod 755 /usr/local/bin/qmailctl /usr/local/bin/qmHandle
 
 ###########################
 # Services config
@@ -479,21 +477,21 @@ COPY bin/run/spamd /service/spamd/run
 COPY bin/log/default /service/spamd/log/run
 COPY bin/run/lighttpd /service/lighttpd/run
 COPY bin/log/lighttpd /service/lighttpd/log/run
+COPY bin/run/php-fpm /service/php-fpm/run
+COPY bin/log/default /service/php-fpm/log/run
 COPY bin/run/fcron /service/fcron/run
 COPY bin/log/default /service/fcron/log/run
+# For qmail-queue.php
+RUN chown -R qmailq /service/qmail-send
   
 ###########################
 # Templates
 ###########################
-RUN mkdir /var/tpl \
-  && mv /var/qmail/control/ /var/tpl/qmail
-COPY message/quotawarn.msg /var/tpl/vpopmail/quotawarn.msg
-COPY conf/dovecot-sql.conf.ext /var/tpl/qmail
-
-###########################
-# WWW
-###########################
-COPY www/ /var/www/html/
+RUN mkdir -p /qmail-aio/templates \
+	&& cp -a /var/qmail/queue /qmail-aio/templates/ \
+  && mv /var/qmail/control/ /qmail-aio/templates/
+COPY message/quotawarn.msg /qmail-aio/templates/vpopmail/quotawarn.msg
+COPY conf/dovecot-sql.conf.ext /qmail-aio/templates/
 
 ###########################
 # Volumes
@@ -521,7 +519,7 @@ VOLUME [ \
 ###########################
 # Final cleaning
 ###########################
-WORKDIR "/log"
+WORKDIR "/qmail-aio"
 RUN rm -rf /qmail-aio/patches /qmail-aio/src \
     && rm -rf /service/qmail-pop3* \
     && rm -rf /var/log/qmail-pop3* \
@@ -534,7 +532,7 @@ RUN rm -rf /qmail-aio/patches /qmail-aio/src \
 EXPOSE 25 465 587
 EXPOSE 110 995
 EXPOSE 143 993
-EXPOSE 80
+EXPOSE 80 88
 
 COPY bin/docker-entrypoint.sh /bin/
 ENTRYPOINT ["/bin/docker-entrypoint.sh"]

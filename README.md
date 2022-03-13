@@ -10,24 +10,15 @@ All-in-one QMail server with
   - imap/pop3
   - web admin
 
-## Getting Started
-
-### Prerequisities
-
-
-In order to run this container you'll need docker installed.
-
-* [Windows](https://docs.docker.com/windows/started)
-* [OS X](https://docs.docker.com/mac/started/)
-* [Linux](https://docs.docker.com/linux/started/)
-
-### Usage
+## Usage
 
 #### Docker
 
 ```shell
 docker run \
   --name qmail-aio \
+  --publish 80:80 \
+  --publish 88:88 \
   --publish 25:25 \
   --publish 465:465 \
   --publish 587:587 \
@@ -64,7 +55,8 @@ services:
       - ./data/queue:/var/qmail/queue
       - ./data/qalias:/var/qmail/alias
     ports:
-      - 8090:80
+      - 80:80
+      - 88:88
       - 25:25
       - 465:465
       - 587:587
@@ -74,8 +66,8 @@ services:
       - 993:993
 ```
 
-#### Initialization
-#### Docker
+## Initialization
+### Docker
 ```shell
 docker run \
   --rm -it \
@@ -90,17 +82,18 @@ docker run \
   --volume ./mail_data/qusers:/var/qmail/users \
   semhoun/qmail_all-in-one /qmail-aio/bin/init.sh
 ```
-#### Docker Compose
+### Docker Compose
 ```shell
 docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
 ```
 
-#### Environment
+## Docker configuration
+### Environment
 
 * `SKIP_INIT_ENV` - Skip all initialization of docker_entrypoint (like directory, spamassassin, clamav)
 * `DEV_MODE` - Currently remove some clamav databases
 
-#### Volumes
+### Volumes
 
 * `/ssl` - SSL Certificates
 * `/var/qmail/control`- QMail config files
@@ -113,7 +106,19 @@ docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
 * `/var/qmail/queue` - QMail queue
 * `/var/qmail/alias` - QMail alias (for local users) 
 
-#### Useful File Locations
+## Ports
+
+* `80` - Webmail (roundcube)
+* `88` - HTTP admin (https and security not provided)
+* `25` - SMTP
+* `465` - SMTPs
+* `587` - Submission
+* `110` - POP3
+* `995` - POP3s
+* `143` - IMAP
+* `993` - IMAPs
+
+## Useful File Locations
 * `/ssl` - SSL Certificates
   * `/ssl/imap.key` - IMAP Key
   * `/ssl/imap.crt` - IMAP Certificate
@@ -125,7 +130,6 @@ docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
 * `/qmail-aio/bin/domainkey.sh` - DKIM key creation
   * usage `domainkey.sh [-p] domain [selector]`
   * Print domainkey with -p, without create domain
-
 
 ## Built With
 

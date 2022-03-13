@@ -4,4 +4,4 @@ if [ ! -p $LOG_PIPE ]; then
 	mkfifo -m0640 "$LOG_PIPE"
 	chown www-data.www-data "$LOG_PIPE"
 fi
-exec /usr/sbin/lighttpd -D -f /etc/lighttpd/lighttpd.conf
+exec /usr/sbin/lighttpd -D -f /etc/lighttpd/lighttpd.conf 2>&1

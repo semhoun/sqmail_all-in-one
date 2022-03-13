@@ -1,7 +1,6 @@
 #!/bin/ksh
 QMAIL="/var/qmail"
 #
-alias -x SCANNER='/usr/local/bin/clamdscan'
 alias -x SPAMMER='/usr/local/bin/spamc'
 alias -x 822FIELD='/usr/local/bin/822field'
 #
