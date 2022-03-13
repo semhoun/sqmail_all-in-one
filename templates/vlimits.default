@@ -1,0 +1,45 @@
+# Default limits file.  This file is used for domains without a
+# .qmailadmin-limits file.
+
+# maximums for each account type, -1 = unlimited
+maxpopaccounts          -1
+maxforwards             -1
+maxautoresponders       -1
+maxmailinglists         -1
+
+# quota for entire domain, in megabytes
+# example shows a domain with a 100MB quota and a limit of 10,000 messages
+#quota                  100
+#maxmsgcount            10000
+
+# default quota for newly created users (in bytes)
+# example shows a user with a 10MB quota and a limit of 1000 messages
+#default_quota          10485760
+#default_maxmsgcount    1000
+
+# uncomment the following lines to disable certain features
+#disable_pop
+#disable_imap
+#disable_dialup
+#disable_password_changing
+#disable_external_relay
+#disable_smtp
+#disable_webmail
+#disable_spamassassin
+#delete_spam
+#disable_maildrop
+
+
+# Set bitflags on account management for non-postmaster admins.
+# To disable certain features, add the following bits
+#   Create = 1, Modify = 2, Delete = 4
+# So, to allow modification but not creation or deletion of
+# POPIMAP accounts, set perm_account to 5.
+
+perm_account            0
+perm_alias              0
+perm_forward            0
+perm_autoresponder      0
+perm_maillist           0
+perm_quota              0
+perm_defaultquota       0

@@ -15,6 +15,7 @@ services:
         - CLAMAV_TAG=${CLAMAV_TAG}
         - SPAMASSASSIN_TAG=${SPAMASSASSIN_TAG}
         - FCRON_TAG=${FCRON_TAG}
+        - ROUNDCUBEMAIL_TAG=${ROUNDCUBEMAIL_TAG}
     extra_hosts:
       - mariadb:host-gateway
     environment:

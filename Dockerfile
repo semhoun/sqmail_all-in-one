@@ -14,6 +14,7 @@ ARG DOVECOT_TAG
 ARG CLAMAV_TAG
 ARG SPAMASSASSIN_TAG
 ARG FCRON_TAG
+ARG ROUNDCUBEMAIL_TAG
 
 ########################  
 # Base install
@@ -23,7 +24,7 @@ WORKDIR "/qmail-aio/src"
 
 RUN mkdir -p /qmail-aio/src /qmail-aio/bin /qmail-aio/conf \
 	&& apt-get update \
-  && apt-get -y install build-essential equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake \
+  && apt-get -y install build-essential equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg \
 ## Add docker group for logs
   && groupadd -g 998 docker \
 ## Add MTA Local (equivs is needed)
@@ -56,11 +57,13 @@ ENV LC_ALL en_US.UTF-8
 # Additionnals packages
 ########################
 RUN apt-get -y install bsd-mailx \
-    libperl-dev libmariadb-dev libmariadb-dev-compat csh maildrop bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
-    lighttpd php7.4-fpm \
-    check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
-    libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
+		libperl-dev libmariadb-dev libmariadb-dev-compat csh maildrop bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
+		check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
+		libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
 		mariadb-client \
+		lighttpd php7.4-fpm \
+# For roundcube
+	&& apt-get install -y php7.4-zip php7.4-pspell php7.4-mysql php7.4-gd php7.4-imap php7.4-xml php7.4-mbstring php7.4-intl php-imagick aspell-fr php7.4-intl php7.4-curl \
   && cpan -i IP::Country::DB_File Digest::SHA1 \
   && rm -rf /root/.local
 
@@ -272,6 +275,7 @@ RUN wget https://qmailrocks.thibs.com/downloads/vqadmin-2.3.7.tar.gz \
   && tar xvzf vqadmin-2.3.7.tar.gz \
   && cd vqadmin-2.3.7 \
   && patch -p0 < /qmail-aio/patches/vqadmin-2.3.7.patch \
+	&& sed 's#/cgi-bin/#/cgi/#g' -i user.c cedit.c domain.c html/* \
   && ./configure --enable-cgibindir=/var/www/admin/cgi --build=i386 \
   && make \
   && make install \
@@ -436,14 +440,40 @@ RUN wget http://www.jetmore.org/john/code/swaks/latest/swaks \
 # we have to fix qmail-send s6-svc
 ###########################
 COPY conf/lighttpd.conf /etc/lighttpd/lighttpd.conf
+COPY conf/php.ini /etc/php/7.4/fpm/conf.d/99-qmail-aio.ini
 COPY www/ /var/www/
-RUN sed -i 's/;cgi.fix_pathinfo=.*/cgi.fix_pathinfo=1/' /etc/php/7.4/fpm/php.ini \
-	&& mkdir -p /run/php \
+RUN mkdir -p /run/php \
 	&& chown -R www-data.www-data /var/www/admin/html/ /var/www/admin/cgi/qmail-queue.php \
 # Admin patches
 	&& cp /usr/bin/php7.4 /usr/bin/qmailq-php \	
 	&& chmod 4755 /usr/bin/qmailq-php
-  
+	
+###########################
+# Roundcube
+###########################
+RUN cd /var/www/html \
+	&& curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer \
+	&& wget -O roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz https://github.com/roundcube/roundcubemail/releases/download/${ROUNDCUBEMAIL_TAG}/roundcubemail-${ROUNDCUBEMAIL_TAG}-complete.tar.gz \
+	&& tar -xvzf roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz --strip 1 \
+	&& rm -f index.lighttpd.html roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz \
+	&& mv composer.json-dist composer.json \
+	&& composer \
+			--working-dir=/var/www/html/ \
+			--prefer-dist --prefer-stable \
+			--update-no-dev --no-interaction \
+			--optimize-autoloader --apcu-autoloader \
+			require \
+					weird-birds/thunderbird_labels \
+					prodrigestivill/gravatar \
+	&& composer \
+			--working-dir=/var/www/html/ \
+			--prefer-dist --no-dev \
+			--no-interaction \
+			--optimize-autoloader --apcu-autoloader \
+			update \
+	&& rm -rf installer \
+	&& chown -R www-data.www-data /var/www/html
+
 ###########################
 # Binaries
 ###########################
@@ -490,8 +520,7 @@ RUN chown -R qmailq /service/qmail-send
 RUN mkdir -p /qmail-aio/templates \
 	&& cp -a /var/qmail/queue /qmail-aio/templates/ \
   && mv /var/qmail/control/ /qmail-aio/templates/
-COPY message/quotawarn.msg /qmail-aio/templates/vpopmail/quotawarn.msg
-COPY conf/dovecot-sql.conf.ext /qmail-aio/templates/
+COPY templates/ /qmail-aio/templates/
 
 ###########################
 # Volumes

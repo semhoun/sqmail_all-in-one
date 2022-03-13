@@ -162,8 +162,9 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 ## Acknowledgments
 This docker use sources and patches from
 
-- http://cr.yp.to/
+- http://cr.yp.to
 - https://www.fehcom.de/sqmail/sqmail.html
-- https://notes.sagredo.eu/
+- https://notes.sagredo.eu
 - https://www.inter7.com/vpopmail-virtualized-email/
 - http://skarnet.org/software/s6/index.html
+- http://fcron.free.fr

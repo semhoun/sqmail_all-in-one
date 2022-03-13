@@ -1,0 +1,33 @@
+driver = mysql
+connect = host=${MYSQL_HOST} dbname=${MYSQL_DB} user=${MYSQL_USER} password=${MYSQL_PASS}
+default_pass_scheme = MD5-CRYPT
+
+#  USER LIMITS via vpopmail.pw_gid filed was currently removed
+password_query = \
+	SELECT \
+		CONCAT(vpopmail.pw_name, '@', vpopmail.pw_domain) AS user, \
+  		vpopmail.pw_passwd AS password, \
+                vpopmail.pw_dir AS userdb_home, \
+                89 AS userdb_uid, \
+                89 AS userdb_gid, \
+                CONCAT('*:bytes=', REPLACE(SUBSTRING_INDEX(vpopmail.pw_shell, 'S', 1), 'NOQUOTA', '0')) AS userdb_quota_rule \
+	FROM vpopmail \
+		LEFT JOIN aliasdomains ON aliasdomains.alias='%d' \
+		LEFT JOIN limits ON limits.domain = '%d' \
+	WHERE \
+		vpopmail.pw_name='%n' \
+		AND \
+		(vpopmail.pw_domain='%d' OR vpopmail.pw_domain=aliasdomains.domain)
+
+user_query = \
+	SELECT \
+		vpopmail.pw_dir AS home, \
+	  	89 AS uid, \
+  		89 AS gid \
+  	FROM vpopmail \
+  	WHERE \
+  		vpopmail.pw_name='%n' \
+		AND \
+		vpopmail.pw_domain='%d'
+
+iterate_query = SELECT CONCAT(pw_name,'@',pw_domain) AS user FROM vpopmail

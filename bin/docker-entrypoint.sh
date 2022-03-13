@@ -6,6 +6,14 @@ function delayedProcess {
 	/bin/s6-svperms -G www-data /service/qmail-send
 }
 
+function writeRoundCubeConf {
+	# Launch with &, so export will not in main env
+	. /var/qmail/control/roundcube.conf
+	cat /qmail-aio/templates/roundcube-config.php | envsubst \
+		'$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $PRODUCT_NAME $SUPPORT_URL' \
+		> /var/www/html/config/config.inc.php
+}
+
 if [ -n "${SKIP_INIT_ENV}" ]; then
   exec $@
   exit
@@ -43,6 +51,8 @@ rm -f /var/run/lighttpd-log.pipe
 # Fix some config file who was not in volumes
 cp /var/qmail/control/spamassassin_sql.cf /etc/mail/spamassassin/sql.cf
 cp /var/qmail/control/me /etc/mailname
+
+writeRoundCubeConf &
 
 delayedProcess &
 
