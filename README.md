@@ -9,6 +9,7 @@ All-in-one QMail server with
   - spam filter
   - imap/pop3
   - web admin
+  - Roundcube
 
 ## Usage
 
@@ -138,7 +139,9 @@ docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
 * dovecot 2.3.18
 * ezmlm-idx 7.2.2
 * fehQlibs 19
+* fcron 3.3.1
 * qmailadmin 1.2.16
+* Roundcube 1.5.2
 * SpamAssassin 2.4.6
 * s6 2.11.1.0
 * SQMail 4.1.15
