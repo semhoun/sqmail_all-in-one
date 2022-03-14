@@ -139,10 +139,13 @@ function viewMessage($msgId) {
     $msg = file_get_contents(QUEUE_DIR . 'mess' . '/' . $split . '/' .$msgId);
     $msg = trim($msg);
 
-    echo '<div class="message">'
-       . '<h3>Message ' . $split . '/' .$msgId . '</h3>'
-       . '<pre>' . $msg . '</pre>'
-       . '</div>';
+    echo
+      '<figure class="text-center">'
+      . '<blockquote class="blockquote">'
+      . '<figcaption class="blockquote-footer">Message ' . $split . '/' .$msgId . '</figcaption>'
+      . '<pre>' . $msg . '</pre>'
+      . '</blockquote>'
+      . '</figure>';
 }
 
 function doQueue() {
@@ -155,58 +158,42 @@ if (!empty($GET['action']) && $GET['action'] == 'doqueue') doQueue();
 
     $messages = getMessages();
 ?>
-<html>
-    <style>
-     h1 {
-         text-align: center;
-     }
-     h2 {
-         text-align: center;
-     }
-     /* Center table */
-     table {
-         margin: 0 auto;
-     }
+<!DOCTYPE html>
+<html lang="en" >
 
-     /* Default Table Style */
-     table {
-         color: #333;
-         background: white;
-         border: 1px solid grey;
-         font-size: 12pt;
-         border-collapse: collapse;
-     }
-     table thead th,
-     table tfoot th {
-         color: #777;
-         background: rgba(0,0,0,.1);
-     }
-     table caption {
-         padding:.5em;
-     }
-     table th,
-     table td {
-         padding: .5em;
-         border: 1px solid lightgrey;
-     }
-    </style>
-    <body>
-    <h1>QMail Queue</h1>
-    <h2><a href="/cgi/qmail-queue.php?action=doqueue">Force queue process</a></h2>
+<head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+    
+    <title>QMail AIO - Admin</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/line-awesome.min.css">
+</head>
+
+<body>
+    <div class="container">
+    <div class="col-xs-12">
+      <div class="text-center" style="padding-top: 30px; padding-bottom: 30px;">
+          <h2>QMail Queue</h2>
+      </div>
+    </div>
+    </div>
+ 
+    <h3 class="text-center"><a href="/cgi/qmail-queue.php?action=doqueue">Force queue process <i class="las la-redo-alt"></i></a></h3>
 <?php
     if (!empty($GET['action']) && $GET['action'] == 'view' && !empty($GET['id'])) viewMessage($GET['id']);
 ?>
-    <table>
+    <table class="table table-striped">
     <thead>
         <tr>
-            <th>id</th>
-            <th>Direction</th>
-            <th>From</th>
-            <th>To</th>
-            <th>Date</th>
-            <th>Subject</th>
-            <th>Size</th>
-            <th>Action</th>
+            <th scope="col">id</th>
+            <th scope="col">Direction</th>
+            <th scope="col">From</th>
+            <th scope="col">To</th>
+            <th scope="col">Date</th>
+            <th scope="col">Subject</th>
+            <th scope="col">Size</th>
+            <th scope="col">Action</th>
         </tr>
     </thead>
     <tbody>
@@ -221,11 +208,21 @@ if (!empty($GET['action']) && $GET['action'] == 'doqueue') doQueue();
             <td>'. $msg['date']->format('Y/m/d H:i:s') . '</td>
             <td>'. $msg['subject'] . '</td>
             <td>'. $msg['size'] . ' bytes</td>
-            <td><a href="/cgi/qmail-queue.php?action=remove&id=' . $msg['ext_id'] . '">Remove</a> <a href="/cgi/qmail-queue.php?action=view&id=' . $msg['ext_id'] . '">View</a></td>
+            <td><a href="/cgi/qmail-queue.php?action=remove&id=' . $msg['ext_id'] . '" data-toggle="tooltip" title="Remove this mail"><i class="las la-trash"></i></a> <a href="/cgi/qmail-queue.php?action=view&id=' . $msg['ext_id'] . '" data-toggle="tooltip" title="View this mail"><i class="las la-eye"></i></a></td>
         </tr>
 ';
     }
 ?>
     </tbody>
     </table>
+
+    <script src="/js/jquery-3.6.0.slim.min.js"></script>
+    <script src="/js/bootstrap.bundle.min.js"></script>
+    <script>
+    $(function () {
+      $('[data-toggle="tooltip"]').tooltip()
+    })
+    </script>
 </body>
+
+</html>
