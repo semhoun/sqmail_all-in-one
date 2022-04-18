@@ -141,10 +141,10 @@ docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
 * fehQlibs 19
 * fcron 3.3.1
 * qmailadmin 1.2.16
-* Roundcube 1.5.2
+* Roundcube 1.6-beta
 * SpamAssassin 2.4.6
 * s6 2.11.1.0
-* SQMail 4.1.15
+* SQMail 4.1.16
 * VPopMail 5.4.33
 * vqadmin 2.3.74
 

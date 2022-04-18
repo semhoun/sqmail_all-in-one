@@ -2,7 +2,7 @@
 PATH=/var/qmail/bin:/bin:/usr/bin:/usr/local/bin:/usr/local/sbin
 export PATH
 
-svclist="qmail-send qmail-smtpd qmail-smtpsd qmail-smtpsub spamd clamd dovecot fcron lighttpd php-fom"
+svclist="qmail-send qmail-smtpd qmail-smtpsd qmail-smtpsub spamd clamd dovecot fcron lighttpd php-fpm"
 
 case "$1" in
   start)
