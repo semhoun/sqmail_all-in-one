@@ -16,6 +16,7 @@ services:
         - SPAMASSASSIN_TAG=${SPAMASSASSIN_TAG}
         - FCRON_TAG=${FCRON_TAG}
         - ROUNDCUBEMAIL_TAG=${ROUNDCUBEMAIL_TAG}
+        - VPOPMAIL_TAG=${VPOPMAIL_TAG}
     extra_hosts:
       - mariadb:host-gateway
     environment:

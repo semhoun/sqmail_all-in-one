@@ -15,6 +15,7 @@ ARG CLAMAV_TAG
 ARG SPAMASSASSIN_TAG
 ARG FCRON_TAG
 ARG ROUNDCUBEMAIL_TAG
+ARG VPOPMAIL_TAG
 
 ########################  
 # Base install
@@ -138,7 +139,7 @@ COPY conf/ssl_env /var/qmail/ssl_env
 # VPopMail
 ########################
 # Libev for vusaged
-RUN wget  http://dist.schmorp.de/libev/libev-4.33.tar.gz \
+RUN wget http://dist.schmorp.de/libev/libev-4.33.tar.gz \
     && tar xzvf libev-4.33.tar.gz \
     && cd libev-4.33 \
     && ./configure \
@@ -151,10 +152,10 @@ RUN wget  http://dist.schmorp.de/libev/libev-4.33.tar.gz \
     && groupadd -g 89 vchkpw \
     && useradd -g vchkpw -u 89 -s /usr/sbin/nologin -d /var/vpopmail vpopmail \
     && chown -R vpopmail.vchkpw /var/vpopmail \
-    && wget http://downloads.sourceforge.net/project/vpopmail/vpopmail-stable/5.4.33/vpopmail-5.4.33.tar.gz \
-    && tar xzf vpopmail-5.4.33.tar.gz \
-    && cd vpopmail-5.4.33 \
-    && patch -p1 < /qmail-aio/patches/roberto_vpopmail-5.4.33.patch \
+    && wget -O vpopmail-${VPOPMAIL_TAG}.tar.gz https://github.com/semhoun/vpopmail/archive/refs/tags/${VPOPMAIL_TAG}.tar.gz  \
+    && mkdir vpopmail \
+    && cd vpopmail \
+    && tar xzf ../vpopmail-${VPOPMAIL_TAG}.tar.gz --strip 1 \
     && autoreconf -f -i \
     && ./configure \
         --enable-qmaildir=/var/qmail/ \
@@ -166,21 +167,23 @@ RUN wget  http://dist.schmorp.de/libev/libev-4.33.tar.gz \
         --enable-auth-module=mysql \
         --enable-incdir=/usr/include/mariadb \
         --enable-libdir=/usr/lib \
-        --enable-logging=n \
         --disable-clear-passwd \
+        --enable-logging=n \
         --enable-auth-logging \
-        --enable-sql-logging=e \
-        --disable-passwd \
+        --enable-sql-logging \
+        --enable-min-pwd-length=6 \
         --enable-qmail-ext \
         --enable-mysql-limits \
         --enable-sql-aliasdomains \
         --enable-defaultdelivery \
         --enable-valias \
-    && make install-strip \
+		&& make \
+    && make install \
 # vusaged
     && cd vusaged \
-		&& LIBS=`head -1 /var/vpopmail/etc/lib_deps` ./configure \
-        --with-vpopmail=/var/vpopmail \
+		&& LIBS=`head -1 /var/vpopmail/etc/lib_deps` \
+			./configure \
+      --with-vpopmail=/var/vpopmail \
     && make \
     && cp -f vusaged /var/vpopmail/bin \
     && cp -f etc/vusaged.conf /var/vpopmail/etc \
@@ -289,12 +292,10 @@ RUN wget https://qmailrocks.thibs.com/downloads/vqadmin-2.3.7.tar.gz \
 ########################
 RUN groupadd -g 5010 clamav \
   && useradd -g clamav -u 5010 -s /usr/sbin/nologin -c "Clam AntiVirus" -d /var/empty clamav \
-  && echo "clamav: ${CLAMAV_TAG}" \
-#  && wget https://www.clamav.net/downloads/production/clamav-${CLAMAV_TAG}.tar.gz \
-	&& wget https://github.com/Cisco-Talos/clamav/archive/refs/tags/clamav-${CLAMAV_TAG}.tar.gz \
+  && curl https://sh.rustup.rs -sSf | sh -s -- -y \
+  && wget https://www.clamav.net/downloads/production/clamav-${CLAMAV_TAG}.tar.gz \
   && tar xvzf clamav-${CLAMAV_TAG}.tar.gz \
-#  && cd clamav-${CLAMAV_TAG} \
-  && cd clamav-clamav-${CLAMAV_TAG} \
+  && cd clamav-${CLAMAV_TAG} \
   && cmake . \
     -D CMAKE_BUILD_TYPE=Release \
     -D CMAKE_INSTALL_PREFIX=/usr \
@@ -421,6 +422,8 @@ RUN wget http://fcron.free.fr/archives/fcron-${FCRON_TAG}.src.tar.gz \
     --with-sysfcrontab=no \
     --with-answer-all \
 		--with-sendmail=/var/qmail/bin/sendmail \
+		--with-boot-install=no \
+		--with-systemdsystemunitdir=no \	
   && make \
   && make install \
 # cleaning

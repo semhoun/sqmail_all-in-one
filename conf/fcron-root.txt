@@ -1,5 +1,6 @@
 # Prepare file with : fcrontab -u root -e
-%nightly,stdout(yes),mail(no),random(yes),runas(root) * 1-4 /usr/bin/freshclam
-%nightly,stdout(yes),mail(no),random(yes),runas(root) * 1-4 /var/dcc/libexec/cron-dccd
-%nightly,stdout(yes),mail(no),random(yes),runas(root) * 1-4 /usr/local/bin/sa-update
-%nightly,stdout(yes),mail(no),random(yes),runas(vpopmail) * 1-4 /var/qmail/bin/learnSpam
+!stdout(yes),mail(no),runas(root)
+%nightly,random(yes) * 1-4 /usr/bin/freshclam
+%nightly,random(yes) * 1-4 /var/dcc/libexec/cron-dccd
+%nightly,random(yes) * 1-4 /usr/local/bin/sa-update
+%nightly,random(yes),runas(vpopmail) * 1-4 /var/qmail/bin/learnSpam

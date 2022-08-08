@@ -135,17 +135,17 @@ docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
 ## Built With
 
 * Autorespond 2.0.5
-* clamav 0.104.2
+* clamav 0.105.0
 * dovecot 2.3.18
 * ezmlm-idx 7.2.2
 * fehQlibs 19
 * fcron 3.3.1
 * qmailadmin 1.2.16
-* Roundcube 1.6-beta
-* SpamAssassin 2.4.6
-* s6 2.11.1.0
-* SQMail 4.1.16
-* VPopMail 5.4.33
+* Roundcube 1.6.0
+* SpamAssassin 3.4.6
+* s6 2.11.1.2
+* SQMail 4.1.17
+* VPopMail 5.5.0
 * vqadmin 2.3.74
 
 ## Find Me
@@ -168,6 +168,6 @@ This docker use sources and patches from
 - http://cr.yp.to
 - https://www.fehcom.de/sqmail/sqmail.html
 - https://notes.sagredo.eu
-- https://www.inter7.com/vpopmail-virtualized-email/
+- https://github.com/brunonymous/vpopmail
 - http://skarnet.org/software/s6/index.html
 - http://fcron.free.fr
