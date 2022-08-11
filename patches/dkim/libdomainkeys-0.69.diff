@@ -1,0 +1,11 @@
+--- Makefile.orig	2006-01-17 17:28:58.000000000 -0700
++++ Makefile	2009-01-25 21:24:04.000000000 -0700
+@@ -28,7 +28,7 @@
+ dnstest: dnstest.o dns_txt.o
+ 	$(CC) $(CFLAGS) -o dnstest dnstest.o dns_txt.o
+ dns.lib: dnstest.c
+-	(if $(MAKE) dnstest >/dev/null 2>&1; then echo -lresolv; else echo ""; fi) >dns.lib
++	(if ! $(MAKE) dnstest >/dev/null 2>&1; then echo -lresolv; else echo ""; fi) >dns.lib
+ 	 rm -f dnstest
+ 
+ socktest.o: socktest.c

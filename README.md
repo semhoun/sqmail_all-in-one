@@ -58,6 +58,7 @@ services:
     ports:
       - 80:80
       - 88:88
+      - 443:443
       - 25:25
       - 465:465
       - 587:587
@@ -82,10 +83,18 @@ docker run \
   --volume ./mail_data/tmp:/var/qmail/tmp \
   --volume ./mail_data/qusers:/var/qmail/users \
   semhoun/qmail_all-in-one /qmail-aio/bin/init.sh
+  
+docker run \
+  --rm -it \
+  --env SKIP_INIT_ENV=1 \
+  --volume ./mail_data/ssl:/ssl \
+  --publish 80:80 \
+  semhoun/qmail_all-in-one /qmail-aio/bin/init-certs.sh
 ```
 ### Docker Compose
 ```shell
-docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
+docker compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
+docker compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init-certs.sh
 ```
 
 ## Docker configuration
@@ -109,8 +118,9 @@ docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
 
 ## Ports
 
-* `80` - Webmail (roundcube)
+* `80` - Webmail (roundcube) and SSL Acme certs
 * `88` - HTTP admin (https and security not provided)
+* `443` - SSL Webmail (roundcube)
 * `25` - SMTP
 * `465` - SMTPs
 * `587` - Submission
@@ -120,14 +130,19 @@ docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
 * `993` - IMAPs
 
 ## Useful File Locations
+* `/ssl`/acme - Letsencrypt SSL data (remove to renew certs installation)
 * `/ssl` - SSL Certificates
+  * `/ssl/http.key` - Webmail Key
+  * `/ssl/http.crt` - Webmail Certificate
   * `/ssl/imap.key` - IMAP Key
   * `/ssl/imap.crt` - IMAP Certificate
   * `/ssl/pop.key` - POP3 Key
   * `/ssl/pop.crt` - POP3 Certificate
   * `/ssl/smtp.key` - SMTP Key
   * `/ssl/smtp.crt` - SMTP Certificate
+
 * `/qmail-aio/bin/init.sh` - Initialisation script
+* `/qmail-aio/bin/init-certs.sh` - Certs initialisation script
 * `/qmail-aio/bin/domainkey.sh` - DKIM key creation
   * usage `domainkey.sh [-p] domain [selector]`
   * Print domainkey with -p, without create domain
@@ -147,6 +162,15 @@ docker-compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
 * SQMail 4.1.17
 * VPopMail 5.5.0
 * vqadmin 2.3.74
+* acme.sh 3.0.4
+
+## Testing
+### SMTP
+You can test the SMTP part with [Swaks](https://github.com/jetmore/swaks) 
+A simpe test mail could be done with this:
+```shell
+swaks --to <to mail> --from <from email> --server <qmail aio host name>
+```
 
 ## Find Me
 

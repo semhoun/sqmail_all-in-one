@@ -16,6 +16,7 @@ ARG SPAMASSASSIN_TAG
 ARG FCRON_TAG
 ARG ROUNDCUBEMAIL_TAG
 ARG VPOPMAIL_TAG
+ARG ACMESH_TAG
 
 ########################  
 # Base install
@@ -23,7 +24,7 @@ ARG VPOPMAIL_TAG
 COPY patches /qmail-aio/patches
 WORKDIR "/qmail-aio/src"
 
-RUN mkdir -p /qmail-aio/src /qmail-aio/bin /qmail-aio/conf \
+RUN mkdir -p /qmail-aio/src /qmail-aio/bin /qmail-aio/templates \
 	&& apt-get update \
   && apt-get -y install build-essential equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg \
 ## Add docker group for logs
@@ -62,6 +63,7 @@ RUN apt-get -y install bsd-mailx \
 		check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
 		libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
 		mariadb-client \
+		socat \
 		lighttpd php7.4-fpm \
 # For roundcube
 	&& apt-get install -y php7.4-zip php7.4-pspell php7.4-mysql php7.4-gd php7.4-imap php7.4-xml php7.4-mbstring php7.4-intl php-imagick aspell-fr php7.4-intl php7.4-curl \
@@ -72,21 +74,21 @@ RUN apt-get -y install bsd-mailx \
 # Skarnet S6
 ########################
 RUN wget -O skalibs-${SKALIB_TAG}.tar.gz https://github.com/skarnet/skalibs/archive/refs/tags/v${SKALIB_TAG}.tar.gz \
-	&& tar xvzf skalibs-${SKALIB_TAG}.tar.gz \
+	&& tar xzf skalibs-${SKALIB_TAG}.tar.gz \
 	&& cd skalibs-${SKALIB_TAG} \
 	&& ./configure \
 	&& make \
 	&& make install \
 	&& cd /qmail-aio/src/ \
 	&& wget -O execline-${EXECLINE_TAG}.tar.gz https://github.com/skarnet/execline/archive/refs/tags/v${EXECLINE_TAG}.tar.gz \
-	&& tar xvzf execline-${EXECLINE_TAG}.tar.gz \
+	&& tar xzf execline-${EXECLINE_TAG}.tar.gz \
 	&& cd execline-${EXECLINE_TAG} \
 	&& ./configure \
 	&& make \
 	&& make install \
 	&& cd /qmail-aio/src/ \
 	&& wget -O s6-${S6_TAG}.tar.gz https://github.com/skarnet/s6/archive/refs/tags/v${S6_TAG}.tar.gz \
-	&& tar xvzf s6-${S6_TAG}.tar.gz \
+	&& tar xzf s6-${S6_TAG}.tar.gz \
 	&& cd s6-${S6_TAG} \
 	&& ./configure \
 	&& make \
@@ -104,7 +106,7 @@ RUN mkdir -p /package \
     && cd /qmail-aio/src \
     && wget https://www.fehcom.de/ipnet/fehQlibs/fehQlibs-${FEHQLIBS_TAG}.tgz \
     && cd /usr/local \
-    && tar xvzf /qmail-aio/src/fehQlibs-${FEHQLIBS_TAG}.tgz \
+    && tar xzf /qmail-aio/src/fehQlibs-${FEHQLIBS_TAG}.tgz \
     && mv fehQlibs-${FEHQLIBS_TAG} qlibs  \
     && cd qlibs \
     && make \
@@ -112,21 +114,21 @@ RUN mkdir -p /package \
     && cd /qmail-aio/src \
     && wget https://www.fehcom.de/ipnet/ucspi-ssl/ucspi-ssl-${UCSPISSL_TAG}.tgz \
     && cd /package \
-    && tar xvzf /qmail-aio/src/ucspi-ssl-${UCSPISSL_TAG}.tgz \
+    && tar xzf /qmail-aio/src/ucspi-ssl-${UCSPISSL_TAG}.tgz \
     && cd host/superscript.com/net/ucspi-ssl-${UCSPISSL_TAG} \
     && package/install \
 ## ucspi-tcp6
     && cd /qmail-aio/src \
     && wget https://www.fehcom.de/ipnet/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
     && cd /package \
-    && tar xvzf /qmail-aio/src/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
+    && tar xzf /qmail-aio/src/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
     && cd net/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG} \
     && package/install \
 ## sqmail
     && cd /qmail-aio/src \
     && wget https://www.fehcom.de/sqmail/sqmail-${SQMAIL_TAG}.tgz \
     && cd /package \
-    && tar xvzf /qmail-aio/src/sqmail-${SQMAIL_TAG}.tgz \
+    && tar xzf /qmail-aio/src/sqmail-${SQMAIL_TAG}.tgz \
     && cd mail/sqmail/sqmail-${SQMAIL_TAG} \
     && package/install; echo "Otherwise return 1" \
 ## cleaning
@@ -172,7 +174,7 @@ RUN wget http://dist.schmorp.de/libev/libev-4.33.tar.gz \
         --enable-auth-logging \
         --enable-sql-logging \
         --enable-min-pwd-length=6 \
-        --enable-qmail-ext \
+        --enable-sqmail-ext \
         --enable-mysql-limits \
         --enable-sql-aliasdomains \
         --enable-defaultdelivery \
@@ -197,7 +199,7 @@ RUN groupadd -g 2110 dovecot \
 	&& useradd -g dovecot -u 7798 -s /usr/sbin/nologin -d /var/run dovenull \
 	&& useradd -g dovecot -u 7799 -s /usr/sbin/nologin -d /var/run dovecot \
 	&& wget https://dovecot.org/releases/2.3/dovecot-${DOVECOT_TAG}.tar.gz \
-	&& tar xvzf dovecot-${DOVECOT_TAG}.tar.gz \
+	&& tar xzf dovecot-${DOVECOT_TAG}.tar.gz \
 	&& cd dovecot-${DOVECOT_TAG} \
 	&& ./configure \
 			--prefix=/usr \
@@ -224,7 +226,7 @@ COPY conf/dovecot-etc/ /etc/
 # Autorespond
 ########################
 RUN wget http://qmail.ixip.net/download/autorespond-2.0.5.tar.gz \
-  && tar xvzf autorespond-2.0.5.tar.gz \
+  && tar xzf autorespond-2.0.5.tar.gz \
   && cd autorespond-2.0.5 \
   && make \
   && cp autorespond /usr/local/bin \
@@ -236,7 +238,7 @@ RUN wget http://qmail.ixip.net/download/autorespond-2.0.5.tar.gz \
 # ezmlm-idx
 ########################
 RUN wget https://qmailrocks.thibs.com/downloads/ezmlm-idx-7.2.2.tar.gz \
-  && tar xvzf ezmlm-idx-7.2.2.tar.gz \
+  && tar xzf ezmlm-idx-7.2.2.tar.gz \
   && cd ezmlm-idx-7.2.2 \
   && make && make man && make install \
 # cleaning
@@ -246,7 +248,7 @@ RUN wget https://qmailrocks.thibs.com/downloads/ezmlm-idx-7.2.2.tar.gz \
 # QmailAdmin
 ########################
 RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qmailadmin-1.2.16.tar.gz \
-  && tar xvzf qmailadmin-1.2.16.tar.gz\
+  && tar xzf qmailadmin-1.2.16.tar.gz\
   && cd qmailadmin-1.2.16 \
 	&& patch -p1 < /qmail-aio/patches/roberto-qmailadmin-1.2.16.patch \
 	&& cp /qmail-aio/patches/qmailadmin/* images/ \
@@ -275,7 +277,7 @@ RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qm
 # vqadmin
 ########################
 RUN wget https://qmailrocks.thibs.com/downloads/vqadmin-2.3.7.tar.gz \
-  && tar xvzf vqadmin-2.3.7.tar.gz \
+  && tar xzf vqadmin-2.3.7.tar.gz \
   && cd vqadmin-2.3.7 \
   && patch -p0 < /qmail-aio/patches/vqadmin-2.3.7.patch \
 	&& sed 's#/cgi-bin/#/cgi/#g' -i user.c cedit.c domain.c html/* \
@@ -294,7 +296,7 @@ RUN groupadd -g 5010 clamav \
   && useradd -g clamav -u 5010 -s /usr/sbin/nologin -c "Clam AntiVirus" -d /var/empty clamav \
   && curl https://sh.rustup.rs -sSf | sh -s -- -y \
   && wget https://www.clamav.net/downloads/production/clamav-${CLAMAV_TAG}.tar.gz \
-  && tar xvzf clamav-${CLAMAV_TAG}.tar.gz \
+  && tar xzf clamav-${CLAMAV_TAG}.tar.gz \
   && cd clamav-${CLAMAV_TAG} \
   && cmake . \
     -D CMAKE_BUILD_TYPE=Release \
@@ -334,7 +336,7 @@ RUN groupadd -g 5010 clamav \
 # DCC
 ########################
 RUN wget https://www.dcc-servers.net/dcc/source/dcc.tar.Z \
-  && tar xvzf dcc.tar.Z \
+  && tar xzf dcc.tar.Z \
   && cd dcc-2.3.168 \
   && ./configure --disable-dccm \
   && make \
@@ -346,7 +348,7 @@ RUN wget https://www.dcc-servers.net/dcc/source/dcc.tar.Z \
 # SpamAssassin
 ########################
 RUN wget https://dlcdn.apache.org//spamassassin/source/Mail-SpamAssassin-${SPAMASSASSIN_TAG}.tar.gz \
-  && tar xvzf Mail-SpamAssassin-${SPAMASSASSIN_TAG}.tar.gz \
+  && tar xzf Mail-SpamAssassin-${SPAMASSASSIN_TAG}.tar.gz \
   && cd Mail-SpamAssassin-${SPAMASSASSIN_TAG} \
   && perl Makefile.PL CONTACT_ADDRESS="http://www.e-dune.info/spam" \
   && make \
@@ -371,12 +373,10 @@ COPY bin/learnSpam.sh /var/qmail/bin/learnSpam
 RUN wget http://www.memoryhole.net/qmail/dkimsign.pl \
   && wget http://www.memoryhole.net/qmail/qmail-remote.sh \
   && wget https://downloads.sourceforge.net/project/domainkeys/libdomainkeys/0.69/libdomainkeys-0.69.tar.gz \
-  && wget https://notes.sagredo.eu/files/qmail/patches/libdomainkeys/libdomainkeys-openssl-1.1.patch \
-  && wget https://notes.sagredo.eu/files/qmail/patches/libdomainkeys/libdomainkeys-0.69.diff \
-  && tar xvzf libdomainkeys-0.69.tar.gz \
+  && tar xzf libdomainkeys-0.69.tar.gz \
   && cd libdomainkeys-0.69 \
-  && patch -p1 < /qmail-aio/src/libdomainkeys-openssl-1.1.patch \
-  && patch < /qmail-aio/src/libdomainkeys-0.69.diff \
+  && patch -p1 < /qmail-aio/patches/dkim/libdomainkeys-openssl-1.1.patch \
+  && patch < /qmail-aio/patches/dkim/libdomainkeys-0.69.diff \
   && make \
   && cp dktest /usr/local/bin/ \
   && install /qmail-aio/src/dkimsign.pl /usr/local/bin/ \
@@ -389,7 +389,7 @@ RUN wget http://www.memoryhole.net/qmail/dkimsign.pl \
 # Qmail Remove https://www.fehcom.de/sqmail/man/qmail-qmaint.html
 ########################
 RUN wget http://www.linuxmagic.com/opensource/qmail/qmail-remove/qmail-remove-0.95.tar.gz \
-  && tar xvzf qmail-remove-0.95.tar.gz \
+  && tar xzf qmail-remove-0.95.tar.gz \
   && cd qmail-remove-0.95 \
   && make \
   && make install \
@@ -400,7 +400,7 @@ RUN wget http://www.linuxmagic.com/opensource/qmail/qmail-remove/qmail-remove-0.
 # mess822
 ########################
 RUN wget http://cr.yp.to/software/mess822-0.58.tar.gz \
-  && tar xvzf mess822-0.58.tar.gz \
+  && tar xzf mess822-0.58.tar.gz \
   && cd mess822-0.58 \
   && sed -i "s#extern int errno;#\#include <errno.h>#" error.h \
   && make \
@@ -413,7 +413,7 @@ RUN wget http://cr.yp.to/software/mess822-0.58.tar.gz \
 ###########################
 #http://fcron.free.fr/download.php
 RUN wget http://fcron.free.fr/archives/fcron-${FCRON_TAG}.src.tar.gz \
-  && tar xvzf fcron-${FCRON_TAG}.src.tar.gz \
+  && tar xzf fcron-${FCRON_TAG}.src.tar.gz \
   && cd fcron-${FCRON_TAG} \
   && ./configure \
     --prefix=/usr \
@@ -431,12 +431,23 @@ RUN wget http://fcron.free.fr/archives/fcron-${FCRON_TAG}.src.tar.gz \
 COPY conf/fcron-root /var/spool/fcron/root
 
 ###########################
-# swaks (for test)
+# ACME.SH
 ###########################
-RUN wget http://www.jetmore.org/john/code/swaks/latest/swaks \
-  && install swaks /usr/local/bin \
+RUN wget -O acmesh-${ACMESH_TAG}.tar.gz https://github.com/acmesh-official/acme.sh/archive/refs/tags/${ACMESH_TAG}.tar.gz \
+	&& mkdir acmesh \
+	&& cd acmesh \
+	&& tar xzf ../acmesh-${ACMESH_TAG}.tar.gz --strip 1 \
+  && ./acme.sh --install  \
+		--home /usr/bin \
+		--config-home /ssl/acme \
+		--cert-home /ssl/acme/certs \
+		--accountemail "_ACCOUNT_EMAIL_" \
+		--no-cron \
+		--no-profile \
+	&& mv /ssl/acme /qmail-aio/templates/ \
+	&& rm -rf /ssl \
 # cleaning
-  && rm -rf /qmail-aio/src/*  
+  && rm -rf /qmail-aio/src/*
 	
 ###########################
 # Web parts
@@ -457,7 +468,7 @@ RUN mkdir -p /run/php \
 RUN cd /var/www/html \
 	&& curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer \
 	&& wget -O roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz https://github.com/roundcube/roundcubemail/releases/download/${ROUNDCUBEMAIL_TAG}/roundcubemail-${ROUNDCUBEMAIL_TAG}-complete.tar.gz \
-	&& tar -xvzf roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz --strip 1 \
+	&& tar -xzf roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz --strip 1 \
 	&& rm -f index.lighttpd.html roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz \
 	&& mv composer.json-dist composer.json \
 	&& composer \
@@ -520,8 +531,7 @@ RUN chown -R qmailq /service/qmail-send
 ###########################
 # Templates
 ###########################
-RUN mkdir -p /qmail-aio/templates \
-	&& cp -a /var/qmail/queue /qmail-aio/templates/ \
+RUN cp -a /var/qmail/queue /qmail-aio/templates/ \
   && mv /var/qmail/control/ /qmail-aio/templates/
 COPY templates/ /qmail-aio/templates/
 

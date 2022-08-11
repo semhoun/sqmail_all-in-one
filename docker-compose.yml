@@ -17,10 +17,24 @@ services:
         - FCRON_TAG=${FCRON_TAG}
         - ROUNDCUBEMAIL_TAG=${ROUNDCUBEMAIL_TAG}
         - VPOPMAIL_TAG=${VPOPMAIL_TAG}
+        - ACMESH_TAG=${ACMESH_TAG}
+    network_mode: bridge
     extra_hosts:
       - mariadb:host-gateway
     environment:
       - DEV_MODE=1
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.qmail.rule=Host(`mail.dune.tf`)"
+      - "traefik.http.routers.qmail.entryPoints=websecure"
+      - "traefik.http.routers.qmail.tls.certresolver=dns"
+      - "traefik.http.routers.qmail.service=qmail"
+      - "traefik.http.services.qmail.loadbalancer.server.port=80"
+      - "traefik.http.routers.qmail_acme.rule=Host(`mail.dune.tf`) && PathPrefix(`/.well-known/acme-challenge/`)"
+      - "traefik.http.routers.qmail_acme.entryPoints=web"
+      - "traefik.http.routers.qmail_acme.priority=9000" 
+      - "traefik.http.routers.qmail_acme.service=qmail_acme"
+      - "traefik.http.services.qmail_acme.loadbalancer.server.port=80" 
     image: semhoun/qmail_all-in-one:${QMAIL_AIO_VERSION}
     volumes:
       - ./data/qcontrol:/var/qmail/control
@@ -35,7 +49,8 @@ services:
       - ./data/alias:/var/qmail/alias
     ports:
       - 8090:80
-      - 8091:88
+      - 8091:443
+      - 8092:88
       - 25:25
       - 465:465
       - 587:587

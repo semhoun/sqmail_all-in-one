@@ -4,3 +4,4 @@
 %nightly,random(yes) * 1-4 /var/dcc/libexec/cron-dccd
 %nightly,random(yes) * 1-4 /usr/local/bin/sa-update
 %nightly,random(yes),runas(vpopmail) * 1-4 /var/qmail/bin/learnSpam
+%nightly,random(yes) * 1-4 /qmail-aio/bin/acme-cron.sh
