@@ -80,7 +80,7 @@ if [ -n "${HOST_SMTP}" ]; then
 	echo "smtp;${HOST_SMTP}" >> /ssl/acme/hosts.lst
 fi
 if [ -n "${HOST_IMAP}" ]; then
-	if [ ! -s "/ssl/acme/certs/${HOST_SMTP}/fullchain.cer" ]; then
+	if [ ! -s "/ssl/acme/certs/${HOST_IMAP}/fullchain.cer" ]; then
 		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --webroot /var/www/html -d ${HOST_IMAP}
 	fi
 	echo "imap;${HOST_IMAP}" >> /ssl/acme/hosts.lst
