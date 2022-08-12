@@ -9,31 +9,29 @@ VHOME=`/var/vpopmail/bin/vuserinfo -d $EXT@$HOST`
 VMAILDIR="$VHOME/Maildir"
 SPAMDIR="$VHOME/Maildir/.Spam"
 
-
 if ( $VHOME eq "" )
 {
-		to "$VPOP"
+	to "$VPOP"
 }
 else
 {
-		# Creation d'un dossier "Spam" s'il n'existe pas encore
-		DUMMY=`test -d $SPAMDIR`
-		if ( $RETURNCODE == 1 )
-		{
-				DUMMY=`$QMAILDIRMAKE $SPAMDIR`
-				DUMMY=`echo INBOX.Spam >> $VMAILDIR/courierimapsubscribed`
-		}
+	# Creation d'un dossier "Spam" s'il n'existe pas encore
+	DUMMY=`test -d $SPAMDIR`
+	if ( $RETURNCODE == 1 )
+	{
+		DUMMY=`$QMAILDIRMAKE $SPAMDIR`
+		DUMMY=`echo INBOX.Spam >> $VMAILDIR/courierimapsubscribed`
+	}
 
-		# Distribution suivant le marquage de Spamassassin
-		if (/^X-Spam-Flag: *Yes/)
-		{
-				exception {
-						to "$SPAMDIR/"
-				}
-
+	# Distribution suivant le marquage de Spamassassin
+	if (/^X-Spam-Flag: *Yes/)
+	{
+		exception {
+			to "$SPAMDIR/"
 		}
-		else
-		{
-				to "$VMAILDIR/"
-		}
+	}
+	else
+	{
+		to "$VMAILDIR/"
+	}
 }

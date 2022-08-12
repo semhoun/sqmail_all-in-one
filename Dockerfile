@@ -25,7 +25,7 @@ COPY patches /qmail-aio/patches
 WORKDIR "/qmail-aio/src"
 
 RUN mkdir -p /qmail-aio/src /qmail-aio/bin /qmail-aio/templates \
-	&& apt-get update \
+  && apt-get update \
   && apt-get -y install build-essential equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg \
 ## Add docker group for logs
   && groupadd -g 998 docker \
@@ -59,14 +59,14 @@ ENV LC_ALL en_US.UTF-8
 # Additionnals packages
 ########################
 RUN apt-get -y install bsd-mailx \
-		libperl-dev libmariadb-dev libmariadb-dev-compat csh maildrop bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
-		check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
-		libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
-		mariadb-client \
-		socat \
-		lighttpd php7.4-fpm \
+    libperl-dev libmariadb-dev libmariadb-dev-compat csh maildrop bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
+    check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
+    libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
+    mariadb-client \
+    socat \
+    lighttpd php7.4-fpm \
 # For roundcube
-	&& apt-get install -y php7.4-zip php7.4-pspell php7.4-mysql php7.4-gd php7.4-imap php7.4-xml php7.4-mbstring php7.4-intl php-imagick aspell-fr php7.4-intl php7.4-curl \
+  && apt-get install -y php7.4-zip php7.4-pspell php7.4-mysql php7.4-gd php7.4-imap php7.4-xml php7.4-mbstring php7.4-intl php-imagick aspell-fr php7.4-intl php7.4-curl \
   && cpan -i IP::Country::DB_File Digest::SHA1 \
   && rm -rf /root/.local
 
@@ -74,28 +74,28 @@ RUN apt-get -y install bsd-mailx \
 # Skarnet S6
 ########################
 RUN wget -O skalibs-${SKALIB_TAG}.tar.gz https://github.com/skarnet/skalibs/archive/refs/tags/v${SKALIB_TAG}.tar.gz \
-	&& tar xzf skalibs-${SKALIB_TAG}.tar.gz \
-	&& cd skalibs-${SKALIB_TAG} \
-	&& ./configure \
-	&& make \
-	&& make install \
-	&& cd /qmail-aio/src/ \
-	&& wget -O execline-${EXECLINE_TAG}.tar.gz https://github.com/skarnet/execline/archive/refs/tags/v${EXECLINE_TAG}.tar.gz \
-	&& tar xzf execline-${EXECLINE_TAG}.tar.gz \
-	&& cd execline-${EXECLINE_TAG} \
-	&& ./configure \
-	&& make \
-	&& make install \
-	&& cd /qmail-aio/src/ \
-	&& wget -O s6-${S6_TAG}.tar.gz https://github.com/skarnet/s6/archive/refs/tags/v${S6_TAG}.tar.gz \
-	&& tar xzf s6-${S6_TAG}.tar.gz \
-	&& cd s6-${S6_TAG} \
-	&& ./configure \
-	&& make \
-	&& make install \
+  && tar xzf skalibs-${SKALIB_TAG}.tar.gz \
+  && cd skalibs-${SKALIB_TAG} \
+  && ./configure \
+  && make \
+  && make install \
+  && cd /qmail-aio/src/ \
+  && wget -O execline-${EXECLINE_TAG}.tar.gz https://github.com/skarnet/execline/archive/refs/tags/v${EXECLINE_TAG}.tar.gz \
+  && tar xzf execline-${EXECLINE_TAG}.tar.gz \
+  && cd execline-${EXECLINE_TAG} \
+  && ./configure \
+  && make \
+  && make install \
+  && cd /qmail-aio/src/ \
+  && wget -O s6-${S6_TAG}.tar.gz https://github.com/skarnet/s6/archive/refs/tags/v${S6_TAG}.tar.gz \
+  && tar xzf s6-${S6_TAG}.tar.gz \
+  && cd s6-${S6_TAG} \
+  && ./configure \
+  && make \
+  && make install \
 ## cleaning
-	&& rm -rf /qmail-aio/src/* \
-	&& rm -rf /var/qmail/svc /service/*
+  && rm -rf /qmail-aio/src/* \
+  && rm -rf /var/qmail/svc /service/*
 
 ########################
 # SQMail
@@ -160,31 +160,34 @@ RUN wget http://dist.schmorp.de/libev/libev-4.33.tar.gz \
     && tar xzf ../vpopmail-${VPOPMAIL_TAG}.tar.gz --strip 1 \
     && autoreconf -f -i \
     && ./configure \
-        --enable-qmaildir=/var/qmail/ \
-        --enable-qmail-newu=/var/qmail/bin/qmail-newu \
-        --enable-qmail-inject=/var/qmail/bin/qmail-inject \
-        --enable-qmail-newmrh=/var/qmail/bin/qmail-newmrh \
-        --enable-tcpserver-file=/var/qmail/control/relays.cdb \
-        --disable-roaming-users \
-        --enable-auth-module=mysql \
-        --enable-incdir=/usr/include/mariadb \
-        --enable-libdir=/usr/lib \
-        --disable-clear-passwd \
-        --enable-logging=n \
-        --enable-auth-logging \
-        --enable-sql-logging \
-        --enable-min-pwd-length=6 \
-        --enable-sqmail-ext \
-        --enable-mysql-limits \
-        --enable-sql-aliasdomains \
-        --enable-defaultdelivery \
-        --enable-valias \
-		&& make \
+      --enable-qmaildir=/var/qmail/ \
+      --enable-qmail-newu=/var/qmail/bin/qmail-newu \
+      --enable-qmail-inject=/var/qmail/bin/qmail-inject \
+      --enable-qmail-newmrh=/var/qmail/bin/qmail-newmrh \
+      --enable-tcpserver-file=/var/qmail/control/relays.cdb \
+      --disable-roaming-users \
+      --enable-auth-module=mysql \
+      --enable-incdir=/usr/include/mariadb \
+      --enable-libdir=/usr/lib \
+      --enable-logging=n \
+      --disable-clear-passwd \
+      --enable-auth-logging \
+      --enable-sql-logging=e \
+      --disable-passwd \
+      --enable-qmail-ext \
+      --enable-sqmail-ext \
+      --enable-mysql-limits \
+      --enable-sql-aliasdomains \
+      --enable-defaultdelivery \
+      --enable-valias \
+      --enable-md5-passwords \
+      --enable-min-pwd-length=6 \
+    && make \
     && make install \
 # vusaged
     && cd vusaged \
-		&& LIBS=`head -1 /var/vpopmail/etc/lib_deps` \
-			./configure \
+    && LIBS=`head -1 /var/vpopmail/etc/lib_deps` \
+      ./configure \
       --with-vpopmail=/var/vpopmail \
     && make \
     && cp -f vusaged /var/vpopmail/bin \
@@ -196,27 +199,27 @@ RUN wget http://dist.schmorp.de/libev/libev-4.33.tar.gz \
 # Dovecot
 ########################
 RUN groupadd -g 2110 dovecot \
-	&& useradd -g dovecot -u 7798 -s /usr/sbin/nologin -d /var/run dovenull \
-	&& useradd -g dovecot -u 7799 -s /usr/sbin/nologin -d /var/run dovecot \
-	&& wget https://dovecot.org/releases/2.3/dovecot-${DOVECOT_TAG}.tar.gz \
-	&& tar xzf dovecot-${DOVECOT_TAG}.tar.gz \
-	&& cd dovecot-${DOVECOT_TAG} \
-	&& ./configure \
-			--prefix=/usr \
-			--sysconfdir=/etc \
-			--localstatedir=/var \
-			--with-sql \
-			--with-mysql \
-			--with-docs \
-			--with-ssl \
-			--without-shadow \
-			--without-pam \
-			--without-ldap \
-			--without-pgsql \
-			--without-sqlite \
-	&& make \
-	&& make install \
-	&& mkdir -p /etc/dovecot/ /var/run/dovecot \
+  && useradd -g dovecot -u 7798 -s /usr/sbin/nologin -d /var/run dovenull \
+  && useradd -g dovecot -u 7799 -s /usr/sbin/nologin -d /var/run dovecot \
+  && wget https://dovecot.org/releases/2.3/dovecot-${DOVECOT_TAG}.tar.gz \
+  && tar xzf dovecot-${DOVECOT_TAG}.tar.gz \
+  && cd dovecot-${DOVECOT_TAG} \
+  && ./configure \
+      --prefix=/usr \
+      --sysconfdir=/etc \
+      --localstatedir=/var \
+      --with-sql \
+      --with-mysql \
+      --with-docs \
+      --with-ssl \
+      --without-shadow \
+      --without-pam \
+      --without-ldap \
+      --without-pgsql \
+      --without-sqlite \
+  && make \
+  && make install \
+  && mkdir -p /etc/dovecot/ /var/run/dovecot \
 # cleaning
     && rm -rf /qmail-aio/src/*
 # Config files
@@ -250,26 +253,26 @@ RUN wget https://qmailrocks.thibs.com/downloads/ezmlm-idx-7.2.2.tar.gz \
 RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qmailadmin-1.2.16.tar.gz \
   && tar xzf qmailadmin-1.2.16.tar.gz\
   && cd qmailadmin-1.2.16 \
-	&& patch -p1 < /qmail-aio/patches/roberto-qmailadmin-1.2.16.patch \
-	&& cp /qmail-aio/patches/qmailadmin/* images/ \
+  && patch -p1 < /qmail-aio/patches/roberto-qmailadmin-1.2.16.patch \
+  && cp /qmail-aio/patches/qmailadmin/* images/ \
   && ./configure \
-		--enable-cgibindir=/var/www/admin/cgi \
-		--enable-htmldir=/var/www/admin/html/ \
-		--enable-imagedir=/var/www/admin/html/images/qmailadmin \
-		--enable-cgipath=/cgi/qmailadmin \
-		--enable-imageurl=/images/qmailadmin \
-		--disable-ezmlm-mysql \
-		--enable-modify-quota \
-		--enable-domain-autofill \
-		--enable-modify-spam \
-		--enable-spam-command="|/var/qmail/bin/preline /usr/bin/maildrop /var/qmail/bin/maildrop-filter" \
-		--enable-help \
-		--enable-vpopuser=vpopmail \
-		--enable-vpopgroup=vchkpw \
-		--enable-domain-autofill \
+    --enable-cgibindir=/var/www/admin/cgi \
+    --enable-htmldir=/var/www/admin/html/ \
+    --enable-imagedir=/var/www/admin/html/images/qmailadmin \
+    --enable-cgipath=/cgi/qmailadmin \
+    --enable-imageurl=/images/qmailadmin \
+    --disable-ezmlm-mysql \
+    --enable-modify-quota \
+    --enable-domain-autofill \
+    --enable-modify-spam \
+    --enable-spam-command="|/var/qmail/bin/preline /usr/bin/maildrop /var/qmail/bin/maildrop-filter" \
+    --enable-help \
+    --enable-vpopuser=vpopmail \
+    --enable-vpopgroup=vchkpw \
+    --enable-domain-autofill \
   && make \
   && make install \
-	&& cp images/* /var/www/admin/html/images/qmailadmin/ \
+  && cp images/* /var/www/admin/html/images/qmailadmin/ \
 # cleaning
   && rm -rf /qmail-aio/src/*
 
@@ -280,7 +283,7 @@ RUN wget https://qmailrocks.thibs.com/downloads/vqadmin-2.3.7.tar.gz \
   && tar xzf vqadmin-2.3.7.tar.gz \
   && cd vqadmin-2.3.7 \
   && patch -p0 < /qmail-aio/patches/vqadmin-2.3.7.patch \
-	&& sed 's#/cgi-bin/#/cgi/#g' -i user.c cedit.c domain.c html/* \
+  && sed 's#/cgi-bin/#/cgi/#g' -i user.c cedit.c domain.c html/* \
   && ./configure --enable-cgibindir=/var/www/admin/cgi --build=i386 \
   && make \
   && make install \
@@ -421,9 +424,9 @@ RUN wget http://fcron.free.fr/archives/fcron-${FCRON_TAG}.src.tar.gz \
     --localstatedir=/var \
     --with-sysfcrontab=no \
     --with-answer-all \
-		--with-sendmail=/var/qmail/bin/sendmail \
-		--with-boot-install=no \
-		--with-systemdsystemunitdir=no \	
+    --with-sendmail=/var/qmail/bin/sendmail \
+    --with-boot-install=no \
+    --with-systemdsystemunitdir=no \  
   && make \
   && make install \
 # cleaning
@@ -434,21 +437,21 @@ COPY conf/fcron-root /var/spool/fcron/root
 # ACME.SH
 ###########################
 RUN wget -O acmesh-${ACMESH_TAG}.tar.gz https://github.com/acmesh-official/acme.sh/archive/refs/tags/${ACMESH_TAG}.tar.gz \
-	&& mkdir acmesh \
-	&& cd acmesh \
-	&& tar xzf ../acmesh-${ACMESH_TAG}.tar.gz --strip 1 \
+  && mkdir acmesh \
+  && cd acmesh \
+  && tar xzf ../acmesh-${ACMESH_TAG}.tar.gz --strip 1 \
   && ./acme.sh --install  \
-		--home /usr/bin \
-		--config-home /ssl/acme \
-		--cert-home /ssl/acme/certs \
-		--accountemail "_ACCOUNT_EMAIL_" \
-		--no-cron \
-		--no-profile \
-	&& mv /ssl/acme /qmail-aio/templates/ \
-	&& rm -rf /ssl \
+    --home /usr/bin \
+    --config-home /ssl/acme \
+    --cert-home /ssl/acme/certs \
+    --accountemail "_ACCOUNT_EMAIL_" \
+    --no-cron \
+    --no-profile \
+  && mv /ssl/acme /qmail-aio/templates/ \
+  && rm -rf /ssl \
 # cleaning
   && rm -rf /qmail-aio/src/*
-	
+  
 ###########################
 # Web parts
 # we have to fix qmail-send s6-svc
@@ -457,36 +460,36 @@ COPY conf/lighttpd.conf /etc/lighttpd/lighttpd.conf
 COPY conf/php.ini /etc/php/7.4/fpm/conf.d/99-qmail-aio.ini
 COPY www/ /var/www/
 RUN mkdir -p /run/php \
-	&& chown -R www-data.www-data /var/www/admin/html/ /var/www/admin/cgi/qmail-queue.php \
+  && chown -R www-data.www-data /var/www/admin/html/ /var/www/admin/cgi/qmail-queue.php \
 # Admin patches
-	&& cp /usr/bin/php7.4 /usr/bin/qmailq-php \	
-	&& chmod 4755 /usr/bin/qmailq-php
-	
+  && cp /usr/bin/php7.4 /usr/bin/qmailq-php \ 
+  && chmod 4755 /usr/bin/qmailq-php
+  
 ###########################
 # Roundcube
 ###########################
 RUN cd /var/www/html \
-	&& curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer \
-	&& wget -O roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz https://github.com/roundcube/roundcubemail/releases/download/${ROUNDCUBEMAIL_TAG}/roundcubemail-${ROUNDCUBEMAIL_TAG}-complete.tar.gz \
-	&& tar -xzf roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz --strip 1 \
-	&& rm -f index.lighttpd.html roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz \
-	&& mv composer.json-dist composer.json \
-	&& composer \
-			--working-dir=/var/www/html/ \
-			--prefer-dist --prefer-stable \
-			--update-no-dev --no-interaction \
-			--optimize-autoloader --apcu-autoloader \
-			require \
-					weird-birds/thunderbird_labels \
-					prodrigestivill/gravatar \
-	&& composer \
-			--working-dir=/var/www/html/ \
-			--prefer-dist --no-dev \
-			--no-interaction \
-			--optimize-autoloader --apcu-autoloader \
-			update \
-	&& rm -rf installer \
-	&& chown -R www-data.www-data /var/www/html
+  && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer \
+  && wget -O roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz https://github.com/roundcube/roundcubemail/releases/download/${ROUNDCUBEMAIL_TAG}/roundcubemail-${ROUNDCUBEMAIL_TAG}-complete.tar.gz \
+  && tar -xzf roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz --strip 1 \
+  && rm -f index.lighttpd.html roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz \
+  && mv composer.json-dist composer.json \
+  && composer \
+      --working-dir=/var/www/html/ \
+      --prefer-dist --prefer-stable \
+      --update-no-dev --no-interaction \
+      --optimize-autoloader --apcu-autoloader \
+      require \
+          weird-birds/thunderbird_labels \
+          prodrigestivill/gravatar \
+  && composer \
+      --working-dir=/var/www/html/ \
+      --prefer-dist --no-dev \
+      --no-interaction \
+      --optimize-autoloader --apcu-autoloader \
+      update \
+  && rm -rf installer \
+  && chown -R www-data.www-data /var/www/html
 
 ###########################
 # Binaries
@@ -500,7 +503,7 @@ RUN chown vpopmail.vchkpw /var/qmail/bin/maildrop-filter \
   && chmod 600 /var/qmail/bin/maildrop-filter \
   && chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
   && chmod 1755 /var/qmail/bin/qmail-queuescan \
-	&& chmod 755 /usr/local/bin/qmailctl /usr/local/bin/qmHandle
+  && chmod 755 /usr/local/bin/qmailctl /usr/local/bin/qmHandle
 
 ###########################
 # Services config
