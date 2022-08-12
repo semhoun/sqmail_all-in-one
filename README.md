@@ -175,7 +175,7 @@ swaks --to <to mail> --from <from email> --server <qmail aio host name>
 ## Find Me
 
 * [GitHub](https://github.com/semhoun/)
-* [DockerHub](https://hub.docker.com/repository/docker/semhoun/sqmail)
+* [DockerHub](https://hub.docker.com/u/semhoun)
 
 ## Authors
 
