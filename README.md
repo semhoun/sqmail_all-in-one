@@ -179,7 +179,7 @@ swaks --to <to mail> --from <from email> --server <qmail aio host name>
 
 ## Authors
 
-* **Nathanaël Semhoun** - *Docker creation* - [semhoun](https://gitlab.com/semhoun)
+* **Nathanaël Semhoun** - *Docker creation* - [semhoun](https://github.com/semhoun/)
 
 
 ## License
