@@ -14,6 +14,11 @@ function writeRoundCubeConf {
 		> /var/www/html/config/config.inc.php
 }
 
+function fixDovecotConf {
+	DEFAULT_DOMAIN=`cat /var/qmail/control/defaultdomain`
+	sed -i "s/auth_default_realm =.*/auth_default_realm = ${DEFAULT_DOMAIN}/" /etc/dovecot/conf.d/10-auth.conf
+}
+
 if [ -n "${SKIP_INIT_ENV}" ]; then
   exec $@
   exit
@@ -52,7 +57,8 @@ rm -f /var/run/lighttpd-log.pipe
 cp /var/qmail/control/spamassassin_sql.cf /etc/mail/spamassassin/sql.cf
 cp /var/qmail/control/me /etc/mailname
 
-writeRoundCubeConf &
+fixDovecotConf
+writeRoundCubeConf
 
 delayedProcess &
 

@@ -78,7 +78,7 @@ connect = host=<mysql-ip> dbname=vpopmail user=vpopmail password=
 # List of supported schemes is in
 # http://wiki2.dovecot.org/Authentication/PasswordSchemes
 #
-default_pass_scheme = MD5-CRYPT
+default_pass_scheme = SHA256-CRYPT
 
 # passdb query to retrieve the password. It can return fields:
 #   password - The user's password. This field must be returned.
