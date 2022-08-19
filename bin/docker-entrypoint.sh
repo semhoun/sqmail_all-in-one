@@ -15,7 +15,7 @@ function writeRoundCubeConf {
 }
 
 function fixDovecotConf {
-	DEFAULT_DOMAIN=`cat /var/qmail/control/defaultdomain`
+	DEFAULT_DOMAIN=$(cat /var/qmail/control/defaultdomain)
 	sed -i "s/auth_default_realm =.*/auth_default_realm = ${DEFAULT_DOMAIN}/" /etc/dovecot/conf.d/10-auth.conf
 }
 
