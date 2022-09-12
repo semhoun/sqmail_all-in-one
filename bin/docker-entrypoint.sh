@@ -9,7 +9,7 @@ function delayedProcess {
 function writeRoundCubeConf {
 	# Launch with &, so export will not in main env
 	. /var/qmail/control/roundcube.conf
-	cat /qmail-aio/templates/roundcube-config.php | envsubst \
+	cat /opt/templates/roundcube-config.php | envsubst \
 		'$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $PRODUCT_NAME $SUPPORT_URL' \
 		> /var/www/html/config/config.inc.php
 }
@@ -32,8 +32,13 @@ fi
 
 if [ ! -s "/var/qmail/queue/lock" ]; then
 	echo "[QMail] Initializing queue directories ..."
-	cp -a /qmail-aio/templates/queue /var/qmail/
+	cp -a /opt/templates/queue /var/qmail/
 fi
+
+if [ ! -f "/var/spool/fcron/root" ]; then
+	echo "[QMail] Initializing fcrontab ..."
+	/usr/bin/fcrontab -n /opt/templates/fcrontab root
+fi	
 
 if [ ! -s "/var/lib/clamav" ]; then
 	echo "[CLAMAV] Lanching first time freshclam ..."

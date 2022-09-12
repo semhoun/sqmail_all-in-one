@@ -1,4 +1,3 @@
-# Prepare file with : fcrontab -u root -e
 !stdout(yes),mail(no),runas(root)
 %nightly,random(yes) * 1-4 /usr/bin/freshclam
 %nightly,random(yes) * 1-4 /var/dcc/libexec/cron-dccd

@@ -1,7 +1,7 @@
 version: '3.2'
 
 services:
-  qmail-aio:
+  sqmail-aio:
     build:
       args:
         - SQMAIL_TAG=${SQMAIL_TAG}
@@ -25,17 +25,17 @@ services:
       - DEV_MODE=1
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.qmail.rule=Host(`mail.dune.tf`)"
-      - "traefik.http.routers.qmail.entryPoints=websecure"
-      - "traefik.http.routers.qmail.tls.certresolver=le-dns"
-      - "traefik.http.routers.qmail.service=qmail"
-      - "traefik.http.services.qmail.loadbalancer.server.port=80"
-      - "traefik.http.routers.qmail_acme.rule=Host(`mail.dune.tf`) && PathPrefix(`/.well-known/acme-challenge/`)"
-      - "traefik.http.routers.qmail_acme.entryPoints=web"
-      - "traefik.http.routers.qmail_acme.priority=9000" 
-      - "traefik.http.routers.qmail_acme.service=qmail_acme"
-      - "traefik.http.services.qmail_acme.loadbalancer.server.port=80" 
-    image: semhoun/qmail_all-in-one:${QMAIL_AIO_VERSION}
+      - "traefik.http.routers.sqmail.rule=Host(`mail.dune.tf`)"
+      - "traefik.http.routers.sqmail.entryPoints=websecure"
+      - "traefik.http.routers.sqmail.tls.certresolver=le-dns"
+      - "traefik.http.routers.sqmail.service=sqmail"
+      - "traefik.http.services.sqmail.loadbalancer.server.port=80"
+      - "traefik.http.routers.sqmail_acme.rule=Host(`mail.dune.tf`) && PathPrefix(`/.well-known/acme-challenge/`)"
+      - "traefik.http.routers.sqmail_acme.entryPoints=web"
+      - "traefik.http.routers.sqmail_acme.priority=9000" 
+      - "traefik.http.routers.sqmail_acme.service=sqmail_acme"
+      - "traefik.http.services.sqmail_acme.loadbalancer.server.port=80" 
+    image: semhoun/sqmail_all-in-one:${SQMAIL_AIO_VERSION}
     volumes:
       - ./data/qcontrol:/var/qmail/control
       - ./data/ssl:/ssl

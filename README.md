@@ -1,9 +1,9 @@
-# QMail All-In-One
+# SQMail All-In-One
 
-![License](https://img.shields.io/github/license/semhoun/qmail_all-in-one) ![OpenIssues](https://img.shields.io/github/issues-raw/semhoun/qmail_all-in-one) ![Version](https://img.shields.io/github/v/tag/semhoun/qmail_all-in-one) ![Docker Size](https://img.shields.io/docker/image-size/semhoun/qmail_all-in-one)  ![Docker Pull](https://img.shields.io/docker/pulls/semhoun/qmail_all-in-one)
+![License](https://img.shields.io/github/license/semhoun/sqmail_all-in-one) ![OpenIssues](https://img.shields.io/github/issues-raw/semhoun/sqmail_all-in-one) ![Version](https://img.shields.io/github/v/tag/semhoun/sqmail_all-in-one) ![Docker Size](https://img.shields.io/docker/image-size/semhoun/sqmail_all-in-one)  ![Docker Pull](https://img.shields.io/docker/pulls/semhoun/sqmail_all-in-one)
 
 
-All-in-one QMail server with
+All-in-one S/QMail server with
   - s/qmail
   - dkim
   - spam filter
@@ -17,7 +17,7 @@ All-in-one QMail server with
 
 ```shell
 docker run \
-  --name qmail-aio \
+  --name sqmail-aio \
   --publish 80:80 \
   --publish 88:88 \
   --publish 25:25 \
@@ -35,15 +35,15 @@ docker run \
   --volume ./mail_data/spamassassin:/var/spamassassin \
   --volume ./mail_data/tmp:/var/qmail/tmp \
   --volume ./mail_data/qusers:/var/qmail/users \
-  semhoun/qmail_all-in-one
+  semhoun/sqmail_all-in-one
 ```
 #### Docker Compose
 ```yaml
 version: '3.2'
 
 services:
-  qmail-aio:
-    image: semhoun/qmail_all-in-one
+  sqmail-aio:
+    image: semhoun/sqmail_all-in-one
     volumes:
       - ./data/qcontrol:/var/qmail/control
       - ./data/ssl:/ssl
@@ -82,19 +82,19 @@ docker run \
   --volume ./mail_data/spamassassin:/var/spamassassin \
   --volume ./mail_data/tmp:/var/qmail/tmp \
   --volume ./mail_data/qusers:/var/qmail/users \
-  semhoun/qmail_all-in-one /qmail-aio/bin/init.sh
+  semhoun/sqmail_all-in-one /opt/bin/init.sh
   
 docker run \
   --rm -it \
   --env SKIP_INIT_ENV=1 \
   --volume ./mail_data/ssl:/ssl \
   --publish 80:80 \
-  semhoun/qmail_all-in-one /qmail-aio/bin/init-certs.sh
+  semhoun/sqmail_all-in-one /opt/bin/init-certs.sh
 ```
 ### Docker Compose
 ```shell
-docker compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init.sh
-docker compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init-certs.sh
+docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init.sh
+docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init-certs.sh
 ```
 
 ## Docker configuration
@@ -141,9 +141,9 @@ docker compose run -e SKIP_INIT_ENV=1 qmail-aio /qmail-aio/bin/init-certs.sh
   * `/ssl/smtp.key` - SMTP Key
   * `/ssl/smtp.crt` - SMTP Certificate
 
-* `/qmail-aio/bin/init.sh` - Initialisation script
-* `/qmail-aio/bin/init-certs.sh` - Certs initialisation script
-* `/qmail-aio/bin/domainkey.sh` - DKIM key creation
+* `/opt/bin/init.sh` - Initialisation script
+* `/opt/bin/init-certs.sh` - Certs initialisation script
+* `/opt/bin/domainkey.sh` - DKIM key creation
   * usage `domainkey.sh [-p] domain [selector]`
   * Print domainkey with -p, without create domain
 
