@@ -7,7 +7,7 @@ RESUME=$(mktemp /tmp/sqmail.XXXXXX)
 #########################
 
 #https://en.wikibooks.org/wiki/Bash_Shell_Scripting/Whiptail
-whiptail --title "Semhoun's SQMail" --msgbox "Welcome in the SQMail first time configuration\MYSQL database must already been created" 8 78
+whiptail --title "S/QMail AIO" --msgbox "Welcome in the S/QMail first time configuration\MYSQL database must already been created" 8 78
 
 # MYSQL
 MYSQL_HOST=$(whiptail --inputbox "MYSQL Host" 8 39 "" --title "MYSQL configuration" 3>&1 1>&2 2>&3)
@@ -137,7 +137,7 @@ echo "${QUEUELIFETIME}" > /var/qmail/control/queuelifetime
 
 # VPopmail configuration
 echo "${DEFAULT_DOMAIN}" > /var/vpopmail/etc/defaultdomain
-cp /qmail-aio/templates/vlimits.default /var/vpopmail/etc/vlimits.default
+cp /opt/templates/vlimits.default /var/vpopmail/etc/vlimits.default
 
 # Qmail configuration from /package/mail/sqmail/sqmail/src/config-fast.sh
 echo "${SMTP_SERVER}" > /var/qmail/control/me
@@ -155,7 +155,7 @@ chown alias.sqmail .qmail*
 chmod 644 .qmail*
  
 # Dovecot
-cat /qmail-aio/templates/dovecot-sql.conf.ext | envsubst \
+cat /opt/templates/dovecot-sql.conf.ext | envsubst \
 		'$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB' \
 		> /var/qmail/control/dovecot-sql.conf.ext
 chown root.root /var/qmail/control/dovecot-sql.conf.ext
@@ -179,7 +179,7 @@ chown -R vpopmail.vchkpw /var/vpopmail/domains
 /var/vpopmail/bin/vadddomain ${DEFAULT_DOMAIN} "${POSTMASTER_PWD}"
 
 # SpamAssassin DB
-cat /qmail-aio/templates/spamassassin.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+cat /opt/templates/spamassassin.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
 
 # Rules cdb
 cat > /var/qmail/control/rules.smtpsub << EOF
@@ -208,7 +208,7 @@ export PRODUCT_NAME="${ROUNDCUBE_NAME}"
 EOF
 
 # Roundcube DB
-cat /qmail-aio/templates/roundcube.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+cat /opt/templates/roundcube.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
 
 echo "============================"
 echo " QMail AllInOne initialized"

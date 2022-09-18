@@ -7,7 +7,7 @@ RESUME=$(mktemp /tmp/sqmail.XXXXXX)
 #########################
 
 #https://en.wikibooks.org/wiki/Bash_Shell_Scripting/Whiptail
-whiptail --title "Semhoun's SQMail Certs" --msgbox "Welcome in the SQMail Certs configuration" 8 78
+whiptail --title "S/QMail AIO Certs" --msgbox "Welcome in the S/QMail Certs configuration" 8 78
 
 LETSENCRYPT_EMAIL=$(whiptail --inputbox "Let's Encrypt account email" 8 39 "" --title "Let's Encrypt configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
@@ -21,6 +21,7 @@ HOST_POP=$(whiptail --inputbox "POP domain name" 8 39 "" --title "Let's Encrypt 
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 
 ACME_SERVER="https://acme-v02.api.letsencrypt.org/directory"
+PREFERRED_CHAIN="ISRG Root X1"
 
 cat >> "${RESUME}" <<EOF
 Let's encrypt account email will be ${LETSENCRYPT_EMAIL}
@@ -56,7 +57,7 @@ LPID=$!
 #########################
 # Initialize acme directory
 #########################
-cp -a /qmail-aio/templates/acme /ssl/acme
+cp -a /opt/templates/acme /ssl/acme
 
 #########################
 # Configure email account
@@ -69,25 +70,25 @@ sed -i "s/_ACCOUNT_EMAIL_/${LETSENCRYPT_EMAIL}/" /ssl/acme/account.conf
 > /ssl/acme/hosts.lst
 if [ -n "${HOST_WEBMAIL}" ]; then
 	if [ ! -s "/ssl/acme/certs/${HOST_WEBMAIL}/fullchain.cer" ]; then
-		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --webroot /var/www/html -d ${HOST_WEBMAIL}
+		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --preferred-chain  "${PREFERRED_CHAIN}" --webroot /var/www/html -d ${HOST_WEBMAIL}
 	fi
 	echo "http;${HOST_WEBMAIL}" >> /ssl/acme/hosts.lst
 fi
 if [ -n "${HOST_SMTP}" ]; then
 	if [ ! -s "/ssl/acme/certs/${HOST_SMTP}/fullchain.cer" ]; then
-		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --webroot /var/www/html -d ${HOST_SMTP}
+		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --preferred-chain  "${PREFERRED_CHAIN}" --webroot /var/www/html -d ${HOST_SMTP}
 	fi
 	echo "smtp;${HOST_SMTP}" >> /ssl/acme/hosts.lst
 fi
 if [ -n "${HOST_IMAP}" ]; then
 	if [ ! -s "/ssl/acme/certs/${HOST_IMAP}/fullchain.cer" ]; then
-		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --webroot /var/www/html -d ${HOST_IMAP}
+		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --preferred-chain  "${PREFERRED_CHAIN}" --webroot /var/www/html -d ${HOST_IMAP}
 	fi
 	echo "imap;${HOST_IMAP}" >> /ssl/acme/hosts.lst
 fi
 if [ -n "${HOST_POP}" ]; then
 	if [ ! -s "/ssl/acme/certs/${HOST_POP}/fullchain.cer" ]; then
-		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --webroot /var/www/html -d ${HOST_POP}
+		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --preferred-chain  "${PREFERRED_CHAIN}" --webroot /var/www/html -d ${HOST_POP}
 	fi
 	echo "pop;${HOST_POP}" >> /ssl/acme/hosts.lst
 fi
