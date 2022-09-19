@@ -475,21 +475,18 @@ RUN cd /var/www/html \
   && wget -O roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz https://github.com/roundcube/roundcubemail/releases/download/${ROUNDCUBEMAIL_TAG}/roundcubemail-${ROUNDCUBEMAIL_TAG}-complete.tar.gz \
   && tar -xzf roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz --strip 1 \
   && rm -f index.lighttpd.html roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz \
-  && mv composer.json-dist composer.json \
+  && cp composer.json-dist composer.json \
   && composer \
       --working-dir=/var/www/html/ \
-      --prefer-dist --prefer-stable \
-      --update-no-dev --no-interaction \
-      --optimize-autoloader --apcu-autoloader \
+      --no-interaction \
+      update \
+  && composer \
+      --working-dir=/var/www/html/ \
+			--no-interaction \
+			--no-scripts \
       require \
           weird-birds/thunderbird_labels \
           prodrigestivill/gravatar \
-  && composer \
-      --working-dir=/var/www/html/ \
-      --prefer-dist --no-dev \
-      --no-interaction \
-      --optimize-autoloader --apcu-autoloader \
-      update \
   && rm -rf installer \
   && chown -R www-data.www-data /var/www/html
 
@@ -564,7 +561,7 @@ VOLUME [ \
 ###########################
 # Final cleaning
 ###########################
-WORKDIR "/qmail-aio"
+WORKDIR "/opt"
 RUN rm -rf /opt/patches /opt/src \
     && rm -rf /service/qmail-pop3* \
     && rm -rf /var/log/qmail-pop3* \
