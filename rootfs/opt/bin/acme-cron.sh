@@ -16,4 +16,4 @@ cat /ssl/acme/hosts.lst | while read LINE; do
 	cp /ssl/acme/certs/${HOST}/${HOST}.key /ssl/${KIND}.key
 done
 
-/usr/local/bin/qmailctl restart
+/opt/bin/qmailctl restart

@@ -21,11 +21,9 @@ ARG ACMESH_TAG
 ########################  
 # Base install
 ########################
-COPY opt /opt/
+COPY patches/ /opt/patches/
 WORKDIR "/opt/src"
-
 RUN mkdir -p /opt/src \
-  && chmod 755 /opt/bin/* \
   && apt-get update \
   && apt-get -y install build-essential equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg \
 ## Add docker group for logs
@@ -133,12 +131,12 @@ RUN mkdir -p /package \
 	&& cd mail/sqmail/sqmail-${SQMAIL_TAG} \
 	&& sed -i '/service/d' package/install \
 	&& sed -i '/run/d' package/install \
-	&& package/install #; echo "Otherwise return 1" \
+	&& package/install \
+# Fix sendmail
+	&& cp /var/qmail/bin/sendmail /usr/sbin/sendmail \
 ## cleaning
 	&& rm -rf /opt/src/* \
 	&& rm -rf /var/qmail/svc /service/*
-# SSL Config
-COPY conf/ssl_env /var/qmail/ssl_env
     
 ########################
 # VPopMail
@@ -201,7 +199,7 @@ RUN wget http://dist.schmorp.de/libev/libev-4.33.tar.gz \
 ########################
 # Dovecot
 ########################
-	RUN groupadd -g 2110 dovecot \
+RUN groupadd -g 2110 dovecot \
 	&& useradd -g dovecot -u 7798 -s /usr/sbin/nologin -d /var/run dovenull \
 	&& useradd -g dovecot -u 7799 -s /usr/sbin/nologin -d /var/run dovecot \
 	&& wget https://dovecot.org/releases/2.3/dovecot-${DOVECOT_TAG}.tar.gz \
@@ -223,10 +221,8 @@ RUN wget http://dist.schmorp.de/libev/libev-4.33.tar.gz \
 	&& make \
 	&& make install \
 	&& mkdir -p /etc/dovecot/ /var/run/dovecot \
-	# cleaning
-		&& rm -rf /opt/src/*
-	# Config files
-	COPY conf/dovecot-etc/ /etc/
+# cleaning
+	&& rm -rf /opt/src/*
 
 ########################
 # Autorespond
@@ -367,11 +363,6 @@ RUN wget https://dlcdn.apache.org//spamassassin/source/Mail-SpamAssassin-${SPAMA
       /etc/mail/spamassassin/v310.pre \
 # cleaning
   && rm -rf /opt/src/*
-# Config files
-COPY conf/spamassin-local.cf /etc/mail/spamassassin/local.conf
-COPY conf/spamassin-directory.cf /etc/mail/spamassassin/directory.cf 
-# Binary
-COPY bin/learnSpam.sh /var/qmail/bin/learnSpam
 
 ########################
 # DKIM
@@ -456,13 +447,8 @@ RUN wget -O acmesh-${ACMESH_TAG}.tar.gz https://github.com/acmesh-official/acme.
   
 ###########################
 # Web parts
-# we have to fix qmail-send s6-svc
 ###########################
-COPY conf/lighttpd.conf /etc/lighttpd/lighttpd.conf
-COPY conf/php.ini /etc/php/7.4/fpm/conf.d/99-qmail-aio.ini
-COPY www/ /var/www/
 RUN mkdir -p /run/php \
-  && chown -R www-data.www-data /var/www/admin/html/ /var/www/admin/cgi/qmail-queue.php \
 # Admin patches
   && cp /usr/bin/php7.4 /usr/bin/qmailq-php \ 
   && chmod 4755 /usr/bin/qmailq-php
@@ -477,76 +463,50 @@ RUN cd /var/www/html \
   && rm -f index.lighttpd.html roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz \
   && cp composer.json-dist composer.json \
   && composer \
-      --working-dir=/var/www/html/ \
-      --no-interaction \
-      update \
+		--working-dir=/var/www/html/ \
+		--no-interaction \
+		update \
   && composer \
-      --working-dir=/var/www/html/ \
-			--no-interaction \
-			--no-scripts \
-      require \
-          weird-birds/thunderbird_labels \
-          prodrigestivill/gravatar \
-  && rm -rf installer \
-  && chown -R www-data.www-data /var/www/html
+		--working-dir=/var/www/html/ \
+		--no-interaction \
+		--no-scripts \
+		require \
+			weird-birds/thunderbird_labels \
+			prodrigestivill/gravatar \
+  && rm -rf installer
 
 ###########################
-# Binaries
+# ROOT FS && Co
 ###########################
-COPY bin/maildrop-filter /var/qmail/bin/maildrop-filter
-COPY bin/qmail-queuescan /var/qmail/bin/qmail-queuescan
-COPY bin/qmailctl /usr/local/bin/qmailctl
-COPY bin/qmHandle /usr/local/bin/qmHandle
+COPY rootfs /
 RUN chown vpopmail.vchkpw /var/qmail/bin/maildrop-filter \
   && chmod 600 /var/qmail/bin/maildrop-filter \
   && chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
   && chmod 1755 /var/qmail/bin/qmail-queuescan \
-  && chmod 755 /usr/local/bin/qmailctl /usr/local/bin/qmHandle
-
-###########################
-# Services config
-###########################
-COPY bin/run/qmail-smtpd /service/qmail-smtpd/run
-COPY bin/log/default /service/qmail-smtpd/log/run
-COPY bin/run/qmail-smtpsd /service/qmail-smtpsd/run
-COPY bin/log/default /service/qmail-smtpsd/log/run
-COPY bin/run/qmail-smtpsub /service/qmail-smtpsub/run
-COPY bin/log/default /service/qmail-smtpsub/log/run
-COPY bin/run/qmail-send /service/qmail-send/run
-COPY bin/log/default /service/qmail-send/log/run
-COPY bin/run/dovecot /service/dovecot/run
-COPY bin/log/default /service/dovecot/log/run
-COPY bin/run/clamd /service/clamd/run
-COPY bin/log/default /service/clamd/log/run
-COPY bin/run/spamd /service/spamd/run
-COPY bin/log/default /service/spamd/log/run
-COPY bin/run/lighttpd /service/lighttpd/run
-COPY bin/log/lighttpd /service/lighttpd/log/run
-COPY bin/run/php-fpm /service/php-fpm/run
-COPY bin/log/default /service/php-fpm/log/run
-COPY bin/run/fcron /service/fcron/run
-COPY bin/log/default /service/fcron/log/run
-# For qmail-queue.php
-RUN chown -R qmailq /service/qmail-send
-  
-###########################
+  && chmod 755 /opt/bin/* \
+	&& chown -R www-data.www-data /var/www \
+	&& chown -R qmailq /service/qmail-send \
 # Templates
-###########################
-RUN cp -a /var/qmail/queue /opt/templates/ \
-  && mv /var/qmail/control/ /opt/templates/
+	&& cp -a /var/qmail/queue /opt/templates/ \
+  && mv /var/qmail/control/ /opt/templates/ \
+# Volumes 
+	&& mkdir -p \
+		/var/vpopmail/domains/ \
+		/ssl \
+		/var/vpopmail/etc \
+		/var/qmail/control \
+		/log \
+		/var/spamassassin \
+		/var/qmail/tmp \
+# Final cleaning
+	&& rm -rf \
+		/opt/patches /opt/src \
+		/service/qmail-pop3* \
+		/var/log/qmail-pop3* \
+		/service/*/down
 
 ###########################
 # Volumes
-###########################
-RUN mkdir -p \
-  /var/vpopmail/domains/ \
-  /ssl \
-  /var/vpopmail/etc \
-  /var/qmail/control \
-  /log \
-  /var/spamassassin \
-  /var/qmail/tmp
-
 VOLUME [ \
   "/var/vpopmail/domains",\
   "/ssl",\
@@ -559,23 +519,13 @@ VOLUME [ \
 ]
 
 ###########################
-# Final cleaning
-###########################
-WORKDIR "/opt"
-RUN rm -rf /opt/patches /opt/src \
-    && rm -rf /service/qmail-pop3* \
-    && rm -rf /var/log/qmail-pop3* \
-    && cp /var/qmail/bin/sendmail /usr/sbin/sendmail \
-    && rm -f /service/*/down
-
-###########################
 # Docker final parms
 ###########################
+WORKDIR "/opt"
+ENV PATH="${PATH}:/opt/bin"
 EXPOSE 25 465 587
 EXPOSE 110 995
 EXPOSE 143 993
 EXPOSE 80 88
-
-COPY bin/docker-entrypoint.sh /bin/
-ENTRYPOINT ["/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["/opt/bin/docker-entrypoint.sh"]
 CMD ["/bin/s6-svscan", "/service", "2>&1"]

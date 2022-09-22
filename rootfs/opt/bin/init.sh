@@ -194,7 +194,7 @@ for ip in ${IPS}; do
 done
 echo ":allow,QHPSI='clamdscan',QHPSIARG1='--no-summary',MFDNSCHECK='',BADMIMETYPE='',BADLOADERTYPE='M',HELOCHECK='.',TARPITCOUNT='5',TARPITDELAY='20',QMAILQUEUE='bin/qmail-queuescan'" >> /var/qmail/control/rules.smtpd
 echo ":allow,QHPSI='clamdscan',QHPSIARG1='--no-summary',MFDNSCHECK='',BADMIMETYPE='',BADLOADERTYPE='M',HELOCHECK='.',TARPITCOUNT='5',TARPITDELAY='20',QMAILQUEUE='bin/qmail-queuescan'" >> /var/qmail/control/rules.smtpsd
-/usr/local/bin/qmailctl cdb
+/opt/bin/qmailctl cdb
 
 # Generate roundcube config
 cat > /var/qmail/control/roundcube.conf << EOF
