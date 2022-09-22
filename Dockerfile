@@ -23,7 +23,7 @@ ARG ACMESH_TAG
 ########################
 COPY patches/ /opt/patches/
 WORKDIR "/opt/src"
-RUN mkdir -p /opt/src \
+RUN mkdir -p /opt/src /opt/templates \
   && apt-get update \
   && apt-get -y install build-essential equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg \
 ## Add docker group for logs
