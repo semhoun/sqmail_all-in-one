@@ -55,6 +55,13 @@ ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
 
 ########################  
+# Fix certificates
+########################
+RUN curl -o /usr/share/ca-certificates/ZeroSSL_RSA_Domain_Secure_Site_CA.crt https://ssl-tools.net/certificates/c81a8bd1f9cf6d84c525f378ca1d3f8c30770e34.pem \
+	&& echo "ZeroSSL_RSA_Domain_Secure_Site_CA.crt" >> /etc/ca-certificates.conf \
+	&& update-ca-certificates
+	
+########################  
 # Additionnals packages
 ########################
 RUN apt-get -y install bsd-mailx \
@@ -484,7 +491,7 @@ RUN chown vpopmail.vchkpw /var/qmail/bin/maildrop-filter \
   && chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
   && chmod 1755 /var/qmail/bin/qmail-queuescan \
   && chmod 755 /opt/bin/* \
-	&& chown -R www-data.www-data /var/www \
+	&& chown -R www-data.www-data /var/www/html /var/www/admin/html \
 	&& chown -R qmailq /service/qmail-send \
 # Templates
 	&& cp -a /var/qmail/queue /opt/templates/ \
