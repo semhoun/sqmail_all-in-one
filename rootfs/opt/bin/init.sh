@@ -138,6 +138,7 @@ echo "${QUEUELIFETIME}" > /var/qmail/control/queuelifetime
 # VPopmail configuration
 echo "${DEFAULT_DOMAIN}" > /var/vpopmail/etc/defaultdomain
 cp /opt/templates/vlimits.default /var/vpopmail/etc/vlimits.default
+cp /opt/templates/vusage* /var/vpopmail/etc/
 
 # Qmail configuration from /package/mail/sqmail/sqmail/src/config-fast.sh
 echo "${SMTP_SERVER}" > /var/qmail/control/me

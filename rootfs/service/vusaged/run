@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /var/vpopmail/bin/vusaged /var/vpopmail/etc/vusaged.conf 2>&1
