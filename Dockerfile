@@ -22,6 +22,7 @@ ARG QMAILADMIN_TAG
 ARG VQADMIN_TAG
 
 WORKDIR "/opt/src"
+
 ########################  
 # Base install
 ########################
@@ -45,10 +46,7 @@ Description: A local MTA package \n\
   && mkdir -p /usr/share/man/man1 /usr/share/man/man5 /usr/share/man/man7 /usr/share/man/man8 \
   && touch /usr/share/man/man1/maildirmake.1.gz \
   && touch /usr/share/man/man8/deliverquota.8.gz \
-  && touch /usr/share/man/man1/lockmail.1.gz \
-  && touch /usr/share/man/man5/maildir.maildrop.5.gz \
-  && touch /usr/share/man/man1/lockmail.maildrop.1.gz \
-  && touch /usr/share/man/man7/maildirquota.maildrop.7.gz
+  && touch /usr/share/man/man1/lockmail.1.gz
 
 ########################  
 # Encoding fix
@@ -74,7 +72,7 @@ RUN curl -o /usr/share/ca-certificates/ZeroSSL_RSA_Domain_Secure_Site_CA.crt htt
 # Additionnals packages
 ########################
 RUN apt-get -y install bsd-mailx \
-    libperl-dev libmariadb-dev libmariadb-dev-compat csh maildrop bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
+    libperl-dev libmariadb-dev libmariadb-dev-compat csh bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
     check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
     libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
     mariadb-client \
@@ -296,7 +294,7 @@ RUN wget -O qmailadmin-${QMAILADMIN_TAG}.tar.gz https://github.com/semhoun/qmail
     --enable-modify-quota \
     --enable-domain-autofill \
     --enable-modify-spam \
-    --enable-spam-command="|/var/qmail/bin/preline /usr/bin/maildrop /var/qmail/bin/maildrop-filter" \
+    --enable-spam-command='|/var/qmail/bin/preline -f /usr/libexec/dovecot/deliver -d $EXT@$USER' \
     --enable-help \
     --enable-vpopuser=vpopmail \
     --enable-vpopgroup=vchkpw \
@@ -493,17 +491,23 @@ RUN cd /var/www/html \
   && tar -xzf roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz --strip 1 \
   && rm -f index.lighttpd.html roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz \
   && cp composer.json-dist composer.json \
+	&& composer \
+    --working-dir=/var/www/html/ \
+    --no-interaction \
+    update \
   && composer \
-		--working-dir=/var/www/html/ \
-		--no-interaction \
-		update \
+    --working-dir=/var/www/html/ \
+    --no-interaction \
+    require \
+      weird-birds/thunderbird_labels \
+      prodrigestivill/gravatar \
+      johndoh/sauserprefs \
+      johndoh/contextmenu \
+      johndoh/swipe \
   && composer \
-		--working-dir=/var/www/html/ \
-		--no-interaction \
-		--no-scripts \
-		require \
-			weird-birds/thunderbird_labels \
-			prodrigestivill/gravatar \
+    --working-dir=/var/www/html/ \
+    --no-interaction \
+    update \
   && rm -rf installer
 
 ###########################
@@ -511,11 +515,12 @@ RUN cd /var/www/html \
 ###########################
 COPY rootfs /
 RUN chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
-  && chmod 600 /var/qmail/bin/maildrop-filter \
   && chmod 1755 /var/qmail/bin/qmail-queuescan \
   && chmod 755 /opt/bin/* \
   && chown -R www-data.www-data /var/www/html /var/www/admin/html \
   && chown -R qmailq /service/qmail-send \
+  && chown -R vpopmail.vchkpw /etc/dovecot/sieve \
+  && cd /etc/dovecot/sieve/before.d && /usr/bin/sievec . \
 # Templates
   && cp -a /var/qmail/queue /opt/templates/ \
   && mv /var/qmail/control/ /opt/templates/ \

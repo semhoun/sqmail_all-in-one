@@ -9,9 +9,12 @@ function delayedProcess {
 function writeRoundCubeConf {
 	# Launch with &, so export will not in main env
 	. /var/qmail/control/roundcube.conf
-	cat /opt/templates/roundcube-config.php | envsubst \
+	for OCONF in /var/www/html/config/*.tpl /var/www/html/plugins/*/*.tpl; do
+		DCONF=${OCONF:0:-4}
+		cat $OCONF| envsubst \
 		'$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $PRODUCT_NAME $SUPPORT_URL' \
-		> /var/www/html/config/config.inc.php
+		> $DCONF
+	done
 }
 
 function fixDovecotConf {

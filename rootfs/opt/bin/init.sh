@@ -108,7 +108,7 @@ export MYSQL_HOST=${MYSQL_HOST}
 # Default config
 echo "MAILER-DAEMON" > /var/qmail/control/bouncefrom
 echo postmaster > /var/qmail/control/doublebounceto
-echo "| /var/vpopmail/bin/vdelivermail '' delete" > /var/qmail/control/defaultdelivery
+echo "|/var/vpopmail/bin/vdelivermail '' delete" > /var/qmail/control/defaultdelivery
 
 # SSL base Config
 openssl dhparam -out /ssl/qmail-dhparam 2048
