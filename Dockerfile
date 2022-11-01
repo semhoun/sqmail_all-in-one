@@ -11,25 +11,34 @@ ARG S6_TAG
 ARG UCSPISSL_TAG
 ARG UCSPITCP6_TAG
 ARG DOVECOT_TAG
+ARG DOVECOT_PIGEONHOLE_TAG
 ARG CLAMAV_TAG
 ARG SPAMASSASSIN_TAG
 ARG FCRON_TAG
 ARG ROUNDCUBEMAIL_TAG
 ARG VPOPMAIL_TAG
 ARG ACMESH_TAG
+ARG QMAILADMIN_TAG
+ARG VQADMIN_TAG
 
+WORKDIR "/opt/src"
 ########################  
 # Base install
 ########################
-COPY patches/ /opt/patches/
-WORKDIR "/opt/src"
 RUN mkdir -p /opt/src /opt/templates \
   && apt-get update \
   && apt-get -y install build-essential equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg \
 ## Add docker group for logs
   && groupadd -g 998 docker \
 ## Add MTA Local (equivs is needed)
-  && equivs-build /opt/patches/mail-transport-agent.ctl \
+  && echo 'Package: mta-local\n\
+Provides: mail-transport-agent\n\
+Conflicts: mail-transport-agent\n\
+Description: A local MTA package \n\
+ A package, which can be used to establish a locally installed\n\
+ mail transport agent.\n'\
+  > /opt/src/mail-transport-agent.ctl \
+  && equivs-build /opt/src/mail-transport-agent.ctl \
   && dpkg -i mta-local*.deb \
   && rm -f /opt/src/* \
 # Fixes for slim install
@@ -58,9 +67,9 @@ ENV LC_ALL en_US.UTF-8
 # Fix certificates
 ########################
 RUN curl -o /usr/share/ca-certificates/ZeroSSL_RSA_Domain_Secure_Site_CA.crt https://ssl-tools.net/certificates/c81a8bd1f9cf6d84c525f378ca1d3f8c30770e34.pem \
-	&& echo "ZeroSSL_RSA_Domain_Secure_Site_CA.crt" >> /etc/ca-certificates.conf \
-	&& update-ca-certificates
-	
+  && echo "ZeroSSL_RSA_Domain_Secure_Site_CA.crt" >> /etc/ca-certificates.conf \
+  && update-ca-certificates
+  
 ########################  
 # Additionnals packages
 ########################
@@ -107,129 +116,144 @@ RUN wget -O skalibs-${SKALIB_TAG}.tar.gz https://github.com/skarnet/skalibs/arch
 # SQMail
 ########################
 RUN mkdir -p /package \
-	&& chmod 1755 /package \
+  && chmod 1755 /package \
 ## fehQlibs
-	&& cd /opt/src \
-	&& wget https://www.fehcom.de/ipnet/fehQlibs/fehQlibs-${FEHQLIBS_TAG}.tgz \
-	&& cd /usr/local \
-	&& tar xzf /opt/src/fehQlibs-${FEHQLIBS_TAG}.tgz \
-	&& mv fehQlibs-${FEHQLIBS_TAG} qlibs  \
-	&& cd qlibs \
-	&& make \
+  && cd /opt/src \
+  && wget https://www.fehcom.de/ipnet/fehQlibs/fehQlibs-${FEHQLIBS_TAG}.tgz \
+  && cd /usr/local \
+  && tar xzf /opt/src/fehQlibs-${FEHQLIBS_TAG}.tgz \
+  && mv fehQlibs-${FEHQLIBS_TAG} qlibs  \
+  && cd qlibs \
+  && make \
 ## ucspi-ssl    
-	&& cd /opt/src \
-	&& wget https://www.fehcom.de/ipnet/ucspi-ssl/ucspi-ssl-${UCSPISSL_TAG}.tgz \
-	&& cd /package \
-	&& tar xzf /opt/src/ucspi-ssl-${UCSPISSL_TAG}.tgz \
-	&& cd host/superscript.com/net/ucspi-ssl-${UCSPISSL_TAG} \
-	&& package/install \
+  && cd /opt/src \
+  && wget https://www.fehcom.de/ipnet/ucspi-ssl/ucspi-ssl-${UCSPISSL_TAG}.tgz \
+  && cd /package \
+  && tar xzf /opt/src/ucspi-ssl-${UCSPISSL_TAG}.tgz \
+  && cd host/superscript.com/net/ucspi-ssl-${UCSPISSL_TAG} \
+  && package/install \
 ## ucspi-tcp6
-	&& cd /opt/src \
-	&& wget https://www.fehcom.de/ipnet/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
-	&& cd /package \
-	&& tar xzf /opt/src/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
-	&& cd net/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG} \
-	&& package/install \
+  && cd /opt/src \
+  && wget https://www.fehcom.de/ipnet/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
+  && cd /package \
+  && tar xzf /opt/src/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
+  && cd net/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG} \
+  && package/install \
 ## sqmail
-	&& cd /opt/src \
-	&& wget https://www.fehcom.de/sqmail/sqmail-${SQMAIL_TAG}.tgz \
-	&& cd /package \
-	&& tar xzf /opt/src/sqmail-${SQMAIL_TAG}.tgz \
-	&& cd mail/sqmail/sqmail-${SQMAIL_TAG} \
-	&& sed -i '/service/d' package/install \
-	&& sed -i '/run/d' package/install \
-	&& package/install \
+  && cd /opt/src \
+  && wget https://www.fehcom.de/sqmail/sqmail-${SQMAIL_TAG}.tgz \
+  && cd /package \
+  && tar xzf /opt/src/sqmail-${SQMAIL_TAG}.tgz \
+  && cd mail/sqmail/sqmail-${SQMAIL_TAG} \
+  && sed -i '/service/d' package/install \
+  && sed -i '/run/d' package/install \
+  && package/install \
 # Fix sendmail
-	&& cp /var/qmail/bin/sendmail /usr/sbin/sendmail \
+  && cp /var/qmail/bin/sendmail /usr/sbin/sendmail \
 ## cleaning
-	&& rm -rf /opt/src/* \
-	&& rm -rf /var/qmail/svc /service/*
+  && rm -rf /opt/src/* \
+  && rm -rf /var/qmail/svc /service/*
     
 ########################
 # VPopMail
 ########################
 # Libev for vusaged
 RUN wget http://dist.schmorp.de/libev/libev-4.33.tar.gz \
-	&& tar xzvf libev-4.33.tar.gz \
-	&& cd libev-4.33 \
-	&& ./configure \
-	&& make \
-	&& make install \
-	&& ldconfig \
+  && tar xzvf libev-4.33.tar.gz \
+  && cd libev-4.33 \
+  && ./configure \
+  && make \
+  && make install \
+  && ldconfig \
 # vpopmail
-	&& cd /opt/src \
-	&& mkdir -p /var/vpopmail \
-	&& groupadd -g 89 vchkpw \
-	&& useradd -g vchkpw -u 89 -s /usr/sbin/nologin -d /var/vpopmail vpopmail \
-	&& chown -R vpopmail.vchkpw /var/vpopmail \
-	&& wget -O vpopmail-${VPOPMAIL_TAG}.tar.gz https://github.com/semhoun/vpopmail/archive/refs/tags/${VPOPMAIL_TAG}.tar.gz  \
-	&& mkdir vpopmail \
-	&& cd vpopmail \
-	&& tar xzf ../vpopmail-${VPOPMAIL_TAG}.tar.gz --strip 1 \
-	&& autoreconf -f -i \
-	&& ./configure \
-		--enable-qmaildir=/var/qmail/ \
-		--enable-qmail-newu=/var/qmail/bin/qmail-newu \
-		--enable-qmail-inject=/var/qmail/bin/qmail-inject \
-		--enable-qmail-newmrh=/var/qmail/bin/qmail-newmrh \
-		--enable-tcpserver-file=/var/qmail/control/relays.cdb \
-		--disable-roaming-users \
-		--enable-auth-module=mysql \
-		--enable-incdir=/usr/include/mariadb \
-		--enable-libdir=/usr/lib \
-		--enable-logging=n \
-		--disable-clear-passwd \
-		--enable-auth-logging \
-		--enable-sql-logging=e \
-		--disable-passwd \
-		--enable-qmail-ext \
-		--enable-sqmail-ext \
-		--enable-mysql-limits \
-		--enable-sql-aliasdomains \
-		--enable-defaultdelivery \
-		--enable-valias \
-		--enable-md5-passwords \
-		--enable-min-pwd-length=6 \
-	&& make \
-	&& make install \
+  && cd /opt/src \
+  && mkdir -p /var/vpopmail \
+  && groupadd -g 89 vchkpw \
+  && useradd -g vchkpw -u 89 -s /usr/sbin/nologin -d /var/vpopmail vpopmail \
+  && chown -R vpopmail.vchkpw /var/vpopmail \
+  && wget -O vpopmail-${VPOPMAIL_TAG}.tar.gz https://github.com/semhoun/vpopmail/archive/refs/tags/${VPOPMAIL_TAG}.tar.gz  \
+  && mkdir vpopmail \
+  && cd vpopmail \
+  && tar xzf ../vpopmail-${VPOPMAIL_TAG}.tar.gz --strip 1 \
+  && ./configure \
+    --enable-qmaildir=/var/qmail/ \
+    --enable-qmail-newu=/var/qmail/bin/qmail-newu \
+    --enable-qmail-inject=/var/qmail/bin/qmail-inject \
+    --enable-qmail-newmrh=/var/qmail/bin/qmail-newmrh \
+    --enable-tcpserver-file=/var/qmail/control/relays.cdb \
+    --disable-roaming-users \
+    --enable-auth-module=mysql \
+    --enable-incdir=/usr/include/mariadb \
+    --enable-libdir=/usr/lib \
+    --enable-logging=n \
+    --disable-clear-passwd \
+    --enable-auth-logging \
+    --enable-sql-logging=e \
+    --disable-passwd \
+    --enable-qmail-ext \
+    --enable-sqmail-ext \
+    --enable-mysql-limits \
+    --enable-sql-aliasdomains \
+    --enable-defaultdelivery \
+    --enable-valias \
+    --enable-md5-passwords \
+    --enable-min-pwd-length=6 \
+  && make \
+  && make install \
 # vusaged
-	&& cd vusaged \
-	&& LIBS=`head -1 /var/vpopmail/etc/lib_deps` \
-		./configure \
-		--with-vpopmail=/var/vpopmail \
-	&& make \
-	&& cp -f vusaged /var/vpopmail/bin \
-	&& cp -f etc/vusaged.conf /var/vpopmail/etc \
+  && cd vusaged \
+  && LIBS=`head -1 /var/vpopmail/etc/lib_deps` \
+    ./configure \
+    --with-vpopmail=/var/vpopmail \
+  && make \
+  && cp -f vusaged /var/vpopmail/bin \
+  && cp -f etc/vusaged.conf /var/vpopmail/etc \
 # cleaning
-	&& rm -rf /opt/src/*
-	
+  && rm -rf /opt/src/*
+  
 ########################
 # Dovecot
 ########################
 RUN groupadd -g 2110 dovecot \
-	&& useradd -g dovecot -u 7798 -s /usr/sbin/nologin -d /var/run dovenull \
-	&& useradd -g dovecot -u 7799 -s /usr/sbin/nologin -d /var/run dovecot \
-	&& wget https://dovecot.org/releases/2.3/dovecot-${DOVECOT_TAG}.tar.gz \
-	&& tar xzf dovecot-${DOVECOT_TAG}.tar.gz \
-	&& cd dovecot-${DOVECOT_TAG} \
-	&& ./configure \
-		--prefix=/usr \
-		--sysconfdir=/etc \
-		--localstatedir=/var \
-		--with-sql \
-		--with-mysql \
-		--with-docs \
-		--with-ssl \
-		--without-shadow \
-		--without-pam \
-		--without-ldap \
-		--without-pgsql \
-		--without-sqlite \
-	&& make \
-	&& make install \
-	&& mkdir -p /etc/dovecot/ /var/run/dovecot \
+  && useradd -g dovecot -u 7798 -s /usr/sbin/nologin -d /var/run dovenull \
+  && useradd -g dovecot -u 7799 -s /usr/sbin/nologin -d /var/run dovecot \
+  && wget https://dovecot.org/releases/2.3/dovecot-${DOVECOT_TAG}.tar.gz \
+  && tar xzf dovecot-${DOVECOT_TAG}.tar.gz \
+  && cd dovecot-${DOVECOT_TAG} \
+  && ./configure \
+    --prefix=/usr \
+    --sysconfdir=/etc \
+    --localstatedir=/var \
+    --with-sql \
+    --with-mysql \
+    --with-docs \
+    --with-ssl \
+    --without-shadow \
+    --without-pam \
+    --without-ldap \
+    --without-pgsql \
+    --without-sqlite \
+  && make \
+  && make install \
+  && mkdir -p /etc/dovecot/ /var/run/dovecot \
 # cleaning
-	&& rm -rf /opt/src/*
+  && rm -rf /opt/src/*
+  
+########################
+# Dovecot PingeonHole
+########################
+RUN wget https://pigeonhole.dovecot.org/releases/2.3/dovecot-2.3-pigeonhole-${DOVECOT_PIGEONHOLE_TAG}.tar.gz \
+  && tar xzf dovecot-2.3-pigeonhole-${DOVECOT_PIGEONHOLE_TAG}.tar.gz \
+  && cd dovecot-2.3-pigeonhole-${DOVECOT_PIGEONHOLE_TAG} \
+  && ./configure \
+    --prefix=/usr \
+    --sysconfdir=/etc \
+    --localstatedir=/var \
+    --with-dovecot=/usr/lib/dovecot \
+  && make \
+  && make install \
+# cleaning
+  && rm -rf /opt/src/*
 
 ########################
 # Autorespond
@@ -246,21 +270,22 @@ RUN wget http://qmail.ixip.net/download/autorespond-2.0.5.tar.gz \
 ########################
 # ezmlm-idx
 ########################
-RUN wget https://qmailrocks.thibs.com/downloads/ezmlm-idx-7.2.2.tar.gz \
+RUN wget http://notes.sagredo.eu/files/qmail/tar/ezmlm-idx-7.2.2.tar.gz \
   && tar xzf ezmlm-idx-7.2.2.tar.gz \
   && cd ezmlm-idx-7.2.2 \
-  && make && make man && make install \
+  && make \
+  && make man \
+  && make install \
 # cleaning
   && rm -rf /opt/src/*
   
 ########################
 # QmailAdmin
 ########################
-RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qmailadmin-1.2.16.tar.gz \
-  && tar xzf qmailadmin-1.2.16.tar.gz\
-  && cd qmailadmin-1.2.16 \
-  && patch -p1 < /opt/patches/roberto-qmailadmin-1.2.16.patch \
-  && cp /opt/patches/qmailadmin/* images/ \
+RUN wget -O qmailadmin-${QMAILADMIN_TAG}.tar.gz https://github.com/semhoun/qmailadmin/archive/refs/tags/${QMAILADMIN_TAG}.tar.gz  \
+  && mkdir qmailadmin \
+  && cd qmailadmin \
+  && tar xzf ../qmailadmin-${QMAILADMIN_TAG}.tar.gz --strip 1 \
   && ./configure \
     --enable-cgibindir=/var/www/admin/cgi \
     --enable-htmldir=/var/www/admin/html/ \
@@ -278,23 +303,21 @@ RUN wget http://downloads.sourceforge.net/project/qmailadmin/qmailadmin-devel/qm
     --enable-domain-autofill \
   && make \
   && make install \
-  && cp images/* /var/www/admin/html/images/qmailadmin/ \
 # cleaning
   && rm -rf /opt/src/*
 
 ########################
 # vqadmin
 ########################
-RUN wget https://qmailrocks.thibs.com/downloads/vqadmin-2.3.7.tar.gz \
-  && tar xzf vqadmin-2.3.7.tar.gz \
-  && cd vqadmin-2.3.7 \
-  && patch -p0 < /opt/patches/vqadmin-2.3.7.patch \
-  && sed 's#/cgi-bin/#/cgi/#g' -i user.c cedit.c domain.c html/* \
-  && ./configure --enable-cgibindir=/var/www/admin/cgi --build=i386 \
+RUN wget -O vqadmin-${VQADMIN_TAG}.tar.gz https://github.com/semhoun/vqadmin/archive/refs/tags/${VQADMIN_TAG}.tar.gz  \
+  && mkdir vqadmin \
+  && cd vqadmin \
+  && tar xzf ../vqadmin-${VQADMIN_TAG}.tar.gz --strip 1 \
+  && ./configure \
+    --enable-cgibindir=/var/www/admin/cgi \
+    --enable-wwwroot=/var/www/admin/html \
   && make \
   && make install \
-  && mkdir -p /var/www/admin/html/images/vqadmin \
-  && cp html/vqadmin.css /var/www/admin/html/images/vqadmin \
 # cleaning
   && rm -rf /opt/src/*
   
@@ -374,6 +397,7 @@ RUN wget https://dlcdn.apache.org//spamassassin/source/Mail-SpamAssassin-${SPAMA
 ########################
 # DKIM
 ########################
+COPY patches/ /opt/patches/
 RUN wget http://www.memoryhole.net/qmail/dkimsign.pl \
   && wget http://www.memoryhole.net/qmail/qmail-remote.sh \
   && wget https://downloads.sourceforge.net/project/domainkeys/libdomainkeys/0.69/libdomainkeys-0.69.tar.gz \
@@ -387,7 +411,7 @@ RUN wget http://www.memoryhole.net/qmail/dkimsign.pl \
   && mv /var/qmail/bin/qmail-remote /var/qmail/bin/qmail-remote.orig \
   && install -T /opt/src/qmail-remote.sh /var/qmail/bin/qmail-remote \
 # cleaning
-  && rm -rf /opt/src/*
+  && rm -rf /opt/src/* /opt/patches
 
 ########################
 # Qmail Remove https://www.fehcom.de/sqmail/man/qmail-qmaint.html
@@ -486,31 +510,30 @@ RUN cd /var/www/html \
 # ROOT FS && Co
 ###########################
 COPY rootfs /
-RUN chown vpopmail.vchkpw /var/qmail/bin/maildrop-filter \
+RUN chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
   && chmod 600 /var/qmail/bin/maildrop-filter \
-  && chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
   && chmod 1755 /var/qmail/bin/qmail-queuescan \
   && chmod 755 /opt/bin/* \
-	&& chown -R www-data.www-data /var/www/html /var/www/admin/html \
-	&& chown -R qmailq /service/qmail-send \
+  && chown -R www-data.www-data /var/www/html /var/www/admin/html \
+  && chown -R qmailq /service/qmail-send \
 # Templates
-	&& cp -a /var/qmail/queue /opt/templates/ \
+  && cp -a /var/qmail/queue /opt/templates/ \
   && mv /var/qmail/control/ /opt/templates/ \
 # Volumes 
-	&& mkdir -p \
-		/var/vpopmail/domains/ \
-		/ssl \
-		/var/vpopmail/etc \
-		/var/qmail/control \
-		/log \
-		/var/spamassassin \
-		/var/qmail/tmp \
+  && mkdir -p \
+    /var/vpopmail/domains/ \
+    /ssl \
+    /var/vpopmail/etc \
+    /var/qmail/control \
+    /log \
+    /var/spamassassin \
+    /var/qmail/tmp \
 # Final cleaning
-	&& rm -rf \
-		/opt/patches /opt/src \
-		/service/qmail-pop3* \
-		/var/log/qmail-pop3* \
-		/service/*/down
+  && rm -rf \
+    /opt/src \
+    /service/qmail-pop3* \
+    /var/log/qmail-pop3* \
+    /service/*/down
 
 ###########################
 # Volumes

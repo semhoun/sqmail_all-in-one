@@ -18,6 +18,8 @@ services:
         - ROUNDCUBEMAIL_TAG=${ROUNDCUBEMAIL_TAG}
         - VPOPMAIL_TAG=${VPOPMAIL_TAG}
         - ACMESH_TAG=${ACMESH_TAG}
+        - QMAILADMIN_TAG=${QMAILADMIN_TAG}
+        - VQADMIN_TAG=${VQADMIN_TAG}
     network_mode: bridge
     extra_hosts:
       - mariadb:host-gateway
