@@ -48,7 +48,7 @@ $config['password_force_new_user'] = false;
 // Also supported are password_hash() algoriths: hash-bcrypt, hash-argon2i, hash-argon2id.
 // Default: 'clear' (no hashing)
 // For details see password::hash_password() method.
-$config['password_algorithm'] = 'ssha256';
+$config['password_algorithm'] = 'sha512-crypt';
 
 // Additional options for password hashing function(s).
 // For password_hash()-based passwords see https://www.php.net/manual/en/function.password-hash.php
@@ -66,7 +66,7 @@ $config['password_dovecotpw'] = '/usr/local/sbin/dovecotpw'; // for dovecot-1.x
 
 // Dovecot password scheme.
 // Used for password_algorithm = 'dovecot'.
-$config['password_dovecotpw_method'] = 'CRAM-MD5';
+$config['password_dovecotpw_method'] = 'SHA512-CRYPT';
 
 // Enables use of password with method prefix, e.g. {MD5}$1$LUiMYWqx$fEkg/ggr/L6Mb2X7be4i1/
 // when using password_algorithm=dovecot
@@ -130,7 +130,7 @@ $config['password_db_dsn'] = 'mysql://${MYSQL_USER}:${MYSQL_PASS}@${MYSQL_HOST}/
 //         (in case the username is an email address)
 // Escaping of macros is handled by this module.
 // Default: "SELECT update_passwd(%c, %u)"
-$config['password_query'] = 'UPDATE vpopmail set pw_passwd=ENCRYPT(%p,concat("$1$",right(md5(rand()),8 ),"$")), pw_clear_passwd=%p where pw_name=%l and pw_domain=%d';
+$config['password_query'] = 'UPDATE vpopmail set pw_passwd=%P where pw_name=%l and pw_domain=%d';
 
 // By default domains in variables are using unicode.
 // Enable this option to use punycoded names

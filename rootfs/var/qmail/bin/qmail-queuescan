@@ -4,7 +4,6 @@ QMAIL="/var/qmail"
 alias -x SPAMMER='/usr/local/bin/spamc'
 alias -x 822FIELD='/usr/local/bin/822field'
 #
-SCANNERARGS="--no-summary"
 SPAMMERARGS="-u $RCPTTO"
 VERBOSE=0
 

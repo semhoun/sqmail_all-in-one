@@ -172,6 +172,7 @@ chown qmailr.sqmail /var/qmail/control/domainkeys
 mkdir -p /var/spamassassin/auto-whitelist
 mkdir -p /var/spamassassin/bayes
 mkdir -p /var/spamassassin/razor
+echo "razorhome = /etc/mail/spamassassin/.razor/" > /var/spamassassin/razor/razor-agent.conf
 chown -R vpopmail.vchkpw /var/spamassassin
 chown 644 /var/vpopmail/etc/*
 chown -R vpopmail.vchkpw /var/vpopmail/domains

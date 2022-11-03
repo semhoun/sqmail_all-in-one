@@ -10,6 +10,8 @@ CREATE TABLE spam_prefs (
   KEY username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COMMENT='Spamassassin Preferences';
 
+DELETE FROM `spam_prefs` WHERE `id` < 50;
+
 INSERT INTO `spam_prefs` (`id`, `username`, `preference`, `value`, `added`, `modified`) VALUES
 (1, '$GLOBAL', 'required_score', '7', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
 (2, '$GLOBAL', 'ok_locales', 'en fr', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
@@ -27,10 +29,11 @@ INSERT INTO `spam_prefs` (`id`, `username`, `preference`, `value`, `added`, `mod
 (14, '$GLOBAL', 'fold_headers', '1', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
 (15, '$GLOBAL', 'add_header all Level', '_STARS(*)_', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
 (16, '$GLOBAL', 'remove_header all', '0', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
-(17, '$GLOBAL', 'report_safe', '1', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
-(18, '$GLOBAL', 'use_auto_whitelist', '0', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
-(19, '$GLOBAL', 'score USER_IN_BLACKLIST', '10', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
-(20, '$GLOBAL', 'score USER_IN_WHITELIST', '-10', '2003-10-11 00:00:00', '2013-09-09 22:00:00');
+(17, '$GLOBAL', 'report_safe', '0', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
+(18, '$GLOBAL', 'rewrite_header Subject', '', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
+(19, '$GLOBAL', 'use_auto_whitelist', '0', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
+(20, '$GLOBAL', 'score USER_IN_BLACKLIST', '10', '2003-10-11 00:00:00', '2013-09-09 22:00:00'),
+(21, '$GLOBAL', 'score USER_IN_WHITELIST', '-10', '2003-10-11 00:00:00', '2013-09-09 22:00:00');
 
 ALTER TABLE `spam_prefs`
   MODIFY `id` int(8) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;

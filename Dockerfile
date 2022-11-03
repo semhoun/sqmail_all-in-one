@@ -76,7 +76,8 @@ RUN apt-get -y install bsd-mailx \
     check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
     libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
     mariadb-client \
-    socat \
+    socat inetutils-ping \
+    swaks \
     lighttpd php7.4-fpm \
 # For roundcube
   && apt-get install -y php7.4-zip php7.4-pspell php7.4-mysql php7.4-gd php7.4-imap php7.4-xml php7.4-mbstring php7.4-intl php-imagick aspell-fr php7.4-intl php7.4-curl \
@@ -491,7 +492,7 @@ RUN cd /var/www/html \
   && tar -xzf roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz --strip 1 \
   && rm -f index.lighttpd.html roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz \
   && cp composer.json-dist composer.json \
-	&& composer \
+  && composer \
     --working-dir=/var/www/html/ \
     --no-interaction \
     update \

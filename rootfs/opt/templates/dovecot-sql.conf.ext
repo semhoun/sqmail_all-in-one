@@ -1,6 +1,6 @@
 driver = mysql
 connect = host=${MYSQL_HOST} dbname=${MYSQL_DB} user=${MYSQL_USER} password=${MYSQL_PASS}
-default_pass_scheme = SHA256-CRYPT
+default_pass_scheme = SHA512-CRYPT
 
 #  USER LIMITS via vpopmail.pw_gid filed was currently removed
 password_query = \

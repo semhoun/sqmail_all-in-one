@@ -22,6 +22,13 @@ function fixDovecotConf {
 	sed -i "s/auth_default_realm =.*/auth_default_realm = ${DEFAULT_DOMAIN}/" /etc/dovecot/conf.d/10-auth.conf
 }
 
+function fixHosts {
+	SMTP_SERVER=$(cat /var/qmail/control/me)
+	if [ -z $(grep "$SMTP_SERVER" "/etc/hosts") ]; then
+		echo "$SMTP_SERVER" >> /etc/hosts
+	fi
+}
+
 if [ -n "${SKIP_INIT_ENV}" ]; then
   exec $@
   exit
@@ -66,6 +73,7 @@ cp /var/qmail/control/spamassassin_sql.cf /etc/mail/spamassassin/sql.cf
 cp /var/qmail/control/me /etc/mailname
 
 fixDovecotConf
+fixHosts
 writeRoundCubeConf
 
 delayedProcess &
