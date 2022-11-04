@@ -77,7 +77,7 @@ RUN apt-get -y install bsd-mailx \
     libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
     mariadb-client \
     socat inetutils-ping \
-    swaks \
+    swaks expect telnet \
     lighttpd php7.4-fpm \
 # For roundcube
   && apt-get install -y php7.4-zip php7.4-pspell php7.4-mysql php7.4-gd php7.4-imap php7.4-xml php7.4-mbstring php7.4-intl php-imagick aspell-fr php7.4-intl php7.4-curl \
@@ -411,17 +411,6 @@ RUN wget http://www.memoryhole.net/qmail/dkimsign.pl \
   && install -T /opt/src/qmail-remote.sh /var/qmail/bin/qmail-remote \
 # cleaning
   && rm -rf /opt/src/* /opt/patches
-
-########################
-# Qmail Remove https://www.fehcom.de/sqmail/man/qmail-qmaint.html
-########################
-RUN wget http://www.linuxmagic.com/opensource/qmail/qmail-remove/qmail-remove-0.95.tar.gz \
-  && tar xzf qmail-remove-0.95.tar.gz \
-  && cd qmail-remove-0.95 \
-  && make \
-  && make install \
-# cleaning
-  && rm -rf /opt/src/*
   
 ########################
 # mess822

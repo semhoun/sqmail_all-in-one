@@ -146,6 +146,8 @@ docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init-certs.sh
 * `/opt/bin/domainkey.sh` - DKIM key creation
   * usage `domainkey.sh [-p] domain [selector]`
   * Print domainkey with -p, without create domain
+* `/opt/bin/tester.sh` - Check is IMAP POP SMTP Clamav and SpamAssasin was working
+  * usage `tester.sh <test mail recipient> -doit`
 
 ## Built With
 
