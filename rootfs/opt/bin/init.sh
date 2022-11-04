@@ -49,6 +49,8 @@ SPFBEHAVIOR=$(whiptail --title "Menu example" --menu "QMail/SMTP configuration" 
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 RELAY_IPS=$(whiptail --inputbox "IP or network to relay (separated by coma)" 8 39 "127.0.0.1,::1,192.168.1." --title "QMail/SMTP configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
+RELAY_IPS=$(whiptail --inputbox "RBL-listed server" 8 39 "sbl-xbl.spamhaus.org" --title "QMail/SMTP configuration" 3>&1 1>&2 2>&3)
+if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 
 cat >> "${RESUME}" << EOF
 QMail/SMTP configuration will be:
@@ -57,6 +59,7 @@ QMail/SMTP configuration will be:
   - database : ${DATABYTES}
   - queue life time : ${QUEUELIFETIME}
   - spf behavior : ${SPFBEHAVIOR}
+	- rslb server: ! ${RLSBSERVER}
   - relay allowed : ${RELAY_IPS}
   
 EOF
@@ -133,6 +136,7 @@ echo -n "${CONCURRENCY_INCOMING}" > /var/qmail/control/concurrencyincoming
 echo "${CONCURRENCY_REMOTE}" > /var/qmail/control/concurrencyremote
 echo "${DATABYTES}" > /var/qmail/control/databytes
 echo "${SPFBEHAVIOR}" > /var/qmail/control/spfbehavior
+echo "${RLSBSERVER}" > /var/qmail/control/rslbserver
 echo "${QUEUELIFETIME}" > /var/qmail/control/queuelifetime
 
 # VPopmail configuration

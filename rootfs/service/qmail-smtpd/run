@@ -3,6 +3,7 @@ QMAILDUID=`id -u vpopmail`
 QMAILDGID=`id -g vpopmail`
 HOSTNAME=`cat /var/qmail/control/me`
 CONCURRENCY=`cat /var/qmail/control/concurrencyincoming`
+RLSBSERVER=`cat /var/qmail/control/rslbserver`
 export SMTPAUTH=""
 export UCSPITLS=""
 . /var/qmail/ssl_env
@@ -12,5 +13,5 @@ exec env PATH="/var/qmail/bin:$PATH" \
     -seVn -Rp -l $HOSTNAME -c $CONCURRENCY \
     -Xx /var/qmail/control/rules.smtpd.cdb \
     -u $QMAILDUID -g $QMAILDGID :0 smtp \
-    /usr/local/bin/rblsmtpd -W -C -r sbl-xbl.spamhaus.org \
+    /usr/local/bin/rblsmtpd -W -C -r $RLSBSERVER \
     /var/qmail/bin/qmail-smtpd /var/vpopmail/bin/vchkpw /bin/true 2>&1
