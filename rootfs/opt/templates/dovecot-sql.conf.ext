@@ -2,22 +2,35 @@ driver = mysql
 connect = host=${MYSQL_HOST} dbname=${MYSQL_DB} user=${MYSQL_USER} password=${MYSQL_PASS}
 default_pass_scheme = SHA512-CRYPT
 
-#  USER LIMITS via vpopmail.pw_gid filed was currently removed
 password_query = \
 	SELECT \
 		CONCAT(vpopmail.pw_name, '@', vpopmail.pw_domain) AS user, \
-  		vpopmail.pw_passwd AS password, \
-                vpopmail.pw_dir AS userdb_home, \
-                89 AS userdb_uid, \
-                89 AS userdb_gid, \
-                CONCAT('*:bytes=', REPLACE(SUBSTRING_INDEX(vpopmail.pw_shell, 'S', 1), 'NOQUOTA', '0')) AS userdb_quota_rule \
+		vpopmail.pw_passwd AS password, \
+		vpopmail.pw_dir AS userdb_home, \
+		89 AS userdb_uid, \
+		89 AS userdb_gid, \
+		CONCAT('*:bytes=', REPLACE(SUBSTRING_INDEX(vpopmail.pw_shell, 'S', 1), 'NOQUOTA', '0')) AS userdb_quota_rule \
 	FROM vpopmail \
 		LEFT JOIN aliasdomains ON aliasdomains.alias='%d' \
 		LEFT JOIN limits ON limits.domain = '%d' \
 	WHERE \
 		vpopmail.pw_name='%n' \
 		AND \
-		(vpopmail.pw_domain='%d' OR vpopmail.pw_domain=aliasdomains.domain)
+		(vpopmail.pw_domain='%d' OR vpopmail.pw_domain=aliasdomains.domain) \
+		AND \
+		('%a'!='110' OR !(vpopmail.pw_gid & 2)) \
+		AND \
+		('%a'!='995' OR !(vpopmail.pw_gid & 2)) \
+		AND \
+		('%r'!='127.0.0.1' OR !(vpopmail.pw_gid & 4)) \
+		AND \
+		('%r'='127.0.0.1' OR '%a'!='993' OR !(vpopmail.pw_gid & 8)) \
+		AND \
+		('%r'='127.0.0.1' OR '%a'!='143' OR !(vpopmail.pw_gid & 8)) \
+		AND \
+		('%r'!='127.0.0.1' OR limits.disable_webmail IS NULL OR limits.disable_webmail!=1) \
+		AND \
+		('%r'='127.0.0.1' OR limits.disable_imap IS NULL OR limits.disable_imap!=1)
 
 user_query = \
 	SELECT \

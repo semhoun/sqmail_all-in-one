@@ -135,9 +135,9 @@ password_query = \
 		AND \
 		('%r'='<WEBMAIL-IP>' OR '%a'!='993' OR !(vpopmail.pw_gid & 8)) \
 		AND \
-		('%r'!='<WEBMAIL-IP>' OR COALESCE(disable_webmail,0)!=1) \
+		('%r'!='<WEBMAIL-IP>' OR limits.disable_webmail!=1) \
 		AND \
-		('%r'='<WEBMAIL-IP>' OR COALESCE(disable_imap,0)!=1)
+		('%r'='<WEBMAIL-IP>' OR limits.disable_imap,0)!=1)
 
 # <WEBMAIL-IP> is the IP of your webmail web server.
 # I'm assuming that the imap connection is only on port 993 and the pop3 connection is on port 995.
