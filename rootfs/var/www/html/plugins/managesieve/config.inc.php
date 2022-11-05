@@ -37,7 +37,7 @@ $config['managesieve_auth_pw'] = null;
 $config['managesieve_conn_options'] = null;
 
 // A file with default script content (e.g. spam filter)
-$config['managesieve_default'] = '';
+$config['managesieve_default'] = 'default';
 
 // The name of the script which will be used when there's no user script
 $config['managesieve_script_name'] = 'roundcube';

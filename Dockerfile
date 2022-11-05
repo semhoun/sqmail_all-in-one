@@ -295,7 +295,7 @@ RUN wget -O qmailadmin-${QMAILADMIN_TAG}.tar.gz https://github.com/semhoun/qmail
     --enable-modify-quota \
     --enable-domain-autofill \
     --enable-modify-spam \
-    --enable-spam-command='|/var/qmail/bin/preline -f /usr/libexec/dovecot/deliver -d $EXT@$USER' \
+    --enable-spam-command='|/var/vpopmail/bin/vdelivermail '' delete' \
     --enable-help \
     --enable-vpopuser=vpopmail \
     --enable-vpopgroup=vchkpw \
@@ -510,7 +510,7 @@ RUN chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
   && chown -R www-data.www-data /var/www/html /var/www/admin/html \
   && chown -R qmailq /service/qmail-send \
   && chown -R vpopmail.vchkpw /etc/dovecot/sieve \
-  && cd /etc/dovecot/sieve/before.d && /usr/bin/sievec . \
+  && cd /etc/dovecot/sieve/ && /usr/bin/sievec . \
 # Templates
   && cp -a /var/qmail/queue /opt/templates/ \
   && mv /var/qmail/control/ /opt/templates/ \

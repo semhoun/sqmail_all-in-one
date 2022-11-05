@@ -84,7 +84,6 @@ $config['sauserprefs_default_prefs'] = [
                                     'ok_locales' => 'en fr',
                                     'fold_headers' => 1,
                                     'add_header all Level' => '_STARS(*)_',
-                                    'use_razor1' => 0,
                                     'use_razor2' => 1,
                                     'use_pyzor' => 1,
                                     'use_dcc' => 1,

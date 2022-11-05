@@ -111,7 +111,7 @@ export MYSQL_HOST=${MYSQL_HOST}
 # Default config
 echo "MAILER-DAEMON" > /var/qmail/control/bouncefrom
 echo postmaster > /var/qmail/control/doublebounceto
-echo "|/var/vpopmail/bin/vdelivermail '' delete" > /var/qmail/control/defaultdelivery
+echo '|/var/qmail/bin/preline -f /usr/libexec/dovecot/deliver -d $EXT@$USER' > /var/qmail/control/defaultdelivery
 
 # SSL base Config
 openssl dhparam -out /ssl/qmail-dhparam 2048
@@ -130,7 +130,7 @@ cat > /var/qmail/control/spamassassin_sql.cf << EOF
 user_scores_dsn DBI:mysql:${MYSQL_DB}:${MYSQL_HOST}
 user_scores_sql_username ${MYSQL_USER}
 user_scores_sql_password ${MYSQL_PASS}
-user_scores_sql_custom_query     SELECT preference, value FROM spam_prefs WHERE username = _USERNAME_ OR username = '\$GLOBAL' OR username = CONCAT('%',_DOMAIN_) ORDER BY username ASC
+user_scores_sql_custom_query SELECT preference, value FROM spam_prefs WHERE username = _USERNAME_ OR username = '\$GLOBAL' OR username = CONCAT('%',_DOMAIN_) ORDER BY username ASC
 EOF
 echo -n "${CONCURRENCY_INCOMING}" > /var/qmail/control/concurrencyincoming
 echo "${CONCURRENCY_REMOTE}" > /var/qmail/control/concurrencyremote
