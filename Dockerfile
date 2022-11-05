@@ -28,7 +28,7 @@ WORKDIR "/opt/src"
 ########################
 RUN mkdir -p /opt/src /opt/templates \
   && apt-get update \
-  && apt-get -y install build-essential equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg \
+  && apt-get -y install build-essential libtool-bin equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg \
 ## Add docker group for logs
   && groupadd -g 998 docker \
 ## Add MTA Local (equivs is needed)
@@ -255,14 +255,20 @@ RUN wget https://pigeonhole.dovecot.org/releases/2.3/dovecot-2.3-pigeonhole-${DO
   && rm -rf /opt/src/*
 
 ########################
-# Autorespond
+# qmail-autoresponder
 ########################
-RUN wget http://qmail.ixip.net/download/autorespond-2.0.5.tar.gz \
-  && tar xzf autorespond-2.0.5.tar.gz \
-  && cd autorespond-2.0.5 \
+RUN wget http://untroubled.org/bglibs/bglibs-2.04.tar.gz \
+	&& tar xzf bglibs-2.04.tar.gz \
+  && cd bglibs-2.04 \
   && make \
-  && cp autorespond /usr/local/bin \
-  && chown root.root /usr/local/bin/autorespond \
+	&& make install \
+	&& ldconfig \
+	&& cd /opt/src \
+	&& wget https://untroubled.org/qmail-autoresponder/qmail-autoresponder-2.0.tar.gz \
+	&& tar xzf qmail-autoresponder-2.0.tar.gz \
+  && cd qmail-autoresponder-2.0 \
+  && make \
+  && make install \
 # cleaning
   && rm -rf /opt/src/*
 
@@ -295,11 +301,12 @@ RUN wget -O qmailadmin-${QMAILADMIN_TAG}.tar.gz https://github.com/semhoun/qmail
     --enable-modify-quota \
     --enable-domain-autofill \
     --enable-modify-spam \
-    --enable-spam-command='|/var/vpopmail/bin/vdelivermail '' delete' \
+    --enable-spam-command='| /var/qmail/bin/preline -f /usr/libexec/dovecot/deliver -d $EXT@$USER' \
     --enable-help \
     --enable-vpopuser=vpopmail \
     --enable-vpopgroup=vchkpw \
     --enable-domain-autofill \
+		--enable-autoresponder-path=/usr/local/bin \
   && make \
   && make install \
 # cleaning

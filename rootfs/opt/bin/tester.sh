@@ -22,6 +22,15 @@ restoreConfig() {
   fi
 }
 
+updateRules() {
+	cp /var/qmail/control/rules.smtpd /var/qmail/control/rules.smtpd.testerback
+	cat > /var/qmail/control/rules.smtpd  << 'EOF'
+:allow,QHPSI='clamdscan',QHPSIARG1='--verbose',MFDNSCHECK='',BADMIMETYPE='',BADLOADERTYPE='M',HELOCHECK='.',TARPITCOUNT='5',TARPITDELAY='20',QMAILQUEUE='bin/qmail-queuescan'
+EOF
+	/opt/bin/qmailctl cdb > /dev/null
+	/opt/bin/qmailctl restart > /dev/null
+}
+
 die () {
   restoreConfig
   echo $*
@@ -351,12 +360,7 @@ INBOX_MAILS="${INBOX_MAILS} ${TEST_ID}"
 let TEST_ID++
 
 
-cp /var/qmail/control/rules.smtpd /var/qmail/control/rules.smtpd.testerback
-cat > /var/qmail/control/rules.smtpd  << 'EOF'
-:allow,QHPSI='clamdscan',QHPSIARG1='--verbose',MFDNSCHECK='',BADMIMETYPE='',BADLOADERTYPE='M',HELOCHECK='.',TARPITCOUNT='5',TARPITDELAY='20',QMAILQUEUE='bin/qmail-queuescan'
-EOF
-/opt/bin/qmailctl cdb > /dev/null
-/opt/bin/qmailctl restart > /dev/null
+updateRules
 
 
 echo ""

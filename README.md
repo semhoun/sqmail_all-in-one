@@ -157,21 +157,33 @@ docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init-certs.sh
 * ezmlm-idx 7.2.2
 * fehQlibs 19
 * fcron 3.3.1
-* qmailadmin 1.2.16
+* [qmailadmin](https://github.com/semhoun/qmailadmin)
+* qmail-autoresponder 2.0
 * Roundcube 1.6.0
 * SpamAssassin 3.4.6
 * s6 2.11.1.2
 * SQMail 4.1.17
-* VPopMail 5.5.0
-* vqadmin 2.3.74
+* [VPopMail](https://github.com/semhoun/vpopmail)
+* [vqadmin](https://github.com/semhoun/vqadmin)
 * acme.sh 3.0.4
 
 ## Testing
-### SMTP
+### Manual SMTP
 You can test the SMTP part with [Swaks](https://github.com/jetmore/swaks) 
 A simpe test mail could be done with this:
 ```shell
 swaks --to <to mail> --from <from email> --server <qmail aio host name>
+```
+### Auto
+You can check IMAP POP SMTP Clamav and SpamAssasin configuration inside the docker with tester.sh script. A valid mail account must used (a temporay is also created for testing).
+Docker must be running during the tests.
+#### Docker
+```shell
+docker exec -it sqmail-aio /opt/bin/tester.sh <receipient email> -doit
+```
+#### Docker compose
+```shell
+docker compose exec sqmail-aio /opt/bin/tester.sh <receipient email> -doit
 ```
 
 ## Find Me
@@ -197,3 +209,4 @@ This docker use sources and patches from
 - https://github.com/brunonymous/vpopmail
 - http://skarnet.org/software/s6/index.html
 - http://fcron.free.fr
+- http://untroubled.org/qmail-autoresponder/
