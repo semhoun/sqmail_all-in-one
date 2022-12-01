@@ -167,12 +167,11 @@ chown root.root /var/qmail/control/dovecot-sql.conf.ext
 chmod 600 /var/qmail/control/dovecot-sql.conf.ext
 
 # Creation directory and setting permissions
-chown -R qmailq.sqmail /var/qmail/queue
 chown -R qmaild.sqmail /var/qmail/control
 chmod 644 /var/qmail/control/*
-mkdir -p /var/qmail/control/domainkeys
-chmod 755 /var/qmail/control/domainkeys
-chown qmailr.sqmail /var/qmail/control/domainkeys
+mkdir -p /var/qmail/ssl/domainkeys
+chmod 755 /var/qmail/ssl/domainkeys
+chown qmailq.sqmail /var/qmail/ssl/domainkeys
 mkdir -p /var/spamassassin/auto-whitelist
 mkdir -p /var/spamassassin/bayes
 mkdir -p /var/spamassassin/razor

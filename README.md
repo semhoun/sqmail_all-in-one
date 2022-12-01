@@ -27,14 +27,15 @@ docker run \
   --publish 995:995 \
   --publish 143:143 \
   --publish 993:993 \
-  --volume ./mail_data/qcontrol:/var/qmail/control \
-  --volume ./mail_data/ssl:/ssl \
-  --volume ./mail_data/domains:/var/vpopmail/domains \
-  --volume ./mail_data/vpopmail_etc:/var/vpopmail/etc \
-  --volume ./mail_data/log:/log \
-  --volume ./mail_data/spamassassin:/var/spamassassin \
-  --volume ./mail_data/tmp:/var/qmail/tmp \
-  --volume ./mail_data/qusers:/var/qmail/users \
+  --volume /opt/mail_data/qcontrol:/var/qmail/control \
+  --volume /opt/mail_data/ssl:/ssl \
+  --volume /opt/mail_data/domains:/var/vpopmail/domains \
+  --volume /opt/mail_data/vpopmail_etc:/var/vpopmail/etc \
+  --volume /opt/mail_data/log:/log \
+  --volume /opt/mail_data/spamassassin:/var/spamassassin \
+  --volume /opt/mail_data/tmp:/var/qmail/tmp \
+  --volume /opt/mail_data/qusers:/var/qmail/users \
+  --volume /opt/mail_data/domainkeys:/var/qmail/ssl/domainkeys
   semhoun/sqmail_all-in-one
 ```
 #### Docker Compose
@@ -55,6 +56,7 @@ services:
       - ./data/qusers:/var/qmail/users
       - ./data/queue:/var/qmail/queue
       - ./data/qalias:/var/qmail/alias
+      - ./data/domainkeys:/var/qmail/ssl/domainkeys
     ports:
       - 80:80
       - 88:88
@@ -74,14 +76,15 @@ services:
 docker run \
   --rm -it \
   --env SKIP_INIT_ENV=1 \
-  --volume ./mail_data/qcontrol:/var/qmail/control \
-  --volume ./mail_data/ssl:/ssl \
-  --volume ./mail_data/domains:/var/vpopmail/domains \
-  --volume ./mail_data/vpopmail_etc:/var/vpopmail/etc \
-  --volume ./mail_data/log:/log \
-  --volume ./mail_data/spamassassin:/var/spamassassin \
-  --volume ./mail_data/tmp:/var/qmail/tmp \
-  --volume ./mail_data/qusers:/var/qmail/users \
+  --volume /opt/mail_data/qcontrol:/var/qmail/control \
+  --volume /opt/mail_data/ssl:/ssl \
+  --volume /opt/mail_data/domains:/var/vpopmail/domains \
+  --volume /opt/mail_data/vpopmail_etc:/var/vpopmail/etc \
+  --volume /opt/mail_data/log:/log \
+  --volume /opt/mail_data/spamassassin:/var/spamassassin \
+  --volume /opt/mail_data/tmp:/var/qmail/tmp \
+  --volume /opt/mail_data/qusers:/var/qmail/users \
+  --volume /opt/mail_data/domainkeys:/var/qmail/ssl/domainkeys
   semhoun/sqmail_all-in-one /opt/bin/init.sh
   
 docker run \
@@ -115,6 +118,7 @@ docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init-certs.sh
 * `/var/qmail/users` - QMail user file
 * `/var/qmail/queue` - QMail queue
 * `/var/qmail/alias` - QMail alias (for local users) 
+* `/var/qmail/ssl/domainkeys` - Domain DKIM private and public keys
 
 ## Ports
 
@@ -143,9 +147,9 @@ docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init-certs.sh
 
 * `/opt/bin/init.sh` - Initialisation script
 * `/opt/bin/init-certs.sh` - Certs initialisation script
-* `/opt/bin/domainkey.sh` - DKIM key creation
-  * usage `domainkey.sh [-p] domain [selector]`
-  * Print domainkey with -p, without create domain
+* `/opt/bin/mkdkimkey.sh` - DKIM key creation
+  * usage `/opt/bin/mkdkimkey.sh [-p] <domain>`
+  * Print domainkey with -p, without create domain keys
 * `/opt/bin/tester.sh` - Check is IMAP POP SMTP Clamav and SpamAssasin was working
   * usage `tester.sh <test mail recipient> -doit`
 

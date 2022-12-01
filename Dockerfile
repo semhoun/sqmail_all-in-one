@@ -72,7 +72,7 @@ RUN curl -o /usr/share/ca-certificates/ZeroSSL_RSA_Domain_Secure_Site_CA.crt htt
 # Additionnals packages
 ########################
 RUN apt-get -y install bsd-mailx \
-    libperl-dev libmariadb-dev libmariadb-dev-compat csh bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libmail-dkim-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
+    libperl-dev libmariadb-dev libmariadb-dev-compat csh bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
     check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
     libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
     mariadb-client \
@@ -401,25 +401,6 @@ RUN wget https://dlcdn.apache.org//spamassassin/source/Mail-SpamAssassin-${SPAMA
   && rm -rf /opt/src/*
 
 ########################
-# DKIM
-########################
-COPY patches/ /opt/patches/
-RUN wget http://www.memoryhole.net/qmail/dkimsign.pl \
-  && wget http://www.memoryhole.net/qmail/qmail-remote.sh \
-  && wget https://downloads.sourceforge.net/project/domainkeys/libdomainkeys/0.69/libdomainkeys-0.69.tar.gz \
-  && tar xzf libdomainkeys-0.69.tar.gz \
-  && cd libdomainkeys-0.69 \
-  && patch -p1 < /opt/patches/dkim/libdomainkeys-openssl-1.1.patch \
-  && patch < /opt/patches/dkim/libdomainkeys-0.69.diff \
-  && make \
-  && cp dktest /usr/local/bin/ \
-  && install /opt/src/dkimsign.pl /usr/local/bin/ \
-  && mv /var/qmail/bin/qmail-remote /var/qmail/bin/qmail-remote.orig \
-  && install -T /opt/src/qmail-remote.sh /var/qmail/bin/qmail-remote \
-# cleaning
-  && rm -rf /opt/src/* /opt/patches
-  
-########################
 # mess822
 ########################
 RUN wget http://cr.yp.to/software/mess822-0.58.tar.gz \
@@ -524,9 +505,10 @@ RUN chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
 # Volumes 
   && mkdir -p \
     /var/vpopmail/domains/ \
-    /ssl \
+    /ssl/ \
     /var/vpopmail/etc \
     /var/qmail/control \
+    /var/qmail/ssl/domainkeys \
     /log \
     /var/spamassassin \
     /var/qmail/tmp \
@@ -547,7 +529,8 @@ VOLUME [ \
   "/log",\
   "/var/spamassassin",\
   "/var/qmail/tmp", \
-  "/var/qmail/users" \
+  "/var/qmail/users", \
+  "/var/qmail/ssl/domainkeys" \
 ]
 
 ###########################
