@@ -167,6 +167,7 @@ chown root.root /var/qmail/control/dovecot-sql.conf.ext
 chmod 600 /var/qmail/control/dovecot-sql.conf.ext
 
 # Creation directory and setting permissions
+chown qmailq.sqmail /var/qmail/queue
 chown -R qmaild.sqmail /var/qmail/control
 chmod 644 /var/qmail/control/*
 mkdir -p /var/qmail/ssl/domainkeys
