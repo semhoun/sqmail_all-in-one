@@ -49,7 +49,7 @@ SPFBEHAVIOR=$(whiptail --title "Menu example" --menu "QMail/SMTP configuration" 
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 RELAY_IPS=$(whiptail --inputbox "IP or network to relay (separated by coma)" 8 39 "127.0.0.1,::1,192.168.1." --title "QMail/SMTP configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
-RELAY_IPS=$(whiptail --inputbox "RBL-listed server" 8 39 "sbl-xbl.spamhaus.org" --title "QMail/SMTP configuration" 3>&1 1>&2 2>&3)
+RLSBSERVER=$(whiptail --inputbox "RBL-listed server" 8 39 "sbl-xbl.spamhaus.org" --title "QMail/SMTP configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 
 cat >> "${RESUME}" << EOF
@@ -59,7 +59,7 @@ QMail/SMTP configuration will be:
   - database : ${DATABYTES}
   - queue life time : ${QUEUELIFETIME}
   - spf behavior : ${SPFBEHAVIOR}
-	- rslb server: ! ${RLSBSERVER}
+  - rslb server : ${RLSBSERVER}
   - relay allowed : ${RELAY_IPS}
   
 EOF
@@ -115,7 +115,7 @@ echo '| /var/vpopmail/bin/vdelivermail '' delete' > /var/qmail/control/defaultde
 
 # SSL base Config
 openssl dhparam -out /ssl/qmail-dhparam 2048
-openssl dhparam -out /ssl/dovecot-dhparam 2048	
+openssl dhparam -out /ssl/dovecot-dhparam 2048  
 
 # Creation configuration
 cat > /var/qmail/control/mysql.conf << EOF
@@ -161,8 +161,8 @@ chmod 644 .qmail*
  
 # Dovecot
 cat /opt/templates/dovecot-sql.conf.ext | envsubst \
-		'$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB' \
-		> /var/qmail/control/dovecot-sql.conf.ext
+    '$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB' \
+    > /var/qmail/control/dovecot-sql.conf.ext
 chown root.root /var/qmail/control/dovecot-sql.conf.ext
 chmod 600 /var/qmail/control/dovecot-sql.conf.ext
 
@@ -195,8 +195,8 @@ EOF
 > /var/qmail/control/rules.smtpsd
 IPS=$(echo $RELAY_IPS | tr "," "\n")
 for ip in ${IPS}; do
-	echo "${ip}:allow,RELAYCLIENT=''" >> /var/qmail/control/rules.smtpd
-	echo "${ip}:allow,RELAYCLIENT=''" >> /var/qmail/control/rules.smtpsd
+  echo "${ip}:allow,RELAYCLIENT=''" >> /var/qmail/control/rules.smtpd
+  echo "${ip}:allow,RELAYCLIENT=''" >> /var/qmail/control/rules.smtpsd
 done
 echo ":allow,QHPSI='clamdscan',QHPSIARG1='--no-summary',MFDNSCHECK='',BADMIMETYPE='',BADLOADERTYPE='M',HELOCHECK='.',TARPITCOUNT='5',TARPITDELAY='20',QMAILQUEUE='bin/qmail-queuescan'" >> /var/qmail/control/rules.smtpd
 echo ":allow,QHPSI='clamdscan',QHPSIARG1='--no-summary',MFDNSCHECK='',BADMIMETYPE='',BADLOADERTYPE='M',HELOCHECK='.',TARPITCOUNT='5',TARPITDELAY='20',QMAILQUEUE='bin/qmail-queuescan'" >> /var/qmail/control/rules.smtpsd

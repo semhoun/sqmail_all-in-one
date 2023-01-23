@@ -1,8 +1,8 @@
 #********************************************************************************
 # Create/Handle domainkeys for openqmail/eQmail/(net)qmail and derivatives      #
 #                                                                               #
-#  Author: Kai Peter (parts taken from Joerg Backschues), ©2014                 #
-# Version: 0.32 -> 0.41
+# Author: Kai Peter (parts taken from Joerg Backschues), ©2014                 #
+# Version: 0.32 -> 0.42
 # Licence: This program is  Copyright(C) ©2015 Kai Peter.  It can be copied and #
 #          modified according to the GNU GENERAL PUBLIC LICENSE (GPL) Version 2 #
 #          or a later version. This software comes without any warranty.        #
@@ -144,7 +144,6 @@ else
              -out ed25519.public_${SELECTOR} -pubout 
   ln -sf ed25519.private_${SELECTOR} default
 fi
-echo ${SELECTOR} > selector
 
 # Set permissions
 
