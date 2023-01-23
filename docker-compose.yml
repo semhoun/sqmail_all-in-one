@@ -21,7 +21,6 @@ services:
         - ACMESH_TAG=${ACMESH_TAG}
         - QMAILADMIN_TAG=${QMAILADMIN_TAG}
         - VQADMIN_TAG=${VQADMIN_TAG}
-    network_mode: bridge
     extra_hosts:
       - mariadb:host-gateway
     environment:
@@ -62,3 +61,8 @@ services:
       - 995:995
       - 143:143
       - 993:993
+      
+networks:
+  default:
+    external: true
+    name: internal  
