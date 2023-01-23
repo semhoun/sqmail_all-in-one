@@ -5,7 +5,6 @@
 
 All-in-one S/QMail server with
   - s/qmail
-  - dkim
   - spam filter
   - imap/pop3
   - web admin
@@ -35,6 +34,8 @@ docker run \
   --volume /opt/mail_data/spamassassin:/var/spamassassin \
   --volume /opt/mail_data/tmp:/var/qmail/tmp \
   --volume /opt/mail_data/qusers:/var/qmail/users \
+  --volume /opt/mail_data/queue:/var/qmail/queue \
+  --volume /opt/mail_data/qalias:/var/qmail/alias \
   --volume /opt/mail_data/domainkeys:/var/qmail/ssl/domainkeys
   semhoun/sqmail_all-in-one
 ```
@@ -80,10 +81,10 @@ docker run \
   --volume /opt/mail_data/ssl:/ssl \
   --volume /opt/mail_data/domains:/var/vpopmail/domains \
   --volume /opt/mail_data/vpopmail_etc:/var/vpopmail/etc \
-  --volume /opt/mail_data/log:/log \
   --volume /opt/mail_data/spamassassin:/var/spamassassin \
-  --volume /opt/mail_data/tmp:/var/qmail/tmp \
   --volume /opt/mail_data/qusers:/var/qmail/users \
+  --volume /opt/mail_data/queue:/var/qmail/queue \
+  --volume /opt/mail_data/qalias:/var/qmail/alias \
   --volume /opt/mail_data/domainkeys:/var/qmail/ssl/domainkeys
   semhoun/sqmail_all-in-one /opt/bin/init.sh
   
