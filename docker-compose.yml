@@ -50,6 +50,7 @@ services:
       - ./data/queue:/var/qmail/queue
       - ./data/alias:/var/qmail/alias
       - ./data/domainkeys:/var/qmail/ssl/domainkeys
+      - /home/nathanael/dev:/opt/qmail/src
     ports:
       - 8090:80
       - 8091:443
