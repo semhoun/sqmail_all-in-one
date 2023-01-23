@@ -150,6 +150,7 @@ echo "${DEFAULT_DOMAIN}" > /var/qmail/control/defaultdomain
 echo "${DEFAULT_DOMAIN}" > /var/qmail/control/plusdomain
 echo "${SMTP_SERVER}" >> /var/qmail/control/rcpthosts
 echo "*:" >> /var/qmail/control/tlsdestinations
+echo "=:" >> /var/qmail/control/dkimdomains
 
 # Alias
 cd /var/qmail/alias
