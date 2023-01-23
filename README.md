@@ -144,20 +144,24 @@ docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init-certs.sh
   * `/ssl/pop.crt` - POP3 Certificate
   * `/ssl/smtp.key` - SMTP Key
   * `/ssl/smtp.crt` - SMTP Certificate
-
 * `/opt/bin/init.sh` - Initialisation script
 * `/opt/bin/init-certs.sh` - Certs initialisation script
 * `/opt/bin/mkdkimkey.sh` - DKIM key creation
   * usage `/opt/bin/mkdkimkey.sh [-p] <domain>`
   * Print domainkey with -p, without create domain keys
+  * You can split the result here: https://www.mailhardener.com/tools/dns-record-splitter
+*  `/var/qmail/control/dkimdomains` - DKIM domains
+  * Sending domains other than the default domain and with they own key must be added in this file
+  * For more information see https://www.fehcom.de/sqmail/man/qmail-dksign.html
+
 * `/opt/bin/tester.sh` - Check is IMAP POP SMTP Clamav and SpamAssasin was working
   * usage `tester.sh <test mail recipient> -doit`
 
 ## Built With
 
-* Autorespond 2.0.5
-* clamav 0.105.0
-* dovecot 2.3.18
+* qmail-autoresponder 2.0
+* clamav 1.0.0
+* dovecot 2.3.20
 * ezmlm-idx 7.2.2
 * fehQlibs 19
 * fcron 3.3.1
@@ -165,11 +169,11 @@ docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init-certs.sh
 * qmail-autoresponder 2.0
 * Roundcube 1.6.0
 * SpamAssassin 3.4.6
-* s6 2.11.1.2
-* SQMail 4.1.17
+* s6 2.11.2.0
+* SQMail 4.2.19
 * [VPopMail](https://github.com/semhoun/vpopmail)
 * [vqadmin](https://github.com/semhoun/vqadmin)
-* acme.sh 3.0.4
+* acme.sh 3.0.5
 
 ## Testing
 ### Manual SMTP
