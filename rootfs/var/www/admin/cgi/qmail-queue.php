@@ -34,7 +34,10 @@ function getMessages() {
                 'id' => $msgId,
                 'split' => $split,
                 'from' => getAddressFromFile(QUEUE_DIR . 'info' . '/' . $split . '/' .$msgId),
-                'direction' => NULL
+                'direction' => NULL,
+				'date' => NULL,
+                'subject' => NULL,
+                'size' => NULL
             ];
         }
     }
@@ -77,20 +80,18 @@ function getMessages() {
         while (false !== ($msgId = readdir($shandle))) {
             if ($msgId == "." || $msgId == "..") continue;
             $fh = fopen(QUEUE_DIR . 'mess' . '/' . $split . '/' .$msgId, 'rb');
-            $fContents = fread($fh,1024);
+            $fContents = fread($fh, 2048);
             fclose($fh);
             $messages[$msgId]['size'] = filesize(QUEUE_DIR . 'mess' . '/' . $split . '/' .$msgId);
-            if (preg_match_all('/Subject: (.*)/i', $fContents, $subject)) {
-                $messages[$msgId]['subject'] = $subject[1][0];
+            if (preg_match('/^Subject: (.*)/im', $fContents, $subject)) {
+                $messages[$msgId]['subject'] = $subject[0][1];
             }
-            else {
-                $messages[$msgId]['subject'] = "";
-            }
-            if (preg_match_all('/Date: (.*)/i', $fContents, $date)) {
-                $messages[$msgId]['date'] = new DateTime($date[1][0]);
-            }
-            else {
-                $messages[$msgId]['date'] = "";
+            if (preg_match('/^Date: (.*)/im', $fContents, $date)) {
+				try {
+					$messages[$msgId]['date'] = new DateTime($date[0][1]);
+				}
+				catch (Exception $e) {
+				}
             }
         }
     }
