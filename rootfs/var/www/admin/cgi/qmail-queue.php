@@ -84,11 +84,11 @@ function getMessages() {
             fclose($fh);
             $messages[$msgId]['size'] = filesize(QUEUE_DIR . 'mess' . '/' . $split . '/' .$msgId);
             if (preg_match('/^Subject: (.*)/im', $fContents, $subject)) {
-                $messages[$msgId]['subject'] = $subject[0][1];
+                $messages[$msgId]['subject'] = $subject[1];
             }
             if (preg_match('/^Date: (.*)/im', $fContents, $date)) {
 				try {
-					$messages[$msgId]['date'] = new DateTime($date[0][1]);
+					$messages[$msgId]['date'] = new DateTime($date[1]);
 				}
 				catch (Exception $e) {
 				}
@@ -198,22 +198,28 @@ if (!empty($GET['action']) && $GET['action'] == 'doqueue') doQueue();
         </tr>
     </thead>
     <tbody>
-<?php
-    foreach ($messages as $msg) {
-        echo '
+        <?php
+        foreach ($messages as $msg) {
+            $size = $msg['size'] . 'b';
+            if ($msg['size'] > 1024 && $msg['size'] < 1048576) {
+                $size = round($msg['size'] / 1024, 2) . 'Kb';
+            }
+            else if ($msg['size'] > 1048576) {
+                $size = round($msg['size'] / 1048576, 2) . 'Mb';
+            }
+            echo '
         <tr>
             <td>'. $msg['id'] . '</td>
             <td>'. $msg['direction'] . '</td>
             <td>'. $msg['from'] . '</td>
             <td>'. $msg['to'] . '</td>
-            <td>'. $msg['date']->format('Y/m/d H:i:s') . '</td>
+            <td>'. (!empty($msg['date']) ? $msg['date']->format('Y/m/d H:i:s') : '') . '</td>
             <td>'. $msg['subject'] . '</td>
-            <td>'. $msg['size'] . ' bytes</td>
+            <td>'. $size . '</td>
             <td><a href="/cgi/qmail-queue.php?action=remove&id=' . $msg['ext_id'] . '" data-toggle="tooltip" title="Remove this mail"><i class="las la-trash"></i></a> <a href="/cgi/qmail-queue.php?action=view&id=' . $msg['ext_id'] . '" data-toggle="tooltip" title="View this mail"><i class="las la-eye"></i></a></td>
-        </tr>
-';
-    }
-?>
+        </tr>';
+        }
+        ?>
     </tbody>
     </table>
 
