@@ -164,14 +164,14 @@ docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init-certs.sh
 * clamav 1.0.0
 * dovecot 2.3.20
 * ezmlm-idx 7.2.2
-* fehQlibs 19
+* fehQlibs 22
 * fcron 3.3.1
 * [qmailadmin](https://github.com/semhoun/qmailadmin)
 * qmail-autoresponder 2.0
-* Roundcube 1.6.0
+* Roundcube 1.6.1
 * SpamAssassin 3.4.6
 * s6 2.11.2.0
-* SQMail 4.2.19
+* SQMail 4.2.20
 * [VPopMail](https://github.com/semhoun/vpopmail)
 * [vqadmin](https://github.com/semhoun/vqadmin)
 * acme.sh 3.0.5
