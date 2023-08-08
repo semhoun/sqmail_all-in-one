@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM=linux
@@ -74,14 +74,14 @@ RUN curl -o /usr/share/ca-certificates/ZeroSSL_RSA_Domain_Secure_Site_CA.crt htt
 RUN apt-get -y install bsd-mailx \
     libperl-dev libmariadb-dev libmariadb-dev-compat csh bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
     check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
-    libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev \
+    libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev libidn2-dev \
     mariadb-client \
     socat inetutils-ping \
     swaks expect telnet \
-    lighttpd php7.4-fpm \
+    lighttpd php8.2-fpm \
 # For roundcube
-  && apt-get install -y php7.4-zip php7.4-pspell php7.4-mysql php7.4-gd php7.4-imap php7.4-xml php7.4-mbstring php7.4-intl php-imagick aspell-fr php7.4-intl php7.4-curl \
-  && cpan -i IP::Country::DB_File Digest::SHA1 \
+  && apt-get install -y php8.2-zip php8.2-pspell php8.2-mysql php8.2-gd php8.2-imap php8.2-xml php8.2-mbstring php8.2-intl php-imagick aspell-fr php8.2-intl php8.2-curl \
+  && cpan -i IP::Country::DB_File MaxMind::DB::Reader Geo::IP IP::Country::Fast Digest::SHA1 Net::LibIDN2 Email::Address::XS \ 
   && rm -rf /root/.local
 
 ########################
@@ -169,7 +169,7 @@ RUN wget http://dist.schmorp.de/libev/libev-4.33.tar.gz \
   && mkdir -p /var/vpopmail \
   && groupadd -g 89 vchkpw \
   && useradd -g vchkpw -u 89 -s /usr/sbin/nologin -d /var/vpopmail vpopmail \
-  && chown -R vpopmail.vchkpw /var/vpopmail \
+  && chown -R vpopmail:vchkpw /var/vpopmail \
   && wget -O vpopmail-${VPOPMAIL_TAG}.tar.gz https://github.com/semhoun/vpopmail/archive/refs/tags/${VPOPMAIL_TAG}.tar.gz  \
   && mkdir vpopmail \
   && cd vpopmail \
@@ -457,7 +457,7 @@ RUN wget -O acmesh-${ACMESH_TAG}.tar.gz https://github.com/acmesh-official/acme.
 ###########################
 RUN mkdir -p /run/php \
 # Admin patches
-  && cp /usr/bin/php7.4 /usr/bin/qmailq-php \ 
+  && cp /usr/bin/php8.2 /usr/bin/qmailq-php \ 
   && chmod 4755 /usr/bin/qmailq-php
   
 ###########################
@@ -492,12 +492,12 @@ RUN cd /var/www/html \
 # ROOT FS && Co
 ###########################
 COPY rootfs /
-RUN chown qmailq.sqmail /var/qmail/bin/qmail-queuescan \
+RUN chown qmailq:sqmail /var/qmail/bin/qmail-queuescan \
   && chmod 1755 /var/qmail/bin/qmail-queuescan \
   && chmod 755 /opt/bin/* \
-  && chown -R www-data.www-data /var/www/html /var/www/admin/html \
+  && chown -R www-data:www-data /var/www/html /var/www/admin/html \
   && chown -R qmailq /service/qmail-send \
-  && chown -R vpopmail.vchkpw /etc/dovecot/sieve \
+  && chown -R vpopmail:vchkpw /etc/dovecot/sieve \
   && cd /etc/dovecot/sieve/ && /usr/bin/sievec . \
 # Templates
   && cp -a /var/qmail/queue /opt/templates/ \

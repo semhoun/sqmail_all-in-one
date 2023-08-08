@@ -12,7 +12,7 @@ fi
 LOG_PIPE="/var/run/lighttpd-log.pipe"
 if [ ! -p $LOG_PIPE ]; then
 	mkfifo -m0640 "$LOG_PIPE"
-	chown www-data.www-data "$LOG_PIPE"
+	chown www-data:www-data "$LOG_PIPE"
 fi
 
 exec 2>&1

@@ -157,30 +157,29 @@ cd /var/qmail/alias
 echo "postmaster@${DEFAULT_DOMAIN}" > .qmail-postmaster
 ln -s .qmail-postmaster .qmail-mailer-daemon
 ln -s .qmail-postmaster .qmail-root
-chown alias.sqmail .qmail*
+chown alias:sqmail .qmail*
 chmod 644 .qmail*
  
 # Dovecot
 cat /opt/templates/dovecot-sql.conf.ext | envsubst \
     '$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB' \
     > /var/qmail/control/dovecot-sql.conf.ext
-chown root.root /var/qmail/control/dovecot-sql.conf.ext
+chown root:root /var/qmail/control/dovecot-sql.conf.ext
 chmod 600 /var/qmail/control/dovecot-sql.conf.ext
 
 # Creation directory and setting permissions
-chown qmailq.sqmail /var/qmail/queue
-chown -R qmaild.sqmail /var/qmail/control
+chown qmailq:sqmail /var/qmail/queue
+chown -R qmaild:sqmail /var/qmail/control
 chmod 644 /var/qmail/control/*
 mkdir -p /var/qmail/ssl/domainkeys
 chmod 755 /var/qmail/ssl/domainkeys
-chown qmailq.sqmail /var/qmail/ssl/domainkeys
-mkdir -p /var/spamassassin/auto-whitelist
+chown qmailq:sqmail /var/qmail/ssl/domainkeys
 mkdir -p /var/spamassassin/bayes
 mkdir -p /var/spamassassin/razor
 echo "razorhome = /etc/mail/spamassassin/.razor/" > /var/spamassassin/razor/razor-agent.conf
-chown -R vpopmail.vchkpw /var/spamassassin
+chown -R vpopmail:vchkpw /var/spamassassin
 chown 644 /var/vpopmail/etc/*
-chown -R vpopmail.vchkpw /var/vpopmail/domains
+chown -R vpopmail:vchkpw /var/vpopmail/domains
 
 # Add domain in vpopmail
 /var/vpopmail/bin/vadddomain ${DEFAULT_DOMAIN} "${POSTMASTER_PWD}"

@@ -61,7 +61,7 @@ if [ ! -s "/var/lib/spamassassin/" ]; then
 fi
 
 # Fix qmail tmp permissions
-chown vpopmail.sqmail -R /var/qmail/tmp
+chown vpopmail:sqmail -R /var/qmail/tmp
 chmod 777 /var/qmail/tmp
 
 # Some fixes
