@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 RESUME=$(mktemp /tmp/sqmail.XXXXXX)
 > ${RESUME}
 

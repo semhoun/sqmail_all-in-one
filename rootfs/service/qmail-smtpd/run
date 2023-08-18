@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/sh
 QMAILDUID=`id -u vpopmail`
 QMAILDGID=`id -g vpopmail`
 HOSTNAME=`cat /var/qmail/control/me`

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/sh
 PATH=/var/qmail/bin:/bin:/usr/bin:/usr/local/bin:/usr/local/sbin
 export PATH
 

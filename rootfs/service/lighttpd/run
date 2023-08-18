@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/sh
 LOG_PIPE="/var/run/lighttpd-log.pipe"
 if [ ! -p $LOG_PIPE ]; then
 	mkfifo -m0640 "$LOG_PIPE"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 if [ "$2" != "-doit" ]; then
     cat<<EOF
 

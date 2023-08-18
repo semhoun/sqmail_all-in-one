@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/sh
 LOG_USER="qmaill"
 LOG_GROUP=`id -g ${LOG_USER}`
 LOG_NAME=`basename ${PWD%/log}`

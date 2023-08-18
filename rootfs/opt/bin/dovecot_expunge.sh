@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 #
 
 DOVEADM="/usr/local/dovecot/bin/doveadm";

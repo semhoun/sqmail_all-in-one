@@ -1,2 +1,2 @@
-#!/bin/sh
+#!/usr/bin/sh
 exec /usr/sbin/clamd 2>&1

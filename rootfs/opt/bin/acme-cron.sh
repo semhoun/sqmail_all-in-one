@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 if [ ! -s "/ssl/acme" ]; then
 	exit 0

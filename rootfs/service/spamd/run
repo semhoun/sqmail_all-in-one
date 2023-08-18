@@ -1,2 +1,2 @@
-#!/bin/sh
+#!/usr/bin/sh
 exec /usr/local/bin/spamd -x -q -v -m `cat /var/qmail/control/concurrencyincoming` -u vpopmail -q -s stderr 2>&1

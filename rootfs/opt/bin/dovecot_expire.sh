@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 #
 # Author: Costel Balta
 # Slightly modified by Roberto Puzzanghera
