@@ -112,7 +112,7 @@ echo "Domain's public key in '${DKDIR}/${DOMAIN}' used for TXT DNS record:"
 
 echo -n "${SELECTOR}._domainkey.${DOMAIN}. IN TXT "
 if [ -f rsa.public_${SELECTOR} ]; then
-  key=`grep -v -e '^-' ed25519.public_${SELECTOR} | tr -d '\n'`
+  key=`grep -v -e '^-' rsa.public_${SELECTOR} | tr -d '\n'`
   echo "\"v=DKIM1; k=rsa; t=s; p=${key}\""
 elif [ -f ed25519.public_${SELECTOR} ]; then
   key=`grep -v -e '^-' ed25519.public_${SELECTOR} | tr -d '\n'`
