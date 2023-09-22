@@ -17,4 +17,4 @@ fi
 
 exec 2>&1
 exec <> $LOG_PIPE
-exec s6-setuidgid ${LOG_USER} s6-log T s2000000 "${LOG_DIR}"
+exec s6-setuidgid ${LOG_USER} s6-log s2000000 "${LOG_DIR}"
