@@ -1,4 +1,5 @@
 FROM debian:bookworm-slim
+LABEL maintainer="nathanael@semhoun.net"
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM=linux
@@ -79,6 +80,7 @@ RUN apt-get -y install bsd-mailx \
     socat inetutils-ping \
     swaks expect telnet \
     lighttpd php8.2-fpm \
+	libev-dev automake1.11 automake \
 # For roundcube
   && apt-get install -y php8.2-zip php8.2-pspell php8.2-mysql php8.2-gd php8.2-imap php8.2-xml php8.2-mbstring php8.2-intl php-imagick aspell-fr php8.2-intl php8.2-curl \
   && cpan -i IP::Country::DB_File MaxMind::DB::Reader Geo::IP IP::Country::Fast Digest::SHA1 Net::LibIDN2 Email::Address::XS \ 
@@ -156,16 +158,7 @@ RUN mkdir -p /package \
 ########################
 # VPopMail
 ########################
-# Libev for vusaged
-RUN wget http://dist.schmorp.de/libev/libev-4.33.tar.gz \
-  && tar xzvf libev-4.33.tar.gz \
-  && cd libev-4.33 \
-  && ./configure \
-  && make \
-  && make install \
-  && ldconfig \
-# vpopmail
-  && cd /opt/src \
+RUN cd /opt/src \
   && mkdir -p /var/vpopmail \
   && groupadd -g 89 vchkpw \
   && useradd -g vchkpw -u 89 -s /usr/sbin/nologin -d /var/vpopmail vpopmail \
@@ -190,7 +183,7 @@ RUN wget http://dist.schmorp.de/libev/libev-4.33.tar.gz \
     --enable-sql-logging=e \
     --disable-passwd \
     --enable-qmail-ext \
-    --enable-sqmail-ext \
+    --enable-qmail-cdb-name=assign.cdb \
     --enable-mysql-limits \
     --enable-sql-aliasdomains \
     --enable-defaultdelivery \
@@ -385,7 +378,7 @@ RUN wget https://www.dcc-servers.net/dcc/source/dcc.tar.Z \
 ########################
 # SpamAssassin
 ########################
-RUN wget https://dlcdn.apache.org//spamassassin/source/Mail-SpamAssassin-${SPAMASSASSIN_TAG}.tar.gz \
+RUN wget https://dlcdn.apache.org/spamassassin/source/Mail-SpamAssassin-${SPAMASSASSIN_TAG}.tar.gz \
   && tar xzf Mail-SpamAssassin-${SPAMASSASSIN_TAG}.tar.gz \
   && cd Mail-SpamAssassin-${SPAMASSASSIN_TAG} \
   && perl Makefile.PL CONTACT_ADDRESS="http://www.e-dune.info/spam" \

@@ -25,6 +25,7 @@ services:
       - mariadb:host-gateway
     environment:
       - DEV_MODE=1
+    restart: always
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.sqmail.rule=Host(`mail.dune.tf`)"
@@ -53,8 +54,6 @@ services:
       - ./data/domainkeys:/var/qmail/ssl/domainkeys
       - /home/nathanael/dev:/opt/qmail/src
     ports:
-      - 8090:80
-      - 8091:443
       - 8092:88
       - 25:25
       - 465:465
