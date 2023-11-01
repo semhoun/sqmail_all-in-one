@@ -1,9 +1,9 @@
 #********************************************************************************
 # Create/Handle domainkeys for openqmail/eQmail/(net)qmail and derivatives      #
 #                                                                               #
-# Author: Kai Peter (parts taken from Joerg Backschues), ©2014                  #
-# Version: 0.32 -> 0.45                                                         #
-# Licence: This program is  Copyright(C) ©2015 Kai Peter.  It can be copied and #
+# Author: Kai Peter (parts taken from Joerg Backschues), Â©2014                  #
+# Version: 0.32 -> 0.46                                                         #
+# Licence: This program is  Copyright(C) Â©2015 Kai Peter.  It can be copied and #
 #          modified according to the GNU GENERAL PUBLIC LICENSE (GPL) Version 2 #
 #          or a later version. This software comes without any warranty.        #
 #                                                                               #
@@ -23,6 +23,10 @@
 # f) RSA and Ed25519 private keys may share the same <Selector> name.           #
 #    If identical, the Ed25519 private key is linked as '<Selector>_'           #
 #    to be picked up automatically by qmail-dksign for simultaneous signing.    #
+#                                                                               #
+# Changelog:                                                                    #
+#                                                                               #
+# 0.46 Fix for RSA DKIM TXT file generation, compactified TXT data.             # 
 #********************************************************************************
 DKDIR="/var/qmail/ssl/domainkeys"
 USR="qmailq"
@@ -113,19 +117,18 @@ echo "Domain's public key in '${DKDIR}/${DOMAIN}' used for TXT DNS record:"
 echo -n "${SELECTOR}._domainkey.${DOMAIN}. IN TXT "
 if [ -f rsa.public_${SELECTOR} ]; then
   key=`grep -v -e '^-' rsa.public_${SELECTOR} | tr -d '\n'`
-  echo "\"v=DKIM1; k=rsa; t=s; p=${key}\""
+  echo "\"v=DKIM1;k=rsa;t=y;p=${key}\""
 elif [ -f ed25519.public_${SELECTOR} ]; then
   key=`grep -v -e '^-' ed25519.public_${SELECTOR} | tr -d '\n'`
   basekey=${key#${ASN1}}
   if [ `echo -n ${basekey} | wc -c | awk '{print $1}'` -eq 44 ]; then
-    echo "\"v=DKIM1; k=ed25519; t=s; p=${basekey}\""
+    echo "\"v=DKIM1;k=ed25519;t=y;p=${basekey}\""
     echo ${basekey} > ed25519.basekey_${SELECTOR}
   else
     (errString="error generating Ed25519 public key" && showError; echo ${key}; echo ${basekey}; exit 1)
   fi
 fi
 echo -n "You need to publish this TXT record in the DNS before activating [rsa|ed25519].private_${SELECTOR} -> ${SELECTOR} for signing."
-echo -n "Remove 't=s;' if domain key is not the same as sender domain."
 
 echo ; exit 0;
 }

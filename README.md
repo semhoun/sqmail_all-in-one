@@ -161,20 +161,20 @@ docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init-certs.sh
 ## Built With
 
 * qmail-autoresponder 2.0
-* clamav 1.2.0
+* clamav 1.2.1
 * dovecot 2.3.21
 * ezmlm-idx 7.2.2
 * fehQlibs 23
 * fcron 3.3.1
 * [qmailadmin](https://github.com/semhoun/qmailadmin)
 * qmail-autoresponder 2.0
-* Roundcube 1.6.3
+* Roundcube 1.6.4
 * SpamAssassin 4.0.0
 * s6 2.11.3.2
-* SQMail 4.2.27a
+* SQMail 4.2.28
 * [VPopMail](https://github.com/semhoun/vpopmail)
 * [vqadmin](https://github.com/semhoun/vqadmin)
-* acme.sh 3.0.6
+* acme.sh 3.0.7
 
 ## Testing
 ### Manual SMTP

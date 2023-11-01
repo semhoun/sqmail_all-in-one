@@ -66,4 +66,4 @@ services:
 networks:
   default:
     external: true
-    name: internal  
+    name: internal
