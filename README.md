@@ -41,7 +41,7 @@ docker run \
 ```
 #### Docker Compose
 ```yaml
-version: '3.2'
+version: '3.8'
 
 services:
   sqmail-aio:
