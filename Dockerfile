@@ -251,15 +251,16 @@ RUN wget https://pigeonhole.dovecot.org/releases/2.3/dovecot-2.3-pigeonhole-${DO
 ########################
 # qmail-autoresponder
 ########################
-RUN wget http://untroubled.org/bglibs/bglibs-2.04.tar.gz \
-	&& tar xzf bglibs-2.04.tar.gz \
+RUN wget https://distrib-coffee.ipsl.jussieu.fr/pub/linux/gentoo/gentoo-distfiles/b4/bglibs-2.04.tar.gz \
+# http://untroubled.org/bglibs/bglibs-2.04.tar.gz \
+  && tar xzf bglibs-2.04.tar.gz \
   && cd bglibs-2.04 \
   && make \
-	&& make install \
-	&& ldconfig \
-	&& cd /opt/src \
-	&& wget https://untroubled.org/qmail-autoresponder/qmail-autoresponder-2.0.tar.gz \
-	&& tar xzf qmail-autoresponder-2.0.tar.gz \
+  && make install \
+  && ldconfig \
+  && cd /opt/src \
+  && wget https://untroubled.org/qmail-autoresponder/qmail-autoresponder-2.0.tar.gz \
+  && tar xzf qmail-autoresponder-2.0.tar.gz \
   && cd qmail-autoresponder-2.0 \
   && make \
   && make install \
