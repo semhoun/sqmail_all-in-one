@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export $(grep -v '^#' .env | xargs)
+export $(cat Dockerfile | grep ARG | sed 's/ARG //' | xargs)
 
 mkdir -p sources
 cd sources

@@ -259,7 +259,8 @@ RUN wget https://distrib-coffee.ipsl.jussieu.fr/pub/linux/gentoo/gentoo-distfile
   && make install \
   && ldconfig \
   && cd /opt/src \
-  && wget https://untroubled.org/qmail-autoresponder/qmail-autoresponder-2.0.tar.gz \
+  && wget https://qmailrocks.thibs.com/downloads/qmail-autoresponder-2.0.tar.gz \
+# https://untroubled.org/qmail-autoresponder/qmail-autoresponder-2.0.tar.gz \
   && tar xzf qmail-autoresponder-2.0.tar.gz \
   && cd qmail-autoresponder-2.0 \
   && make \
