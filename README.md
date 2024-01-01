@@ -6,9 +6,10 @@
 All-in-one S/QMail server with
   - s/qmail
   - spam filter
-  - imap/pop3
+  - dovecot (imap/pop)
   - web admin
   - Roundcube
+  - Fetchmail
 
 ## Usage
 
@@ -97,8 +98,8 @@ docker run \
 ```
 ### Docker Compose
 ```shell
-docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init.sh
-docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init-certs.sh
+docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init.sh
+docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
 ```
 
 ## Docker configuration
@@ -175,6 +176,7 @@ docker compose run -e SKIP_INIT_ENV=1 sqmail-aio /opt/bin/init-certs.sh
 * [VPopMail](https://github.com/semhoun/vpopmail)
 * [vqadmin](https://github.com/semhoun/vqadmin)
 * acme.sh 3.0.7
+* fetchmail
 
 ## Testing
 ### Manual SMTP

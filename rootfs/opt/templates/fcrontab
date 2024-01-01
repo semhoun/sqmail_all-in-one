@@ -4,3 +4,4 @@
 %nightly,random(yes) * 1-4 /usr/local/bin/sa-update
 %nightly,random(yes),runas(vpopmail) * 1-4 /var/qmail/bin/learnSpam
 %nightly,random(yes) * 1-4 /opt/bin/acme-cron.sh
+&runas(vpopmail) */5 * * * * /opt/bin/fetchmail.pl

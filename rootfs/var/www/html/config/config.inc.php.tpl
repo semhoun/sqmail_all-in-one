@@ -27,7 +27,9 @@ $config['plugins'] = [
   'zipdownload',
   'managesieve',
   'contextmenu',
-  'swipe'
+  'swipe',
+  'identity_smtp',
+  'fetchmail'
 ];
 $config['language'] = 'fr_FR, en_US';
 $config['junk_mbox'] = 'Spam';

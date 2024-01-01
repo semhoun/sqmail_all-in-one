@@ -4,12 +4,12 @@ LABEL maintainer="nathanael@semhoun.net"
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM=linux
 
-ARG SQMAIL_TAG=4.2.28
+ARG SQMAIL_TAG=4.2.29
 ARG FEHQLIBS_TAG=23
 ARG EXECLINE_TAG=2.9.3.0
 ARG SKALIB_TAG=2.13.1.1
 ARG S6_TAG=2.11.3.2
-ARG UCSPISSL_TAG=0.12.7
+ARG UCSPISSL_TAG=0.12.10
 ARG UCSPITCP6_TAG=1.12.4
 ARG DOVECOT_TAG=2.3.21
 ARG DOVECOT_PIGEONHOLE_TAG=0.5.21
@@ -81,6 +81,7 @@ RUN apt-get -y install bsd-mailx \
     swaks expect telnet \
     lighttpd php8.2-fpm \
 	libev-dev automake1.11 automake \
+	fetchmail liblockfile-simple-perl \
 # For roundcube
   && apt-get install -y php8.2-zip php8.2-pspell php8.2-mysql php8.2-gd php8.2-imap php8.2-xml php8.2-mbstring php8.2-intl php-imagick aspell-fr php8.2-intl php8.2-curl \
   && cpan -i IP::Country::DB_File MaxMind::DB::Reader Geo::IP IP::Country::Fast Digest::SHA1 Net::LibIDN2 Email::Address::XS \ 
@@ -461,6 +462,8 @@ RUN cd /var/www/html \
   && wget -O roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz https://github.com/roundcube/roundcubemail/releases/download/${ROUNDCUBEMAIL_TAG}/roundcubemail-${ROUNDCUBEMAIL_TAG}-complete.tar.gz \
   && tar -xzf roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz --strip 1 \
   && rm -f index.lighttpd.html roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz \
+  && cp config/config.inc.php.sample config/config.inc.php \
+  && echo "$config['db_dsnw'] = 'sqlite:///var/www/html/installer/sqlite.db?mode=0646';" > config/config.inc.php \
   && cp composer.json-dist composer.json \
   && composer \
     --working-dir=/var/www/html/ \
@@ -475,10 +478,18 @@ RUN cd /var/www/html \
       johndoh/sauserprefs \
       johndoh/contextmenu \
       johndoh/swipe \
+	  elm/identity_smtp \
   && composer \
     --working-dir=/var/www/html/ \
     --no-interaction \
     update \
+# Manual fetchmail install
+  && mkdir plugins/fetchmail \
+  && cd plugins/fetchmail \
+  && wget -O fetchmail.tgz  https://github.com/semhoun/fetchmail/archive/refs/heads/feature/server_port.tar.gz \
+  && tar -xzf fetchmail.tgz --strip 1 \
+  && rm -f fetchmail.tgz \
+# Cleaning
   && rm -rf installer
 
 ###########################
