@@ -8,12 +8,10 @@ function delayedProcess {
 
 function writeRoundCubeConf {
 	# Launch with &, so export will not in main env
-	. /var/qmail/control/roundcube.conf
+	. /var/qmail/control/aio-conf/roundcube.conf
 	for OCONF in /var/www/html/config/*.tpl /var/www/html/plugins/*/*.tpl; do
 		DCONF=${OCONF:0:-4}
-		cat $OCONF| envsubst \
-		'$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $PRODUCT_NAME $SUPPORT_URL' \
-		> $DCONF
+		cat $OCONF | envsubst '$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $PRODUCT_NAME $SUPPORT_URL' > $DCONF
 	done
 }
 
@@ -32,6 +30,10 @@ function fixHosts {
 if [ -n "${SKIP_INIT_ENV}" ]; then
   exec $@
   exit
+fi
+
+if [ "$(cat /var/qmail/control/aio-conf/sqmail_aio_version)" != "1.4" ]; then
+	/opt/bin/sqmail_aio_upgrade.sh
 fi
 
 if [ -n "${DEV_MODE}" ]; then
@@ -63,6 +65,10 @@ fi
 # Fix qmail tmp permissions
 chown vpopmail:sqmail -R /var/qmail/tmp
 chmod 777 /var/qmail/tmp
+
+# Fix Fecthmail permissions
+mkdir -p /var/run/fetchmail
+chown vpopmail:sqmail /var/run/fetchmail
 
 # Some fixes
 rm -f /var/run/dovecot/master.pid

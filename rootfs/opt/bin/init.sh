@@ -103,6 +103,8 @@ fi
 #########################
 # Create config
 #########################
+mkdir -p /var/qmail/control/aio-conf
+
 export MYSQL_USER=${MYSQL_USER}
 export MYSQL_PASS=${MYSQL_PASS}
 export MYSQL_DB=${MYSQL_DB}
@@ -118,13 +120,13 @@ openssl dhparam -out /ssl/qmail-dhparam 2048
 openssl dhparam -out /ssl/dovecot-dhparam 2048  
 
 # Creation configuration
-cat > /var/qmail/control/mysql.conf << EOF
-MYSQL_USER=${MYSQL_USER}
-MYSQL_PASS=${MYSQL_PASS}
-MYSQL_DB=${MYSQL_DB}
-MYSQL_HOST=${MYSQL_HOST}
+cat > /var/qmail/control/aio-conf/mysql.conf << EOF
+export MYSQL_USER=${MYSQL_USER}
+export MYSQL_PASS=${MYSQL_PASS}
+export MYSQL_DB=${MYSQL_DB}
+export MYSQL_HOST=${MYSQL_HOST}
 EOF
-echo "${MYSQL_HOST}|0|${MYSQL_USER}|${MYSQL_PASS}|${MYSQL_DB}" > /var/vpopmail/etc/vpopmail.mysql
+
 cat > /var/qmail/control/spamassassin_sql.cf << EOF
 # User prefs
 user_scores_dsn DBI:mysql:${MYSQL_DB}:${MYSQL_HOST}
@@ -140,6 +142,7 @@ echo "${RLSBSERVER}" > /var/qmail/control/rslbserver
 echo "${QUEUELIFETIME}" > /var/qmail/control/queuelifetime
 
 # VPopmail configuration
+echo "${MYSQL_HOST}|0|${MYSQL_USER}|${MYSQL_PASS}|${MYSQL_DB}" > /var/vpopmail/etc/vpopmail.mysql
 echo "${DEFAULT_DOMAIN}" > /var/vpopmail/etc/defaultdomain
 cp /opt/templates/vlimits.default /var/vpopmail/etc/vlimits.default
 cp /opt/templates/vusage* /var/vpopmail/etc/
@@ -185,7 +188,7 @@ chown -R vpopmail:vchkpw /var/vpopmail/domains
 /var/vpopmail/bin/vadddomain ${DEFAULT_DOMAIN} "${POSTMASTER_PWD}"
 
 # SpamAssassin DB
-cat /opt/templates/spamassassin.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+cat /opt/sql/spamassassin.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
 
 # Rules cdb
 cat > /var/qmail/control/rules.smtpsub << EOF
@@ -203,7 +206,7 @@ echo ":allow,QHPSI='clamdscan',QHPSIARG1='--no-summary',MFDNSCHECK='',BADMIMETYP
 /opt/bin/qmailctl cdb
 
 # Generate roundcube config
-cat > /var/qmail/control/roundcube.conf << EOF
+cat > /var/qmail/control/aio-conf/roundcube.conf << EOF
 export MYSQL_USER=${MYSQL_USER}
 export MYSQL_PASS=${MYSQL_PASS}
 export MYSQL_DB=${MYSQL_DB}
@@ -214,7 +217,20 @@ export PRODUCT_NAME="${ROUNDCUBE_NAME}"
 EOF
 
 # Roundcube DB
-cat /opt/templates/roundcube.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+cat /opt/sql/roundcube.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+
+# Fetchmail config
+cat > /var/qmail/control/aio-conf/fetchmail.conf << EOF
+\$db_host='${MYSQL_HOST}';
+\$db_name='${MYSQL_DB}';
+\$db_username='${MYSQL_USER}';
+\$db_password='${MYSQL_PASS}';
+EOF
+
+# Fetchmail DB
+cat /opt/sql/fetchmail.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+
+echo -n "1.4" > /var/qmail/control/sqmail_aio_version
 
 echo "============================"
 echo " QMail AllInOne initialized"
