@@ -15,9 +15,9 @@ ARG DOVECOT_TAG=2.3.21
 ARG DOVECOT_PIGEONHOLE_TAG=0.5.21
 ARG CLAMAV_TAG=1.2.1
 ARG SPAMASSASSIN_TAG=4.0.0
-ARG ROUNDCUBEMAIL_TAG=1.6.5
+ARG ROUNDCUBEMAIL_TAG=1.6.6
 ARG FCRON_TAG=3.3.1
-ARG VPOPMAIL_TAG=5.5.1
+ARG VPOPMAIL_TAG=5.6.1
 ARG ACMESH_TAG=3.0.7
 ARG QMAILADMIN_TAG=1.3.1
 ARG VQADMIN_TAG=2.4.0
@@ -164,7 +164,7 @@ RUN cd /opt/src \
   && groupadd -g 89 vchkpw \
   && useradd -g vchkpw -u 89 -s /usr/sbin/nologin -d /var/vpopmail vpopmail \
   && chown -R vpopmail:vchkpw /var/vpopmail \
-  && wget -O vpopmail-${VPOPMAIL_TAG}.tar.gz https://github.com/semhoun/vpopmail/archive/refs/tags/${VPOPMAIL_TAG}.tar.gz  \
+  && wget -O vpopmail-${VPOPMAIL_TAG}.tar.gz https://github.com/brunonymous/vpopmail/archive/refs/tags/v${VPOPMAIL_TAG}.tar.gz \
   && mkdir vpopmail \
   && cd vpopmail \
   && tar xzf ../vpopmail-${VPOPMAIL_TAG}.tar.gz --strip 1 \
@@ -251,16 +251,16 @@ RUN wget https://pigeonhole.dovecot.org/releases/2.3/dovecot-2.3-pigeonhole-${DO
 ########################
 # qmail-autoresponder
 ########################
-RUN wget https://distrib-coffee.ipsl.jussieu.fr/pub/linux/gentoo/gentoo-distfiles/b4/bglibs-2.04.tar.gz \
-# http://untroubled.org/bglibs/bglibs-2.04.tar.gz \
+RUN wget http://untroubled.org/bglibs/bglibs-2.04.tar.gz \
   && tar xzf bglibs-2.04.tar.gz \
   && cd bglibs-2.04 \
+  && sed -i 's/69,5,1,51/45,63,65,23/' net/resolve_ipv4addr.c \
+  && sed -i 's/69.5.1.51 => .*/45.63.65.23 => vx0.untroubled.org/' net/resolve_ipv4addr.c \
   && make \
   && make install \
   && ldconfig \
   && cd /opt/src \
-  && wget https://qmailrocks.thibs.com/downloads/qmail-autoresponder-2.0.tar.gz \
-# https://untroubled.org/qmail-autoresponder/qmail-autoresponder-2.0.tar.gz \
+  && wget https://untroubled.org/qmail-autoresponder/qmail-autoresponder-2.0.tar.gz \
   && tar xzf qmail-autoresponder-2.0.tar.gz \
   && cd qmail-autoresponder-2.0 \
   && make \
