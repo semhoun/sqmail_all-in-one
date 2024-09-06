@@ -1,6 +1,7 @@
 #!/usr/bin/bash
 
 function up_1.3_to_1.4 {
+echo "Upgrading S/QMAIL AIO to 1.4"
 	. /var/qmail/control/roundcube.conf
 	mkdir -p /var/qmail/control/aio-conf
 	cat > /var/qmail/control/aio-conf/mysql.conf << EOF
@@ -20,8 +21,23 @@ EOF
 	cat /opt/sql/fetchmail.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
 }
 
+function up_1.4_to_1.5 {
+echo "Upgrading S/QMAIL AIO to 1.5"
+	. /var/qmail/control/aio-conf/mysql.conf
+cat << 'EOF' | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+ALTER TABLE `valias` ADD `valias_type` TINYINT NULL DEFAULT '1' COMMENT '1=forwarder 0=lda' FIRST;
+ALTER TABLE `valias` ADD `copy` TINYINT NULL DEFAULT '0' COMMENT '0=redirect 1=copy&redirect' AFTER `valias_line`;
+EOF
+}
+
 if ! [ -f /var/qmail/control/aio-conf/sqmail_aio_version ]; then
 	up_1.3_to_1.4
 fi
 
-echo -n "1.4" > /var/qmail/control/aio-conf/sqmail_aio_version
+VERSION=$(cat /var/qmail/control/aio-conf/sqmail_aio_version)
+
+if [ "$VERSION" == "1.4" ]; then
+	up_1.4_to_1.5
+fi
+
+echo -n "1.5" > /var/qmail/control/aio-conf/sqmail_aio_version
