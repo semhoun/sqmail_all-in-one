@@ -125,7 +125,7 @@ docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
 ## Ports
 
 * `80` - Webmail (roundcube) and SSL Acme certs
-* `88` - HTTP admin (https and security not provided)
+* `88` - HTTP admin (https not provided)
 * `443` - SSL Webmail (roundcube)
 * `25` - SMTP
 * `465` - SMTPs
@@ -148,6 +148,8 @@ docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
   * `/ssl/smtp.crt` - SMTP Certificate
 * `/opt/bin/init.sh` - Initialisation script
 * `/opt/bin/init-certs.sh` - Certs initialisation script
+* `/opt/bin/lighttpd_admin.sh` - Add an admin user for the web interface
+  * usage `/opt/bin/lighttpd_admin.sh <user> <password>`
 * `/opt/bin/mkdkimkey.sh` - DKIM key creation
   * usage `/opt/bin/mkdkimkey.sh [-p] <domain>`
   * Print domainkey with -p, without create domain keys

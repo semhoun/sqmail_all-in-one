@@ -83,10 +83,21 @@ if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 ROUNDCUBE_NAME=$(whiptail --inputbox "Roundcube name" 8 39 "Roundcube Webmail" --title "RoundCube Webmail Configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 cat >> "${RESUME}" << EOF
-Roundcube Webmail  configuration will be:
+Roundcube Webmail configuration will be:
   - support url : ${ROUNDCUBE_SUPPORT}
   - roundcube name : ${ROUNDCUBE_NAME}
   
+EOF
+
+WEBADMIN_USER=$(whiptail --inputbox "Webadmin" 8 39 "" --title "Webadmin username" 3>&1 1>&2 2>&3)
+if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
+WEBADMIN_PASSWORD=$(whiptail --inputbox "Webadmin" 8 39 "" --title "Webadmin password" 3>&1 1>&2 2>&3)
+if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
+cat >> "${RESUME}" << EOF
+Webadmin configuration will be:
+  - username : ${WEBADMIN_USER}
+  - password : ${WEBADMIN_PASSWORD}
+
 EOF
 
 # Resume
@@ -230,7 +241,10 @@ EOF
 # Fetchmail DB
 cat /opt/sql/fetchmail.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
 
-echo -n "1.4" > /var/qmail/control/sqmail_aio_version
+# lighttpd Password
+/opt/bin/lighttpd_admin.sh "${WEBADMIN_USER}" "${WEBADMIN_PASSWORD}"
+
+/opt/bin/sqmail_set_version.sh
 
 echo "============================"
 echo " QMail AllInOne initialized"

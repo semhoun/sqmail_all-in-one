@@ -1,5 +1,9 @@
 #!/usr/bin/bash
 
+if [ "$(cat /var/qmail/control/aio-conf/sqmail_aio_version)" == "1.5" ]; then
+	exit
+fi
+
 function up_1.3_to_1.4 {
 echo "Upgrading S/QMAIL AIO to 1.4"
 	. /var/qmail/control/roundcube.conf
@@ -40,4 +44,4 @@ if [ "$VERSION" == "1.4" ]; then
 	up_1.4_to_1.5
 fi
 
-echo -n "1.5" > /var/qmail/control/aio-conf/sqmail_aio_version
+/opt/bin/sqmail_set_version.sh

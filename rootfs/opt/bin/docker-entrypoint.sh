@@ -32,9 +32,7 @@ if [ -n "${SKIP_INIT_ENV}" ]; then
   exit
 fi
 
-if [ "$(cat /var/qmail/control/aio-conf/sqmail_aio_version)" != "1.5" ]; then
-	/opt/bin/sqmail_aio_upgrade.sh
-fi
+/opt/bin/sqmail_aio_upgrade.sh
 
 if [ -n "${DEV_MODE}" ]; then
 	sed '/^ExcludeDatabase/d' -i /etc/clamav/freshclam.conf
