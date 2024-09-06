@@ -1,26 +1,30 @@
 FROM debian:bookworm-slim
 LABEL maintainer="nathanael@semhoun.net"
 
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 ENV TERM=linux
 
 ARG SQMAIL_TAG=4.2.29
 ARG FEHQLIBS_TAG=23
-ARG EXECLINE_TAG=2.9.3.0
-ARG SKALIB_TAG=2.13.1.1
-ARG S6_TAG=2.11.3.2
+ARG MESS822X_TAG=0.67
 ARG UCSPISSL_TAG=0.12.10
 ARG UCSPITCP6_TAG=1.12.4
+
+ARG EXECLINE_TAG=2.9.6.0
+ARG SKALIB_TAG=2.14.2.0
+ARG S6_TAG=2.13.0.0
+
 ARG DOVECOT_TAG=2.3.21
 ARG DOVECOT_PIGEONHOLE_TAG=0.5.21
-ARG CLAMAV_TAG=1.2.1
-ARG SPAMASSASSIN_TAG=4.0.0
-ARG ROUNDCUBEMAIL_TAG=1.6.6
+
+ARG CLAMAV_TAG=1.4.0
+ARG SPAMASSASSIN_TAG=4.0.1
+ARG ROUNDCUBEMAIL_TAG=1.6.8
 ARG FCRON_TAG=3.3.1
-ARG VPOPMAIL_TAG=5.6.1
+ARG VPOPMAIL_TAG=5.6.2
 ARG ACMESH_TAG=3.0.7
-ARG QMAILADMIN_TAG=1.3.1
-ARG VQADMIN_TAG=2.4.0
+ARG QMAILADMIN_TAG=1.2.23
+ARG VQADMIN_TAG=2.4.1
 
 WORKDIR "/opt/src"
 
@@ -141,6 +145,13 @@ RUN mkdir -p /package \
   && tar xzf /opt/src/ucspi-tcp6-${UCSPITCP6_TAG}.tgz \
   && cd net/ucspi-tcp6/ucspi-tcp6-${UCSPITCP6_TAG} \
   && package/install \
+## mess822x
+  && cd /opt/src \
+  && wget https://www.fehcom.de/ipnet/mess822x/mess822x-${MESS822X_TAG}.tgz \
+  && cd /package \
+  && tar xzf /opt/src/mess822x-${MESS822X_TAG}.tgz \
+  && cd  mail/mess822x/mess822x-${MESS822X_TAG} \
+  && package/install \
 ## sqmail
   && cd /opt/src \
   && wget https://www.fehcom.de/sqmail/sqmail-${SQMAIL_TAG}.tgz \
@@ -164,7 +175,7 @@ RUN cd /opt/src \
   && groupadd -g 89 vchkpw \
   && useradd -g vchkpw -u 89 -s /usr/sbin/nologin -d /var/vpopmail vpopmail \
   && chown -R vpopmail:vchkpw /var/vpopmail \
-  && wget -O vpopmail-${VPOPMAIL_TAG}.tar.gz https://github.com/brunonymous/vpopmail/archive/refs/tags/v${VPOPMAIL_TAG}.tar.gz \
+  && wget -O vpopmail-${VPOPMAIL_TAG}.tar.gz https://github.com/semhoun/vpopmail/archive/refs/tags/${VPOPMAIL_TAG}.tar.gz \
   && mkdir vpopmail \
   && cd vpopmail \
   && tar xzf ../vpopmail-${VPOPMAIL_TAG}.tar.gz --strip 1 \
@@ -302,7 +313,8 @@ RUN wget -O qmailadmin-${QMAILADMIN_TAG}.tar.gz https://github.com/semhoun/qmail
     --enable-vpopuser=vpopmail \
     --enable-vpopgroup=vchkpw \
     --enable-domain-autofill \
-		--enable-autoresponder-path=/usr/local/bin \
+    --enable-autoresponder-path=/usr/local/bin \
+    --enable-qmail-autoresponder \
   && make \
   && make install \
 # cleaning
@@ -311,10 +323,11 @@ RUN wget -O qmailadmin-${QMAILADMIN_TAG}.tar.gz https://github.com/semhoun/qmail
 ########################
 # vqadmin
 ########################
-RUN wget -O vqadmin-${VQADMIN_TAG}.tar.gz https://github.com/semhoun/vqadmin/archive/refs/tags/${VQADMIN_TAG}.tar.gz  \
+RUN wget -O vqadmin-${VQADMIN_TAG}.tar.gz https://github.com/sagredo-dev/vqadmin/archive/refs/tags/v${VQADMIN_TAG}.tar.gz  \
   && mkdir vqadmin \
   && cd vqadmin \
   && tar xzf ../vqadmin-${VQADMIN_TAG}.tar.gz --strip 1 \
+  && sed -i 's/cgi-bin/cgi/g' configure html/* \
   && ./configure \
     --enable-cgibindir=/var/www/admin/cgi \
     --enable-wwwroot=/var/www/admin/html \
@@ -371,7 +384,7 @@ RUN groupadd -g 5010 clamav \
 ########################
 RUN wget https://www.dcc-servers.net/dcc/source/dcc.tar.Z \
   && tar xzf dcc.tar.Z \
-  && cd dcc-2.3.168 \
+  && cd dcc-2.3.169 \
   && ./configure --disable-dccm \
   && make \
   && make install \
@@ -395,19 +408,7 @@ RUN wget https://dlcdn.apache.org/spamassassin/source/Mail-SpamAssassin-${SPAMAS
       /etc/mail/spamassassin/v310.pre \
 # cleaning
   && rm -rf /opt/src/*
-
-########################
-# mess822
-########################
-RUN wget http://cr.yp.to/software/mess822-0.58.tar.gz \
-  && tar xzf mess822-0.58.tar.gz \
-  && cd mess822-0.58 \
-  && sed -i "s#extern int errno;#\#include <errno.h>#" error.h \
-  && make \
-  && make setup \
-# cleaning
-  && rm -rf /opt/src/*
-  
+ 
 ###########################
 # FCRON
 ###########################

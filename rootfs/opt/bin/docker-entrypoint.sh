@@ -74,6 +74,10 @@ chown vpopmail:sqmail /var/run/fetchmail
 rm -f /var/run/dovecot/master.pid
 rm -f /var/run/lighttpd-log.pipe
 
+# Fix for qmailadmin
+> /var/log/qma-auth.log
+chown vpopmail:vchkpw /var/log/qma-auth.log
+
 # Fix some config file who was not in volumes
 cp /var/qmail/control/spamassassin_sql.cf /etc/mail/spamassassin/sql.cf
 cp /var/qmail/control/me /etc/mailname
