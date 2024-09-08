@@ -17,9 +17,9 @@ ARG S6_TAG=2.13.0.0
 ARG DOVECOT_TAG=2.3.21
 ARG DOVECOT_PIGEONHOLE_TAG=0.5.21
 
-ARG CLAMAV_TAG=1.4.0
+ARG CLAMAV_TAG=1.4.1
 ARG SPAMASSASSIN_TAG=4.0.1
-ARG ROUNDCUBEMAIL_TAG=1.6.8
+ARG ROUNDCUBEMAIL_TAG=1.6.9
 ARG FCRON_TAG=3.3.1
 ARG VPOPMAIL_TAG=5.6.2
 ARG ACMESH_TAG=3.0.7
@@ -62,9 +62,9 @@ RUN apt-get -y install locales \
       -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' \
       -i /etc/locale.gen \
   && /usr/sbin/locale-gen en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US:en
-ENV LC_ALL en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
 
 ########################  
 # Fix certificates
@@ -487,11 +487,19 @@ RUN cd /var/www/html \
     --no-interaction \
     update \
 # Manual fetchmail install
+  && cd /var/www/html \
   && mkdir plugins/fetchmail \
   && cd plugins/fetchmail \
   && wget -O fetchmail.tgz  https://github.com/semhoun/fetchmail/archive/refs/heads/feature/server_port.tar.gz \
   && tar -xzf fetchmail.tgz --strip 1 \
   && rm -f fetchmail.tgz \
+# Manual qmailforward install
+  && cd /var/www/html \
+  && mkdir plugins/qmailforward \
+  && cd plugins/qmailforward \
+  && wget -O qmailforward.tgz  https://github.com/semhoun/qmailforward/archive/refs/tags/1.0.3.tar.gz \
+  && tar -xzf qmailforward.tgz --strip 1 \
+  && rm -f qmailforward.tgz \
 # Cleaning
   && rm -rf installer
 

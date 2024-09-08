@@ -29,7 +29,8 @@ $config['plugins'] = [
   'contextmenu',
   'swipe',
   'identity_smtp',
-  'fetchmail'
+  'fetchmail',
+  'qmailforward',
 ];
 $config['language'] = 'fr_FR, en_US';
 $config['junk_mbox'] = 'Spam';

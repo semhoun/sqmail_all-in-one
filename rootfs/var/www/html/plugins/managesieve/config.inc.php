@@ -89,7 +89,7 @@ $config['managesieve_vacation'] = 1;
 // 0 - no separate section (default),
 // 1 - add Forward section,
 // 2 - add Forward section, but hide Filters section
-$config['managesieve_forward'] = 1;
+$config['managesieve_forward'] = 0;
 
 // Default vacation interval (in days).
 // Note: If server supports vacation-seconds extension it is possible
