@@ -19,12 +19,14 @@ ARG DOVECOT_PIGEONHOLE_TAG=0.5.21
 
 ARG CLAMAV_TAG=1.4.1
 ARG SPAMASSASSIN_TAG=4.0.1
-ARG ROUNDCUBEMAIL_TAG=1.6.9
 ARG FCRON_TAG=3.3.1
 ARG VPOPMAIL_TAG=5.6.2
 ARG ACMESH_TAG=3.0.7
 ARG QMAILADMIN_TAG=1.2.23
 ARG VQADMIN_TAG=2.4.1
+
+ARG ROUNDCUBEMAIL_TAG=1.6.9
+ARG QMAILFORWARD_TAG=1.0.3
 
 WORKDIR "/opt/src"
 
@@ -294,7 +296,7 @@ RUN wget http://notes.sagredo.eu/files/qmail/tar/ezmlm-idx-7.2.2.tar.gz \
 ########################
 # QmailAdmin
 ########################
-RUN wget -O qmailadmin-${QMAILADMIN_TAG}.tar.gz https://github.com/semhoun/qmailadmin/archive/refs/tags/${QMAILADMIN_TAG}.tar.gz  \
+RUN wget -O qmailadmin-${QMAILADMIN_TAG}.tar.gz https://github.com/sagredo-dev/qmailadmin/archive/refs/tags/v${QMAILADMIN_TAG}.tar.gz  \
   && mkdir qmailadmin \
   && cd qmailadmin \
   && tar xzf ../qmailadmin-${QMAILADMIN_TAG}.tar.gz --strip 1 \
@@ -497,7 +499,7 @@ RUN cd /var/www/html \
   && cd /var/www/html \
   && mkdir plugins/qmailforward \
   && cd plugins/qmailforward \
-  && wget -O qmailforward.tgz  https://github.com/semhoun/qmailforward/archive/refs/tags/1.0.3.tar.gz \
+  && wget -O qmailforward.tgz https://github.com/sagredo-dev/qmailforward/archive/refs/tags/v${QMAILFORWARD_TAG}.tar.gz \
   && tar -xzf qmailforward.tgz --strip 1 \
   && rm -f qmailforward.tgz \
 # Cleaning
@@ -553,6 +555,7 @@ VOLUME [ \
 ###########################
 WORKDIR "/opt"
 ENV PATH="${PATH}:/opt/bin"
+ENV SQMAIL_AIO_VERSION="1.5"
 EXPOSE 25 465 587
 EXPOSE 110 995
 EXPOSE 143 993

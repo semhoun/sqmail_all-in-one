@@ -32,7 +32,7 @@ if [ -n "${SKIP_INIT_ENV}" ]; then
   exit
 fi
 
-/opt/bin/sqmail_aio_upgrade.sh
+/opt/bin/upgrade/sqmail_aio_upgrade.sh
 
 if [ -n "${DEV_MODE}" ]; then
 	sed '/^ExcludeDatabase/d' -i /etc/clamav/freshclam.conf

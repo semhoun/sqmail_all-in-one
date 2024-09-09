@@ -137,6 +137,15 @@ export MYSQL_PASS=${MYSQL_PASS}
 export MYSQL_DB=${MYSQL_DB}
 export MYSQL_HOST=${MYSQL_HOST}
 EOF
+cat > /var/qmail/control/aio-conf/mysql.php << EOF
+<?php
+\$MYSQL_CONF = [
+    'MYSQL_USER' => "${MYSQL_USER}",
+    'MYSQL_PASS' => "${MYSQL_PASS}",
+    'MYSQL_DB' => '${MYSQL_DB}',
+    'MYSQL_HOST' => "${MYSQL_HOST}",
+];
+EOF
 
 cat > /var/qmail/control/spamassassin_sql.cf << EOF
 # User prefs
@@ -244,7 +253,7 @@ cat /opt/sql/fetchmail.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_
 # lighttpd Password
 /opt/bin/lighttpd_admin.sh "${WEBADMIN_USER}" "${WEBADMIN_PASSWORD}"
 
-/opt/bin/sqmail_set_version.sh
+echo -n "${SQMAIL_AIO_VERSION}" > /var/qmail/control/aio-conf/sqmail_aio_version
 
 echo "============================"
 echo " QMail AllInOne initialized"
