@@ -148,8 +148,9 @@ docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
   * `/ssl/smtp.crt` - SMTP Certificate
 * `/opt/bin/init.sh` - Initialisation script
 * `/opt/bin/init-certs.sh` - Certs initialisation script
-* `/opt/bin/lighttpd_admin.sh` - Add an admin user for the web interface
+* `/opt/bin/lighttpd_admin.sh` - Add an user allowed to acces the admin web interface
   * usage `/opt/bin/lighttpd_admin.sh <user> <password>`
+  * Administator user for `vqadmin` must be *admin*
 * `/opt/bin/mkdkimkey.sh` - DKIM key creation
   * usage `/opt/bin/mkdkimkey.sh [-p] <domain>`
   * Print domainkey with -p, without create domain keys
