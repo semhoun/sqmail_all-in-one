@@ -130,6 +130,12 @@ openssl dhparam -out /ssl/qmail-dhparam 2048
 openssl dhparam -out /ssl/dovecot-dhparam 2048  
 
 # Creation configuration
+cat > /var/qmail/control/mysql.conf << EOF
+MYSQL_USER=${MYSQL_USER}
+MYSQL_PASS=${MYSQL_PASS}
+MYSQL_DB=${MYSQL_DB}
+MYSQL_HOST=${MYSQL_HOST}
+EOF
 cat > /var/qmail/control/aio-conf/mysql.conf << EOF
 export MYSQL_USER=${MYSQL_USER}
 export MYSQL_PASS=${MYSQL_PASS}
