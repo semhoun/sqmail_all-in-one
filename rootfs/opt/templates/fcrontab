@@ -5,3 +5,4 @@
 %nightly,random(yes),runas(vpopmail) * 1-4 /var/qmail/bin/learnSpam
 %nightly,random(yes) * 1-4 /opt/bin/acme-cron.sh
 &runas(vpopmail) */5 * * * * /opt/bin/fetchmail.pl
+%hourly,random(yes) * /usr/lib/php/sessionclean
