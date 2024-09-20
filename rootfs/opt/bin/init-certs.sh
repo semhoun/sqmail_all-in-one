@@ -11,13 +11,13 @@ whiptail --title "S/QMail AIO Certs" --msgbox "Welcome in the S/QMail Certs conf
 
 LETSENCRYPT_EMAIL=$(whiptail --inputbox "Let's Encrypt account email" 8 39 "" --title "Let's Encrypt configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
-HOST_WEBMAIL=$(whiptail --inputbox "Webmail domain name" 8 39 "" --title "Let's Encrypt configuration" 3>&1 1>&2 2>&3)
+HOST_WEBMAIL=$(whiptail --inputbox "Webmail host name" 8 39 "" --title "Let's Encrypt configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
-HOST_SMTP=$(whiptail --inputbox "SMTP domain name" 8 39 "" --title "Let's Encrypt configuration" 3>&1 1>&2 2>&3)
+HOST_SMTP=$(whiptail --inputbox "SMTP host name" 8 39 "" --title "Let's Encrypt configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
-HOST_IMAP=$(whiptail --inputbox "IMAP domain name" 8 39 "" --title "Let's Encrypt configuration" 3>&1 1>&2 2>&3)
+HOST_IMAP=$(whiptail --inputbox "IMAP host name" 8 39 "" --title "Let's Encrypt configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
-HOST_POP=$(whiptail --inputbox "POP domain name" 8 39 "" --title "Let's Encrypt configuration" 3>&1 1>&2 2>&3)
+HOST_POP=$(whiptail --inputbox "POP host name" 8 39 "" --title "Let's Encrypt configuration" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 
 ACME_SERVER="https://acme-v02.api.letsencrypt.org/directory"
@@ -50,7 +50,7 @@ fi
 #########################
 openssl req -new -x509 -keyout /ssl/http.key -out /ssl/http.crt -days 365 -nodes -subj '/CN=${HOST_WEBMAIL}'
 touch /var/run/lighttpd-log.pipe
-chown www-data.www-data /var/run/lighttpd-log.pipe
+chown www-data:www-data /var/run/lighttpd-log.pipe
 /usr/sbin/lighttpd -D -f /etc/lighttpd/lighttpd.conf &
 LPID=$!
 
