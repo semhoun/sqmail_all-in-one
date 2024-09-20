@@ -72,24 +72,36 @@ if [ -n "${HOST_WEBMAIL}" ]; then
 	if [ ! -s "/ssl/acme/certs/${HOST_WEBMAIL}/fullchain.cer" ]; then
 		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --preferred-chain  "${PREFERRED_CHAIN}" --webroot /var/www/html -d ${HOST_WEBMAIL}
 	fi
+    if [ -d "/ssl/acme/certs/${HOST_WEBMAIL}_ecc" ]; then
+        mv /ssl/acme/certs/${HOST_WEBMAIL}_ecc /ssl/acme/certs/${HOST_WEBMAIL}
+    fi
 	echo "http;${HOST_WEBMAIL}" >> /ssl/acme/hosts.lst
 fi
 if [ -n "${HOST_SMTP}" ]; then
 	if [ ! -s "/ssl/acme/certs/${HOST_SMTP}/fullchain.cer" ]; then
 		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --preferred-chain  "${PREFERRED_CHAIN}" --webroot /var/www/html -d ${HOST_SMTP}
 	fi
+    if [ -d "/ssl/acme/certs/${HOST_SMTP}_ecc" ]; then
+        mv /ssl/acme/certs/${HOST_SMTP}_ecc /ssl/acme/certs/${HOST_SMTP}
+    fi
 	echo "smtp;${HOST_SMTP}" >> /ssl/acme/hosts.lst
 fi
 if [ -n "${HOST_IMAP}" ]; then
 	if [ ! -s "/ssl/acme/certs/${HOST_IMAP}/fullchain.cer" ]; then
 		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --preferred-chain  "${PREFERRED_CHAIN}" --webroot /var/www/html -d ${HOST_IMAP}
 	fi
+    if [ -d "/ssl/acme/certs/${HOST_IMAP}_ecc" ]; then
+        mv /ssl/acme/certs/${HOST_IMAP}_ecc /ssl/acme/certs/${HOST_IMAP}
+    fi
 	echo "imap;${HOST_IMAP}" >> /ssl/acme/hosts.lst
 fi
 if [ -n "${HOST_POP}" ]; then
 	if [ ! -s "/ssl/acme/certs/${HOST_POP}/fullchain.cer" ]; then
 		acme.sh --home /ssl/acme --issue --server ${ACME_SERVER} --preferred-chain  "${PREFERRED_CHAIN}" --webroot /var/www/html -d ${HOST_POP}
 	fi
+    if [ -d "/ssl/acme/certs/${HOST_POP}_ecc" ]; then
+        mv /ssl/acme/certs/${HOST_POP}_ecc /ssl/acme/certs/${HOST_POP}
+    fi
 	echo "pop;${HOST_POP}" >> /ssl/acme/hosts.lst
 fi
 
