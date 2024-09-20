@@ -89,9 +89,8 @@ Roundcube Webmail configuration will be:
   
 EOF
 
-WEBADMIN_USER=$(whiptail --inputbox "Webadmin" 8 39 "" --title "Webadmin username" 3>&1 1>&2 2>&3)
-if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
-WEBADMIN_PASSWORD=$(whiptail --inputbox "Webadmin" 8 39 "" --title "Webadmin password" 3>&1 1>&2 2>&3)
+WEBADMIN_USER=admin
+WEBADMIN_PASSWORD=$(whiptail --inputbox "Webadmin" 8 39 "" --title "Webadmin password (user is ${WEBADMIN_USER})" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 cat >> "${RESUME}" << EOF
 Webadmin configuration will be:
@@ -101,7 +100,7 @@ Webadmin configuration will be:
 EOF
 
 # Resume
-whiptail --textbox "${RESUME}" 30 78
+whiptail --textbox "${RESUME}" 40 78
 rm "${RESUME}"
 
 if !(whiptail --title "Set configuration" --yesno "Apply the configuration." 8 78); then
