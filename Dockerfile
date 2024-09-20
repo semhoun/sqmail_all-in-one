@@ -5,10 +5,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TERM=linux
 
 ARG SQMAIL_TAG=4.2.29
-ARG FEHQLIBS_TAG=25a
+ARG FEHQLIBS_TAG=23
 ARG MESS822X_TAG=0.69
 ARG UCSPISSL_TAG=0.12.10
-ARG UCSPITCP6_TAG=1.13.00
+ARG UCSPITCP6_TAG=1.12.4
 
 ARG VPOPMAIL_TAG=5.6.2
 
@@ -134,7 +134,7 @@ RUN mkdir -p /package \
   && mkdir -p /usr/local/qlibs \
   && cd /usr/local/qlibs \
   && tar xzf /opt/src/fehQlibs-${FEHQLIBS_TAG}.tgz --strip 1 \
-  && make -C src \
+  && make \
 ## ucspi-ssl    
   && cd /opt/src \
   && wget https://www.fehcom.de/ipnet/ucspi-ssl/ucspi-ssl-${UCSPISSL_TAG}.tgz \
