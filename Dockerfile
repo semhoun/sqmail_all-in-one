@@ -4,11 +4,11 @@ LABEL maintainer="nathanael@semhoun.net"
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TERM=linux
 
-ARG SQMAIL_TAG=4.2.29
-ARG FEHQLIBS_TAG=23
+ARG SQMAIL_TAG=4.3.16
+ARG FEHQLIBS_TAG=25b
 ARG MESS822X_TAG=0.69
-ARG UCSPISSL_TAG=0.12.10
-ARG UCSPITCP6_TAG=1.12.4
+ARG UCSPISSL_TAG=0.13.02
+ARG UCSPITCP6_TAG=1.13.01
 
 ARG VPOPMAIL_TAG=5.6.2
 
@@ -20,8 +20,8 @@ ARG ACMESH_TAG=3.0.7
 ARG FCRON_TAG=3.3.1
 ARG CLAMAV_TAG=1.4.1
 
-ARG DOVECOT_TAG=2.3.21
-ARG DOVECOT_PIGEONHOLE_TAG=0.5.21
+ARG DOVECOT_TAG=2.3.21.1
+ARG DOVECOT_PIGEONHOLE_TAG=0.5.21.1
 
 ARG SPAMASSASSIN_TAG=4.0.1
 
@@ -134,7 +134,7 @@ RUN mkdir -p /package \
   && mkdir -p /usr/local/qlibs \
   && cd /usr/local/qlibs \
   && tar xzf /opt/src/fehQlibs-${FEHQLIBS_TAG}.tgz --strip 1 \
-  && make \
+  && make -C src \
 ## ucspi-ssl    
   && cd /opt/src \
   && wget https://www.fehcom.de/ipnet/ucspi-ssl/ucspi-ssl-${UCSPISSL_TAG}.tgz \

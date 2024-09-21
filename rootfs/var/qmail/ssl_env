@@ -4,9 +4,8 @@ SSL_CHROOT="/ssl"
 CERTFILE="/ssl/smtp.crt"
 KEYFILE="/ssl/smtp.key"
 DHFILE="/ssl/qmail-dhparam"
-CIPHERS="TLSv1+HIGH:!SSLv2:!MD5" 
 SSL_UID=`id -u $SSL_USER`
 if [ $? -ne 0 ] ; then echo "No such user '$SSL_USER'" >&2 ; exit; fi
 SSL_GID=`id -g $SSL_USER`
 if [ $? -ne 0 ] ; then echo "No such group '$SSL_GROUP'" >&2 ; exit; fi
-export SSL_UID SSL_GID SSL_CHROOT CERTFILE KEYFILE DHFILE CIPHERS
+export SSL_UID SSL_GID SSL_CHROOT CERTFILE KEYFILE DHFILE
