@@ -1,8 +1,5 @@
-!stdout(yes),mail(no),runas(root)
 %nightly,random(yes) * 1-4 /usr/bin/freshclam
 %nightly,random(yes) * 1-4 /var/dcc/libexec/cron-dccd
 %nightly,random(yes) * 1-4 /usr/local/bin/sa-update
-%nightly,random(yes),runas(vpopmail) * 1-4 /var/qmail/bin/learnSpam
 %nightly,random(yes) * 1-4 /opt/bin/acme_cron.sh
-&runas(vpopmail) */5 * * * * /opt/bin/fetchmail.pl
 %hourly,random(yes) * /usr/lib/php/sessionclean

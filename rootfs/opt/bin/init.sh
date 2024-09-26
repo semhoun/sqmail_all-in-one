@@ -215,6 +215,9 @@ chown -R vpopmail:vchkpw /var/vpopmail/domains
 # SpamAssassin DB
 cat /opt/sql/spamassassin.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
 
+# DMARC DB
+cat /opt/sql/dmarc.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+
 # Rules cdb
 cat > /var/qmail/control/rules.smtpsub << EOF
 :allow,RELAYCLIENT=''

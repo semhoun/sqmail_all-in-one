@@ -1,0 +1,2 @@
+%nightly,random(yes) * 1-4 /var/qmail/bin/learnSpam
+*/5 * * * * /opt/bin/fetchmail.pl

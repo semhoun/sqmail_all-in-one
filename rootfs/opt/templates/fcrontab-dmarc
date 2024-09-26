@@ -1,0 +1,4 @@
+15 * * * * /usr/bin/php -q /var/www/admin/dmarc/utils/fetch_reports.php
+30 4 * * * /usr/bin/php -q /var/www/admin/dmarc/utils/mailbox_cleaner.php
+45 4 * * * /usr/bin/php -q /var/www/admin/dmarc/utils/reportlog_cleaner.ph
+30 5 * * * /usr/bin/php -q /var/www/admin/dmarc/utils/reports_cleaner.php

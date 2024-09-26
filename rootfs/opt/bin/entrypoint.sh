@@ -24,25 +24,28 @@ if [ ! -s "/var/qmail/queue/lock" ]; then
 	cp -a /opt/templates/queue /var/qmail/
 fi
 
-if [ -e "/var/qmail/control/aio-conf/dmarc.conf" ]; then
-	echo "[DMARC] Setting config file  ..."
-	. /var/qmail/control/aio-conf/mysql.conf
-	. /var/qmail/control/aio-conf/dmarc.conf
-    cat /opt/templates/dmarc.conf | envsubst '$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $DMARC_EMAIL_ADDR $DMARC_EMAIL_PASS' /var/www/admin/dmarc/config/conf.php
-fi
+if [ ! -d "/etc/fcrontab" ]; then
+	echo "[fcron] Initializing user's fcrontab ..."
 
-if [ ! -e "/etc/fcrontab" ]; then
-	echo "[QMail] Initializing fcrontab ..."
-    cp /opt/templates/fcrontab /etc/fcrontab
+    mkdir -p /etc/fcrontab
+    echo '!stdout(yes),mail(no)' > /etc/fcrontab/root
+    cat /opt/templates/fcrontab-root >> /etc/fcrontab/root
+    echo '!stdout(yes),mail(no)' > /etc/fcrontab/vpopmail
+    cat /opt/templates/fcrontab-vpopmail >> /etc/fcrontab/vpopmail
     if [ -e "/var/qmail/control/aio-conf/dmarc.conf" ]; then
-        cat /opt/templates/fcrontab-dmarc > /etc/fcrontab
+        echo '!stdout(yes),mail(no)' > /etc/fcrontab/www-data
+        cat /opt/templates/fcrontab-dmarc >> /etc/fcrontab/www-data
     fi
-    rm -rf /var/spool/fcron/root
-	/usr/bin/fcrontab -n /opt/templates/fcrontab root
+
+    rm -rf /var/spool/fcron/*
+    cd /etc/fcrontab/
+    for WHO in *; do
+        /usr/bin/fcrontab -n /etc/fcrontab/${WHO} ${WHO}
+    done
 fi
 
 if [ ! -e "/etc/fetchmail.conf" ]; then
-    echo "[FETCHMAIL] Setting config file ..."
+    echo "[Fetchmail] Setting config file ..."
     . /var/qmail/control/aio-conf/mysql.conf
     cat > /etc/fetchmail.conf << EOF
 \$db_host='${MYSQL_HOST}';
@@ -53,18 +56,18 @@ EOF
 fi
 
 if [ ! -e "/etc/dovecot/conf.d/10-auth.conf" ]; then
-    echo "[DOVECOT] Setting auth file ..."
+    echo "[Dovecot] Setting auth file ..."
     DEFAULT_DOMAIN=$(cat /var/qmail/control/defaultdomain)
 	sed "s/auth_default_realm =.*/auth_default_realm = ${DEFAULT_DOMAIN}/" /opt/templates/dovecot-auth.conf > /etc/dovecot/conf.d/10-auth.conf
 fi
 
 if [ ! -s "/var/lib/clamav" ]; then
-	echo "[CLAMAV] Lanching first time freshclam ..."
+	echo "[ClamAV] Lanching first time freshclam ..."
 	/usr/bin/freshclam 
 fi
 
 if [ ! -e "/etc/mail/spamassassin/sql.cf" ]; then
-	echo "[SPAMASSASSIN] Setting sql confog ..."
+	echo "[SpamAssassin] Setting sql confog ..."
     . /var/qmail/control/aio-conf/mysql.conf
 	cat > /var/qmail/control/spamassassin_sql.cf << EOF
 # User prefs
@@ -76,12 +79,21 @@ EOF
 fi
 
 if [ ! -s "/var/lib/spamassassin/" ]; then
-	echo "[SPAMASSASSIN] Lanching first time sa-update ..."
+	echo "[SpamAssassin] Lanching first time sa-update ..."
 	/usr/local/bin/sa-update
 fi
 
+if [ -e "/var/qmail/control/aio-conf/dmarc.conf" ] && [ ! -e "/var/www/admin/dmarc/config/conf.php" ] ; then
+	echo "[DMARC] Setting config file  ..."
+	. /var/qmail/control/aio-conf/mysql.conf
+	. /var/qmail/control/aio-conf/dmarc.conf
+    cat /opt/templates/dmarc.conf | envsubst '$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $DMARC_EMAIL_ADDR $DMARC_EMAIL_PASS' > /var/www/admin/dmarc/config/conf.php
+    chown www-data:www-data /var/www/admin/dmarc/config/conf.php
+    chmod 600 /var/www/admin/dmarc/config/conf.php
+fi
+
 if [ ! -e "/var/www/html/config/config.inc.php" ]; then
-    echo "[ROUNDCUBE] Setting main and plugin config files ..."
+    echo "[Roundcube] Setting main and plugin config files ..."
    	. /var/qmail/control/aio-conf/mysql.conf
 	. /var/qmail/control/aio-conf/roundcube.conf
 	for OCONF in /var/www/html/config/*.tpl /var/www/html/plugins/*/*.tpl; do
@@ -91,17 +103,17 @@ if [ ! -e "/var/www/html/config/config.inc.php" ]; then
 fi
 
 if [ ! -e "/etc/mailname" ]; then
-    echo "[SYSTEM] Setting /etc/mailname file ..."
+    echo "[system] Setting /etc/mailname file ..."
     cp /var/qmail/control/me /etc/mailname
 fi
 
 SMTP_SERVER=$(cat /var/qmail/control/me)
 if [ -z $(grep "$SMTP_SERVER" "/etc/hosts") ]; then
-    echo "[SYSTEM] Fix hosts file"
+    echo "[system] Fix hosts file"
     echo "$SMTP_SERVER" >> /etc/hosts
 fi
 
-echo "[SYSTEM] Setting file permissions ..."
+echo "[system] Setting file permissions ..."
 
 # Fix qmail tmp permissions
 chown vpopmail:sqmail -R /var/qmail/tmp

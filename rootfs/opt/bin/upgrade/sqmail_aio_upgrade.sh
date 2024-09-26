@@ -52,6 +52,9 @@ EOF
 
 function up_1.5_to_1.6 {
     echo "Upgrading S/QMAIL AIO to 1.6"
+    . /var/qmail/control/aio-conf/mysql.conf
+
+    cat /opt/sql/dmarc.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
 
 	sed -i '/MYSQL_/d' /var/qmail/control/aio-conf/roundcube.conf
     rm -f /var/qmail/control/aio-conf/fetchmail.conf

@@ -33,7 +33,6 @@ docker run \
   --volume /opt/mail_data/vpopmail_etc:/var/vpopmail/etc \
   --volume /opt/mail_data/log:/log \
   --volume /opt/mail_data/spamassassin:/var/spamassassin \
-  --volume /opt/mail_data/tmp:/var/qmail/tmp \
   --volume /opt/mail_data/qusers:/var/qmail/users \
   --volume /opt/mail_data/queue:/var/qmail/queue \
   --volume /opt/mail_data/qalias:/var/qmail/alias \
@@ -54,7 +53,6 @@ services:
       - ./data/vpopmail_etc:/var/vpopmail/etc
       - ./data/log:/log
       - ./data/spamassassin:/var/spamassassin
-      - ./data/tmp:/var/qmail/tmp
       - ./data/qusers:/var/qmail/users
       - ./data/queue:/var/qmail/queue
       - ./data/qalias:/var/qmail/alias
@@ -147,7 +145,9 @@ docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
   * `/ssl/smtp.key` - SMTP Key
   * `/ssl/smtp.crt` - SMTP Certificate
 * `/opt/bin/init.sh` - Initialisation script
-* `/opt/bin/init-certs.sh` - Certs initialisation script
+* `/opt/bin/init_certs.sh` - Certs initialisation script
+* `/opt/bin/init_dmarc.sh` - Create local dmarc user, and init web interface
+  * usage `/opt/bin/init_dmarc.sh <email> <password>`
 * `/opt/bin/lighttpd_admin.sh` - Add an user allowed to acces the admin web interface
   * usage `/opt/bin/lighttpd_admin.sh <user> <password>`
   * Administator user for `vqadmin` must be *admin*
@@ -158,7 +158,6 @@ docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
 *  `/var/qmail/control/dkimdomains` - DKIM domains
   * Sending domains other than the default domain and with they own key must be added in this file
   * For more information see https://www.fehcom.de/sqmail/man/qmail-dksign.html
-
 * `/opt/bin/tester.sh` - Check is IMAP POP SMTP Clamav and SpamAssasin was working
   * usage `tester.sh <test mail recipient> -doit`
 

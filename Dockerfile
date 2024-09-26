@@ -4,11 +4,13 @@ LABEL maintainer="nathanael@semhoun.net"
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TERM=linux
 
+ENV SQMAIL_AIO_VERSION="1.6"
+
 ARG SQMAIL_TAG=4.3.16
 ARG FEHQLIBS_TAG=25b
 ARG MESS822X_TAG=0.69
 ARG UCSPISSL_TAG=0.13.02
-ARG UCSPITCP6_TAG=1.13.01
+ARG UCSPITCP6_TAG=1.13.02
 
 ARG VPOPMAIL_TAG=5.6.2
 
@@ -30,6 +32,8 @@ ARG VQADMIN_TAG=2.4.1
 
 ARG ROUNDCUBEMAIL_TAG=1.6.9
 ARG QMAILFORWARD_TAG=1.0.3
+
+ARG DMARCSRG_TAG=2.2.1
 
 WORKDIR "/opt/src"
 
@@ -504,6 +508,20 @@ RUN cd /var/www/html \
   && wget -O qmailforward.tgz https://github.com/sagredo-dev/qmailforward/archive/refs/tags/v${QMAILFORWARD_TAG}.tar.gz \
   && tar -xzf qmailforward.tgz --strip 1 \
   && rm -f qmailforward.tgz \
+# Remove config file for autoinit
+  && rm -f /var/www/html/config/config.inc.php \
+# Cleaning
+  && rm -rf installer
+
+###########################
+# DmarcSrg
+###########################
+RUN mkdir -p /var/www/admin/dmarc \
+  && wget -O /opt/src/dmarcsrg.tgz https://github.com/liuch/dmarc-srg/archive/refs/tags/v${DMARCSRG_TAG}.tar.gz \
+  && cd /var/www/admin/dmarc \
+  && tar -xzf /opt/src/dmarcsrg.tgz --strip 1 \
+  && composer install \
+  && chown www-data:www-data /var/www/admin/dmarc \
 # Cleaning
   && rm -rf installer
 
@@ -547,7 +565,6 @@ VOLUME [ \
   "/var/qmail/control",\
   "/log",\
   "/var/spamassassin",\
-  "/var/qmail/tmp", \
   "/var/qmail/users", \
   "/var/qmail/ssl/domainkeys" \
 ]
@@ -557,11 +574,10 @@ VOLUME [ \
 ###########################
 WORKDIR "/opt"
 ENV PATH="${PATH}:/opt/bin"
-ENV SQMAIL_AIO_VERSION="1.5"
 EXPOSE 25 465 587
 EXPOSE 110 995
 EXPOSE 143 993
 EXPOSE 80 88
 
-ENTRYPOINT ["/opt/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["/opt/bin/entrypoint.sh"]
 CMD ["/bin/s6-svscan", "/service", "2>&1"]

@@ -31,9 +31,13 @@
                     <button onclick="location.href='/cgi/vqadmin/vqadmin.cgi'" type="button" class="btn btn-outline-light " style="width: 80%; padding-top:10px; padding-bottom:10px; font-weight: 600;">VQAdmin</button>
                 </div>
                 <div style="padding-bottom: 30px;">
-                    <button onclick="location.href='cgi/qmailadmin'" type="button" class="btn btn-outline-light" style="width: 80%; padding-top:10px; padding-bottom:10px; font-weight: 600;">QMail Admin</button>
+                    <button onclick="location.href='/cgi/qmailadmin'" type="button" class="btn btn-outline-light" style="width: 80%; padding-top:10px; padding-bottom:10px; font-weight: 600;">QMail Admin</button>
                 </div>
-                
+<?php if (file_exists('/var/qmail/control/aio-conf/dmarc.conf')) { ?>
+                <div style="padding-bottom: 30px;">
+                    <button onclick="location.href='/dmarc/'" type="button" class="btn btn-outline-light" style="width: 80%; padding-top:10px; padding-bottom:10px; font-weight: 600;">DMARC</button>
+                </div>
+<?php } ?>
                 <div style="padding-bottom: 30px;">
                     <button onclick="location.href='/info.php'" type="button" class="btn btn-outline-light" style="width: 80%; padding-top:10px; padding-bottom:10px; font-weight: 600;">Info</button>
                 </div>
