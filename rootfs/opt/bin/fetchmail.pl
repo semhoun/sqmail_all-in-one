@@ -34,11 +34,11 @@ our $run_dir="/var/run/fetchmail";
 # Where the delivery binary is located
 $dovecot_deliver = "/usr/libexec/dovecot/dovecot-lda";
 
-# instead of changing this script, you can put your settings to /etc/mail/postfixadmin/fetchmail.conf
+# instead of changing this script, you can put your settings to /etc/fetchmail.conf
 # just use perl syntax there to fill the variables listed above (without the "our" keyword). Example:
 # $db_username = 'mail';
-if (-f "/var/qmail/control/aio-conf/fetchmail.conf") {
-	require "/var/qmail/control/aio-conf/fetchmail.conf";
+if (-f "/etc/fetchmail.conf") {
+	require "/etc/fetchmail.conf";
 }
 
 

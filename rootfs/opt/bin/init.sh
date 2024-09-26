@@ -232,10 +232,6 @@ echo ":allow,QHPSI='clamdscan',QHPSIARG1='--no-summary',MFDNSCHECK='',BADMIMETYP
 
 # Generate roundcube config
 cat > /var/qmail/control/aio-conf/roundcube.conf << EOF
-export MYSQL_USER=${MYSQL_USER}
-export MYSQL_PASS=${MYSQL_PASS}
-export MYSQL_DB=${MYSQL_DB}
-export MYSQL_HOST=${MYSQL_HOST}
 export DES_KEY=`apg -MSNCL -m 24 -x 24 -n 1`
 export SUPPORT_URL="${ROUNDCUBE_SUPPORT}"
 export PRODUCT_NAME="${ROUNDCUBE_NAME}"
@@ -243,14 +239,6 @@ EOF
 
 # Roundcube DB
 cat /opt/sql/roundcube.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
-
-# Fetchmail config
-cat > /var/qmail/control/aio-conf/fetchmail.conf << EOF
-\$db_host='${MYSQL_HOST}';
-\$db_name='${MYSQL_DB}';
-\$db_username='${MYSQL_USER}';
-\$db_password='${MYSQL_PASS}';
-EOF
 
 # Fetchmail DB
 cat /opt/sql/fetchmail.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}

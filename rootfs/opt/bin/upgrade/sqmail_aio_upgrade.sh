@@ -50,12 +50,24 @@ EOF
     /opt/bin/upgrade/forward_sieves2valias.php
 }
 
+function up_1.5_to_1.6 {
+    echo "Upgrading S/QMAIL AIO to 1.6"
+
+	sed -i '/MYSQL_/d' /var/qmail/control/aio-conf/roundcube.conf
+    rm -f /var/qmail/control/aio-conf/fetchmail.conf
+    rm -f /var/qmail/control/spamassassin_sql.cf
+}
+
 if [ -z "${LOCAL_VERSION}" ]; then
 	up_1.3_to_1.4
 fi
 
 if [ "${LOCAL_VERSION}" == "1.4" ]; then
 	up_1.4_to_1.5
+fi
+
+if [ "${LOCAL_VERSION}" == "1.5" ]; then
+	up_1.5_to_1.6
 fi
 
 echo -n "${SQMAIL_AIO_VERSION}" > /var/qmail/control/aio-conf/sqmail_aio_version
