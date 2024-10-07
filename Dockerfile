@@ -6,8 +6,8 @@ ENV TERM=linux
 
 ENV SQMAIL_AIO_VERSION="1.6"
 
-ARG SQMAIL_TAG=4.3.16
-ARG FEHQLIBS_TAG=25b
+ARG SQMAIL_TAG=4.3.17
+ARG FEHQLIBS_TAG=26
 ARG MESS822X_TAG=0.69
 ARG UCSPISSL_TAG=0.13.02
 ARG UCSPITCP6_TAG=1.13.02
@@ -166,9 +166,19 @@ RUN mkdir -p /package \
   && cd /package \
   && tar xzf /opt/src/sqmail-${SQMAIL_TAG}.tgz \
   && cd mail/sqmail/sqmail-${SQMAIL_TAG} \
-  && sed -i '/service/d' package/install \
-  && sed -i '/run/d' package/install \
-  && package/install \
+  && sed -i 's/ -lsocket//g' conf-ld \
+  && package/dir \
+  && package/ids \
+  && package/ucspissl \
+  && package/compile \
+#  && package/upgrade \
+  && package/legacy \
+  && package/man \
+  && package/control \
+  && package/sslenv \
+#  && package/service \
+  && package/scripts \
+#  && package/run \
 # Fix sendmail
   && cp /var/qmail/bin/sendmail /usr/sbin/sendmail \
 ## cleaning
