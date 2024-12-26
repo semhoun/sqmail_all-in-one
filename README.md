@@ -163,22 +163,22 @@ docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
 
 ## Built With
 
-* qmail-autoresponder 2.0
-* clamav 1.2.1
-* dovecot 2.3.21
+* [clamav](https://www.clamav.net/) 1.4.1
+* [dovecot](https://www.dovecot.org/) 2.3.21
 * ezmlm-idx 7.2.2
-* fehQlibs 23
-* fcron 3.3.1
-* [qmailadmin](https://github.com/semhoun/qmailadmin)
-* qmail-autoresponder 2.0
-* Roundcube 1.6.4
-* SpamAssassin 4.0.0
-* s6 2.11.3.2
-* SQMail 4.2.28
+* [fehQlibs](https://www.fehcom.de/ipnet/qlibs.html) 26
+* [fcron](https://github.com/yo8192/fcron) 3.3.1
+* [qmailadmin]( https://github.com/sagredo-dev/qmailadmin) 1.2.23
+* [qmail-autoresponder](https://untroubled.org/qmail-autoresponder) 2.0
+* [Roundcube](https://roundcube.net/) 1.6.9
+* [SpamAssassin](https://spamassassin.apache.org/) 4.0.1
+* [s6](https://github.com/skarnet/s6) 2.13.1.0
+* [SQMail](https://www.fehcom.de/sqmail/sqmail.html) 4.3.18
 * [VPopMail](https://github.com/semhoun/vpopmail)
-* [vqadmin](https://github.com/semhoun/vqadmin)
-* acme.sh 3.0.7
+* [vqadmin](https://github.com/sagredo-dev/vqadmin) 2.4.3
+* [acme.sh](https://github.com/acmesh-official/acme.sh) 3.1.0
 * fetchmail
+* [DmarcSrg](https://github.com/liuch/dmarc-srg) 2.2.1
 
 ## Testing
 ### Manual SMTP

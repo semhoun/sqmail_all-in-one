@@ -6,19 +6,19 @@ ENV TERM=linux
 
 ENV SQMAIL_AIO_VERSION="1.6"
 
-ARG SQMAIL_TAG=4.3.17
-ARG FEHQLIBS_TAG=26
-ARG MESS822X_TAG=0.69
-ARG UCSPISSL_TAG=0.13.02
+ARG SQMAIL_TAG=4.3.18
+ARG FEHQLIBS_TAG=26b
+ARG MESS822X_TAG=1.21
+ARG UCSPISSL_TAG=0.13.03
 ARG UCSPITCP6_TAG=1.13.02
 
 ARG VPOPMAIL_TAG=5.6.2
 
-ARG EXECLINE_TAG=2.9.6.0
-ARG SKALIB_TAG=2.14.2.0
-ARG S6_TAG=2.13.0.0
+ARG EXECLINE_TAG=2.9.6.1
+ARG SKALIB_TAG=2.14.3.0
+ARG S6_TAG=2.13.1.0
 
-ARG ACMESH_TAG=3.0.7
+ARG ACMESH_TAG=3.1.0
 ARG FCRON_TAG=3.3.1
 ARG CLAMAV_TAG=1.4.1
 
@@ -28,7 +28,7 @@ ARG DOVECOT_PIGEONHOLE_TAG=0.5.21.1
 ARG SPAMASSASSIN_TAG=4.0.1
 
 ARG QMAILADMIN_TAG=1.2.23
-ARG VQADMIN_TAG=2.4.1
+ARG VQADMIN_TAG=2.4.3
 
 ARG ROUNDCUBEMAIL_TAG=1.6.9
 ARG QMAILFORWARD_TAG=1.0.3
@@ -135,9 +135,10 @@ RUN mkdir -p /package \
 ## fehQlibs
   && cd /opt/src \
   && wget https://www.fehcom.de/ipnet/fehQlibs/fehQlibs-${FEHQLIBS_TAG}.tgz \
-  && mkdir -p /usr/local/qlibs \
-  && cd /usr/local/qlibs \
-  && tar xzf /opt/src/fehQlibs-${FEHQLIBS_TAG}.tgz --strip 1 \
+  && cd /usr/local \
+  && tar xzf /opt/src/fehQlibs-${FEHQLIBS_TAG}.tgz \
+  && mv fehQlibs-* qlibs \
+  && cd qlibs \
   && make -C src \
 ## ucspi-ssl    
   && cd /opt/src \
@@ -311,8 +312,8 @@ RUN wget http://notes.sagredo.eu/files/qmail/tar/ezmlm-idx-7.2.2.tar.gz \
   
 ########################
 # QmailAdmin
-########################
 RUN wget -O qmailadmin-${QMAILADMIN_TAG}.tar.gz https://github.com/sagredo-dev/qmailadmin/archive/refs/tags/v${QMAILADMIN_TAG}.tar.gz  \
+########################
   && mkdir qmailadmin \
   && cd qmailadmin \
   && tar xzf ../qmailadmin-${QMAILADMIN_TAG}.tar.gz --strip 1 \

@@ -114,6 +114,7 @@ fi
 # Create config
 #########################
 mkdir -p /var/qmail/control/aio-conf
+chmod 755 /var/qmail/control/aio-conf
 
 export MYSQL_USER=${MYSQL_USER}
 export MYSQL_PASS=${MYSQL_PASS}
