@@ -8,10 +8,15 @@ function delayedProcess {
 
 if [ -n "${SKIP_INIT_ENV}" ]; then
   exec $@
-  exit
+  exit 0
 fi
 
 /opt/bin/upgrade/sqmail_aio_upgrade.sh
+upgradeStatus=$?
+if [ ${upgradeStatus} -ne 0 ]; then
+  exit 1
+fi
+
 
 if [ -n "${DEV_MODE}" ]; then
 	sed '/^ExcludeDatabase/d' -i /etc/clamav/freshclam.conf
@@ -135,3 +140,4 @@ delayedProcess &
 
 echo "#> Lauching $@"
 exec $@
+exit $?

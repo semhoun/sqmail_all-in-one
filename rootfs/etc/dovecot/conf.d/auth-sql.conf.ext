@@ -1,34 +1,30 @@
-# Authentication for SQL users. Included from 10-auth.conf.
-#
-# <doc/wiki/AuthDatabase.SQL.txt>
+# https://doc.dovecot.org/latest/core/config/auth/databases/sql.html#mysql
+sql_driver = mysql
+# Default password scheme.
+# List of supported schemes is in
+# https://doc.dovecot.org/latest/core/config/auth/schemes.html
+# This is important if you have old MD5-CRYPT passwords accepted (starting with $1)
+auth_allow_weak_schemes = yes
+passdb_default_password_scheme = SHA512-CRYPT
 
-passdb {
-  driver = sql
+# The mysqld.sock socket may be in different locations in different systems.
+#mysql /var/run/mysqld/mysqld.sock {
+# overwritten by local.conf
+#mysql localhost {
+#  user = vpopmail
+#  password = xxxxxxxxxxxxxxxxxxx
+#  dbname = vpopmail
 
-  # Path for SQL configuration file, see example-config/dovecot-sql.conf.ext
-  args = /var/qmail/control/dovecot-sql.conf.ext
-}
+  #ssl = yes
+  #ssl_client_ca_dir = /etc/ssl/certs
+#}
 
-# "prefetch" user database means that the passdb already provided the
-# needed information and there's no need to do a separate userdb lookup.
-# <doc/wiki/UserDatabase.Prefetch.txt>
-userdb {
-  driver = prefetch
-}
+# grab the sql queries for the specific situation
 
-#
-# This is for LDA. It will do a passdb query in any case.
-# But using the prefetch driver will speed up our normal imap operations and
-# this is more important.
-userdb {
-  driver = static
-  args = uid=89 gid=89 home=/var/vpopmail/domains/%d/%n
-}
+# auth-sql --enable-many-domains --enable--sql-aliasdomain --enable-mysql-limits
+!include sql-query-default.conf.ext
 
-# This is needed for the iteration feature. It needs a userdb sql query.
-# The order of the declared drivers is important. Leave this at the end, otherwise
-# it will be used also for the login instead of the prefetch, which is faster.
-userdb {
-  driver = sql
-  args = /var/qmail/control/dovecot-sql.conf.ext
-}
+# auth-sql --disable-many-domains --enable--sql-aliasdomain --enable-mysql-limits
+# You can add the following in your local.conf to overwrite the directives
+# already defined above in sql-query-default.conf.ext
+#!include sql-query--disable-many-domains.conf.ext

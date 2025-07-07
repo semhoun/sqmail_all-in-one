@@ -4,36 +4,35 @@ LABEL maintainer="nathanael@semhoun.net"
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TERM=linux
 
-ENV SQMAIL_AIO_VERSION="1.6"
+ENV SQMAIL_AIO_VERSION="1.7"
 
-ARG SQMAIL_TAG=4.3.18
-ARG FEHQLIBS_TAG=26b
-ARG MESS822X_TAG=1.21
+ARG SQMAIL_TAG=4.3.20
+ARG FEHQLIBS_TAG=27
+ARG MESS822X_TAG=1.23
 ARG UCSPISSL_TAG=0.13.03
 ARG UCSPITCP6_TAG=1.13.02
 
-ARG VPOPMAIL_TAG=5.6.2
+ARG VPOPMAIL_TAG=5.6.8
 
-ARG EXECLINE_TAG=2.9.6.1
-ARG SKALIB_TAG=2.14.3.0
-ARG S6_TAG=2.13.1.0
+ARG EXECLINE_TAG=2.9.7.0
+ARG SKALIB_TAG=2.14.4.0
+ARG S6_TAG=2.13.2.0
 
 ARG ACMESH_TAG=3.1.0
-ARG FCRON_TAG=3.3.1
-ARG CLAMAV_TAG=1.4.1
+ARG FCRON_TAG=3.4.0
+ARG CLAMAV_TAG=1.4.2
 
-ARG DOVECOT_TAG=2.3.21.1
-ARG DOVECOT_PIGEONHOLE_TAG=0.5.21.1
+ARG DOVECOT_TAG=2.4.1-4
 
 ARG SPAMASSASSIN_TAG=4.0.1
 
-ARG QMAILADMIN_TAG=1.2.23
+ARG QMAILADMIN_TAG=1.2.24
 ARG VQADMIN_TAG=2.4.3
 
-ARG ROUNDCUBEMAIL_TAG=1.6.9
+ARG ROUNDCUBEMAIL_TAG=1.6.11
 ARG QMAILFORWARD_TAG=1.0.3
 
-ARG DMARCSRG_TAG=2.2.1
+ARG DMARCSRG_TAG=2.3
 
 WORKDIR "/opt/src"
 
@@ -43,6 +42,7 @@ WORKDIR "/opt/src"
 RUN mkdir -p /opt/src /opt/templates \
   && apt-get update \
   && apt-get -y install build-essential libtool-bin equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg \
+  && apt-get clean \
 ## Add docker group for logs
   && groupadd -g 998 docker \
 ## Add MTA Local (equivs is needed)
@@ -66,6 +66,7 @@ Description: A local MTA package \n\
 # Encoding fix
 ########################
 RUN apt-get -y install locales \
+  && apt-get clean \
   && sed \
       -e 's/# fr_FR.UTF-8 UTF-8/fr_FR.UTF-8 UTF-8/' \
       -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' \
@@ -95,10 +96,16 @@ RUN apt-get -y install bsd-mailx \
     lighttpd php8.2-fpm \
 	libev-dev automake1.11 automake \
 	fetchmail liblockfile-simple-perl \
+# For dovecot
+  &&  apt-get -y install libxapian-dev \
+	# libldap2 must be removed in future
+	libldap2-dev \ 
 # For roundcube
   && apt-get install -y php8.2-zip php8.2-pspell php8.2-mysql php8.2-gd php8.2-imap php8.2-xml php8.2-mbstring php8.2-intl php-imagick aspell-fr php8.2-intl php8.2-curl \
   && cpan -i IP::Country::DB_File MaxMind::DB::Reader Geo::IP IP::Country::Fast Digest::SHA1 Net::LibIDN2 Email::Address::XS \ 
-  && rm -rf /root/.local
+  && rm -rf /root/.local \
+# Cleaning
+  && apt-get clean
 
 ########################
 # Skarnet S6
@@ -194,7 +201,7 @@ RUN cd /opt/src \
   && groupadd -g 89 vchkpw \
   && useradd -g vchkpw -u 89 -s /usr/sbin/nologin -d /var/vpopmail vpopmail \
   && chown -R vpopmail:vchkpw /var/vpopmail \
-  && wget -O vpopmail-${VPOPMAIL_TAG}.tar.gz https://github.com/semhoun/vpopmail/archive/refs/tags/${VPOPMAIL_TAG}.tar.gz \
+  && wget -O vpopmail-${VPOPMAIL_TAG}.tar.gz https://github.com/sagredo-dev/vpopmail/archive/refs/tags/v${VPOPMAIL_TAG}.tar.gz \
   && mkdir vpopmail \
   && cd vpopmail \
   && tar xzf ../vpopmail-${VPOPMAIL_TAG}.tar.gz --strip 1 \
@@ -235,14 +242,19 @@ RUN cd /opt/src \
   && rm -rf /opt/src/*
   
 ########################
-# Dovecot
+# Dovecot & PingeonHole
 ########################
 RUN groupadd -g 2110 dovecot \
   && useradd -g dovecot -u 7798 -s /usr/sbin/nologin -d /var/run dovenull \
   && useradd -g dovecot -u 7799 -s /usr/sbin/nologin -d /var/run dovecot \
-  && wget https://dovecot.org/releases/2.3/dovecot-${DOVECOT_TAG}.tar.gz \
-  && tar xzf dovecot-${DOVECOT_TAG}.tar.gz \
-  && cd dovecot-${DOVECOT_TAG} \
+  && wget -O dovecot-${DOVECOT_TAG}.tar.gz https://dovecot.org/releases/2.4/dovecot-${DOVECOT_TAG}.tar.gz \
+  && wget -O dovecot-pigeonhole-${DOVECOT_TAG}.tar.gz  https://pigeonhole.dovecot.org/releases/2.4/dovecot-pigeonhole-${DOVECOT_TAG}.tar.gz \
+  && mkdir -p /opt/src/dovecot \
+	/opt/src/dovecot-pigeonhole \
+	/etc/dovecot /var/run/dovecot \
+# Dovecot 
+  && cd /opt/src/dovecot \
+  && tar xzf ../dovecot-${DOVECOT_TAG}.tar.gz --strip 1 \
   && ./configure \
     --prefix=/usr \
     --sysconfdir=/etc \
@@ -253,31 +265,26 @@ RUN groupadd -g 2110 dovecot \
     --with-ssl \
     --without-shadow \
     --without-pam \
-    --without-ldap \
+    --with-ldap \
     --without-pgsql \
     --without-sqlite \
+	--with-flatcurve \
   && make \
   && make install \
-  && mkdir -p /etc/dovecot/ /var/run/dovecot \
-# cleaning
-  && rm -rf /opt/src/*
-  
-########################
-# Dovecot PingeonHole
-########################
-RUN wget https://pigeonhole.dovecot.org/releases/2.3/dovecot-2.3-pigeonhole-${DOVECOT_PIGEONHOLE_TAG}.tar.gz \
-  && tar xzf dovecot-2.3-pigeonhole-${DOVECOT_PIGEONHOLE_TAG}.tar.gz \
-  && cd dovecot-2.3-pigeonhole-${DOVECOT_PIGEONHOLE_TAG} \
+# PingeonHole 
+  && cd /opt/src/dovecot-pigeonhole \
+  && tar xzf ../dovecot-pigeonhole-${DOVECOT_TAG}.tar.gz  --strip 1 \
   && ./configure \
     --prefix=/usr \
     --sysconfdir=/etc \
     --localstatedir=/var \
     --with-dovecot=/usr/lib/dovecot \
+	--with-ldap=no \
   && make \
   && make install \
 # cleaning
   && rm -rf /opt/src/*
-
+  
 ########################
 # qmail-autoresponder
 ########################
@@ -391,7 +398,7 @@ RUN groupadd -g 5010 clamav \
     -e "s/#ScanPDF .*/ScanPDF yes/" \
     -e "s/#ScanSWF .*/ScanSWF yes/" \
     -e "s/#ScanXMLDOCS .*/ScanXMLDOCS yes/" \
-    -e "s/#ScanMail .*/ScanMail yes/" \
+    -e "s/#ScanMail .*/ScanMail y es/" \
     -e "s/#Foreground .*/Foreground yes/" \
     -e "s/#ConcurrentDatabaseReload no/ConcurrentDatabaseReload no/" \
     /etc/clamav/clamd.conf.sample > /etc/clamav/clamd.conf \
@@ -432,9 +439,12 @@ RUN wget https://dlcdn.apache.org/spamassassin/source/Mail-SpamAssassin-${SPAMAS
 # FCRON
 ###########################
 #http://fcron.free.fr/download.php
-RUN wget http://fcron.free.fr/archives/fcron-${FCRON_TAG}.src.tar.gz \
-  && tar xzf fcron-${FCRON_TAG}.src.tar.gz \
-  && cd fcron-${FCRON_TAG} \
+RUN apt-get install -y docbook docbook-xsl docbook-xml docbook-utils manpages-dev \
+  && wget -O fcron-${FCRON_TAG}.tar.gz https://github.com/yo8192/fcron/archive/refs/tags/ver$(echo $FCRON_TAG | sed 's/\./_/g').tar.gz \
+  && mkdir fcron \
+  && cd fcron \
+  && tar xzf ../fcron-${FCRON_TAG}.tar.gz --strip 1 \
+  && autoconf \
   && ./configure \
     --prefix=/usr \
     --sysconfdir=/etc \
@@ -447,7 +457,9 @@ RUN wget http://fcron.free.fr/archives/fcron-${FCRON_TAG}.src.tar.gz \
   && make \
   && make install \
 # cleaning
-  && rm -rf /opt/src/*
+  && rm -rf /opt/src/* \
+  && apt-get purge -y manpages-dev \
+  && apt-get clean
 
 ###########################
 # ACME.SH
@@ -546,6 +558,7 @@ RUN chown qmailq:sqmail /var/qmail/bin/qmail-queuescan \
   && chown -R www-data:www-data /var/www/html /var/www/admin/html \
   && chown -R qmailq /service/qmail-send \
   && chown -R vpopmail:vchkpw /etc/dovecot/sieve \
+  && chmod -R ug+w /etc/dovecot/sieve/* \
   && cd /etc/dovecot/sieve/ && /usr/bin/sievec . \
 # Templates
   && cp -a /var/qmail/queue /opt/templates/ \

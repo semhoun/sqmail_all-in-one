@@ -9,14 +9,14 @@
 # sa_cron.sh username@domain.net
 #
 # otherwise, if you run it without passing any user, the job will be done for all users
-# having .Spam.TeachSpam and .Spam.TeachNotSpam dirs in their Maildirs.
+# having .Junk.TeachSpam and .Junk.TeachNotSpam dirs in their Maildirs.
 #
 # The script is intended to be run in a cronjob.
 #
 
 DOMAINS_DIR=/var/vpopmail/domains
-JUNK_DIR=.Spam.TeachSpam
-HAM_DIR=.Spam.TeachNotSpam
+JUNK_DIR=.Junk.TeachSpam
+HAM_DIR=.Junk.TeachNotSpam
 
 # Set this to 1 if you want to log debug msg
 DEBUG=1
@@ -27,7 +27,6 @@ DELETE_TEACH_DATA=1
 # spamassassin settings
 SA_LEARN_CMD=/usr/local/bin/sa-learn
 SA_CMD=/usr/local/bin/spamassassin
-
 
 ################### you should not modify anything below this line
 

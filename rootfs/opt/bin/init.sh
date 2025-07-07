@@ -99,6 +99,13 @@ Webadmin configuration will be:
 
 EOF
 
+DEFAULT_LANGUAGE=$(whiptail --menu "Choose default language :" 15 50 3 --title "Language" "en" "English" "fr" "French" "it" "Italian" 3>&1 1>&2 2>&3)
+if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
+cat >> "${RESUME}" << EOF
+Default language is : ${DEFAULT_LANGUAGE}
+
+EOF
+
 # Resume
 whiptail --textbox "${RESUME}" 40 78
 rm "${RESUME}"
@@ -121,14 +128,15 @@ export MYSQL_PASS=${MYSQL_PASS}
 export MYSQL_DB=${MYSQL_DB}
 export MYSQL_HOST=${MYSQL_HOST}
 
+export DEFAULT_DOMAIN=${DEFAULT_DOMAIN}
+
 # Default config
 echo "MAILER-DAEMON" > /var/qmail/control/bouncefrom
 echo postmaster > /var/qmail/control/doublebounceto
-echo "| /var/vpopmail/bin/vdelivermail '' delete" > /var/qmail/control/defaultdelivery
+echo '|/var/qmail/bin/preline -f /usr/libexec/dovecot/deliver -d $EXT@$USER' > /var/qmail/control/defaultdelivery
 
 # SSL base Config
 openssl dhparam -out /ssl/qmail-dhparam 2048
-openssl dhparam -out /ssl/dovecot-dhparam 2048  
 
 # Creation configuration
 cat > /var/qmail/control/mysql.conf << EOF
@@ -190,11 +198,12 @@ chown alias:sqmail .qmail*
 chmod 644 .qmail*
  
 # Dovecot
-cat /opt/templates/dovecot-sql.conf.ext | envsubst \
-    '$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB' \
-    > /var/qmail/control/dovecot-sql.conf.ext
-chown root:root /var/qmail/control/dovecot-sql.conf.ext
-chmod 600 /var/qmail/control/dovecot-sql.conf.ext
+cat /opt/templates/dovecot-local.conf | envsubst \
+    '$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $DEFAULT_DOMAIN' \
+    > /var/qmail/control/dovecot-local.conf
+cat /opt/templates/dovecot-${DEFAULT_LANGUAGE}.conf >> /var/qmail/control/dovecot-local.conf
+chown root:root /var/qmail/control/dovecot-local.conf
+chmod 600 /var/qmail/control/dovecot-local.conf
 
 # Creation directory and setting permissions
 chown qmailq:sqmail /var/qmail/queue
@@ -249,6 +258,11 @@ cat /opt/sql/fetchmail.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_
 
 # lighttpd Password
 /opt/bin/lighttpd_admin.sh "${WEBADMIN_USER}" "${WEBADMIN_PASSWORD}"
+
+# i8n configuration
+cat > /var/qmail/control/aio-conf/i8n.conf << EOF
+export DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE}
+EOF
 
 echo -n "${SQMAIL_AIO_VERSION}" > /var/qmail/control/aio-conf/sqmail_aio_version
 

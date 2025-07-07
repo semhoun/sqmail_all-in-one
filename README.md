@@ -163,22 +163,22 @@ docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
 
 ## Built With
 
-* [clamav](https://www.clamav.net/) 1.4.1
-* [dovecot](https://www.dovecot.org/) 2.3.21
+* [clamav](https://www.clamav.net/) 1.4.2
+* [dovecot](https://www.dovecot.org/) 2.4.1
 * ezmlm-idx 7.2.2
-* [fehQlibs](https://www.fehcom.de/ipnet/qlibs.html) 26
-* [fcron](https://github.com/yo8192/fcron) 3.3.1
-* [qmailadmin]( https://github.com/sagredo-dev/qmailadmin) 1.2.23
+* [fehQlibs](https://www.fehcom.de/ipnet/qlibs.html) 27
+* [fcron](https://github.com/yo8192/fcron) 3.4.0
+* [qmailadmin]( https://github.com/sagredo-dev/qmailadmin) 1.2.24
 * [qmail-autoresponder](https://untroubled.org/qmail-autoresponder) 2.0
-* [Roundcube](https://roundcube.net/) 1.6.9
+* [Roundcube](https://roundcube.net/) 1.6.11
 * [SpamAssassin](https://spamassassin.apache.org/) 4.0.1
-* [s6](https://github.com/skarnet/s6) 2.13.1.0
-* [SQMail](https://www.fehcom.de/sqmail/sqmail.html) 4.3.18
-* [VPopMail](https://github.com/semhoun/vpopmail)
+* [s6](https://github.com/skarnet/s6) 2.13.2.0
+* [SQMail](https://www.fehcom.de/sqmail/sqmail.html) 4.3.20
+* [VPopMail](https://github.com/semhoun/vpopmail) 5.6.8
 * [vqadmin](https://github.com/sagredo-dev/vqadmin) 2.4.3
 * [acme.sh](https://github.com/acmesh-official/acme.sh) 3.1.0
 * fetchmail
-* [DmarcSrg](https://github.com/liuch/dmarc-srg) 2.2.1
+* [DmarcSrg](https://github.com/liuch/dmarc-srg) 2.3
 
 ## Testing
 ### Manual SMTP
@@ -198,6 +198,11 @@ docker exec -it sqmail-aio /opt/bin/tester.sh <receipient email> -doit
 ```shell
 docker compose exec sqmail-aio /opt/bin/tester.sh <receipient email> -doit
 ```
+
+## Upgrade
+### 1.6 to 1.7
+You must add DEFAULT_LANGUAGE environment variable at first launch (and only at first launch). Valid value are en, fr and it. After 
+
 
 ## Find Me
 

@@ -1,0 +1,31 @@
+passdb sql {
+  # passdb query to retrieve the password. It can return fields:
+  #   password - The user's password. This field must be returned.
+  #   user - user@domain from the database. Needed with case-insensitive lookups.
+  #   username and domain - An alternative way to represent the "user" field.
+  #
+  # The "user" field is often necessary with case-insensitive lookups to avoid
+  # e.g. "name" and "nAme" logins creating two different mail directories. If
+  # your user and domain names are in separate fields, you can return "username"
+  # and "domain" fields instead of "user".
+
+  # Thanks to Pablo Murillo for sharing his sql example
+  query = CALL dovecot_password_query_disable_many_domains('%{user | username}','%{user | domain}','127.0.0.1','%{remote_ip}','%{local_port}')
+}
+
+# "prefetch" user database means that the passdb already provided the
+# needed information and there's no need to do a separate userdb lookup.
+# https://doc.dovecot.org/configuration_manual/authentication/prefetch_userdb/
+userdb prefetch {
+  driver = prefetch
+}
+
+# This is needed for LDA and for the iteration feature. They both need a userdb sql query.
+# The order of the declared drivers is important. Leave this at the end, otherwise
+# it will be used also for the login instead of the prefetch, which is faster.
+userdb sql {
+  userdb_sql_query = CALL dovecot_user_query_disable_many_domains('%{user | username}','%{user | domain}')
+
+  # Query to get a list of all usernames.
+#  userdb_sql_iterate_query = SELECT CONCAT(pw_name,'@',pw_domain) AS user FROM vpopmail
+}
