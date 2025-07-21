@@ -176,7 +176,7 @@ echo "${RLSBSERVER}" > /var/qmail/control/rslbserver
 echo "${QUEUELIFETIME}" > /var/qmail/control/queuelifetime
 
 # VPopmail configuration
-echo "${MYSQL_HOST}|0|${MYSQL_USER}|${MYSQL_PASS}|${MYSQL_DB}" > /var/vpopmail/etc/vpopmail.mysql
+echo "${MYSQL_HOST}|3306|${MYSQL_USER}|${MYSQL_PASS}|${MYSQL_DB}" > /var/vpopmail/etc/vpopmail.mysql
 echo "${DEFAULT_DOMAIN}" > /var/vpopmail/etc/defaultdomain
 cp /opt/templates/vlimits.default /var/vpopmail/etc/vlimits.default
 cp /opt/templates/vusage* /var/vpopmail/etc/

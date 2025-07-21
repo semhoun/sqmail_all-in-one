@@ -90,8 +90,8 @@ EOF
   done
   
   for DOTMAIL in /var/vpopmail/domains/*/*/.qmail; do
-    if [ $(grep -c '/var/qmail/bin/preline -f /usr/libexec/dovecot/deliver' $DOTMAIL) -gt 0 ]; then
-      if [ $(cat /var/vpopmail/domains/dune.tf/nathanael/.qmail | wc -l) -eq 1 ]; then
+    if [ $(grep -c '/var/qmail/bin/preline -f /usr/libexec/dovecot/deliver' ${DOTMAIL}) -gt 0 ]; then
+      if [ $(cat ${DOTMAIL} | wc -l) -eq 1 ]; then
           echo "Removing old sieve .qmail file ${DOTMAIL}"
           rm -f ${DOTMAIL}
       fi
@@ -102,6 +102,8 @@ EOF
   cat > /var/qmail/control/srsdomains << EOF
 *:${SRS_SECRET}|-|srs.
 EOF
+
+  echo "${MYSQL_HOST}|3306|${MYSQL_USER}|${MYSQL_PASS}|${MYSQL_DB}" > /var/vpopmail/etc/vpopmail.mysql
 }
 
 if [ -z "${LOCAL_VERSION}" ]; then
