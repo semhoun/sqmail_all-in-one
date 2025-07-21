@@ -33,7 +33,7 @@ $config['plugins'] = [
   'qmailforward',
 ];
 $config['language'] = 'fr_FR, en_US';
-$config['junk_mbox'] = 'Spam';
+$config['junk_mbox'] = 'Junk';
 $config['imap_vendor'] = 'dovecot';
 
 $config['enable_spellcheck'] = true;

@@ -210,24 +210,23 @@ RUN cd /opt/src \
     --enable-qmail-newu=/var/qmail/bin/qmail-newu \
     --enable-qmail-inject=/var/qmail/bin/qmail-inject \
     --enable-qmail-newmrh=/var/qmail/bin/qmail-newmrh \
-    --enable-tcpserver-file=/var/qmail/control/relays.cdb \
     --disable-roaming-users \
     --enable-auth-module=mysql \
     --enable-incdir=/usr/include/mariadb \
-    --enable-libdir=/usr/lib \
-    --enable-logging=n \
+    --enable-libdir=/usr/lib64 \
+    --enable-logging=e \
     --disable-clear-passwd \
     --enable-auth-logging \
     --enable-sql-logging=e \
     --disable-passwd \
     --enable-qmail-ext \
     --enable-qmail-cdb-name=assign.cdb \
+    --enable-learn-passwords \
     --enable-mysql-limits \
+    --enable-valias \
     --enable-sql-aliasdomains \
     --enable-defaultdelivery \
-    --enable-valias \
     --enable-md5-passwords \
-    --enable-min-pwd-length=6 \
   && make \
   && make install \
 # vusaged
@@ -330,17 +329,18 @@ RUN wget -O qmailadmin-${QMAILADMIN_TAG}.tar.gz https://github.com/sagredo-dev/q
     --enable-imagedir=/var/www/admin/html/images/qmailadmin \
     --enable-cgipath=/cgi/qmailadmin \
     --enable-imageurl=/images/qmailadmin \
+    --enable-qmaildir=/var/qmail \
     --disable-ezmlm-mysql \
     --enable-modify-quota \
     --enable-domain-autofill \
-    --enable-modify-spam \
-    --enable-spam-command='| /var/qmail/bin/preline -f /usr/libexec/dovecot/deliver -d $EXT@$USER' \
     --enable-help \
     --enable-vpopuser=vpopmail \
     --enable-vpopgroup=vchkpw \
     --enable-domain-autofill \
     --enable-autoresponder-path=/usr/local/bin \
     --enable-qmail-autoresponder \
+    --enable-maxusersperpage=100 \
+    --enable-maxaliasesperpage=100 \
   && make \
   && make install \
 # cleaning
@@ -382,26 +382,6 @@ RUN groupadd -g 5010 clamav \
     -D ENABLE_STATIC_LIB=ON \
   && cmake --build . \
   && cmake --build . --target install \
-  && sed -e "s/Example/#Exemple/" \
-    -e "s/#PidFile .*/PidFile \/var\/run\/freshclam.pid/" \
-    -e "s/#DNSDatabaseInfo .*/DNSDatabaseInfo current.cvd.clamav.net/" \
-    -e "s/#DatabaseMirror .*/DatabaseMirror database.clamav.net/" \
-    /etc/clamav/freshclam.conf.sample > /etc/clamav/freshclam.conf \
-  && sed -e "s/Example/#Exemple/" \
-    -e "s/#LogVerbose .*/LogVerbose yes/" \
-    -e "s/#LogClean .*/LogClean yes/" \
-    -e "s/#LocalSocket .*/LocalSocket \/tmp\/clamd.socket/" \
-    -e "s/#TCPSocket .*/TCPSocket 3310/" \
-    -e "s/#TCPAddr .*/TCPAddr 127.0.0.1/" \
-    -e "s/#ScanOLE2 .*/ScanOLE2 yes/" \
-    -e "s/#OLE2BlockMacros .*/OLE2BlockMacros yes/" \
-    -e "s/#ScanPDF .*/ScanPDF yes/" \
-    -e "s/#ScanSWF .*/ScanSWF yes/" \
-    -e "s/#ScanXMLDOCS .*/ScanXMLDOCS yes/" \
-    -e "s/#ScanMail .*/ScanMail y es/" \
-    -e "s/#Foreground .*/Foreground yes/" \
-    -e "s/#ConcurrentDatabaseReload no/ConcurrentDatabaseReload no/" \
-    /etc/clamav/clamd.conf.sample > /etc/clamav/clamd.conf \
 # cleaning
   && rm -rf /opt/src/*
 
@@ -560,6 +540,7 @@ RUN chown qmailq:sqmail /var/qmail/bin/qmail-queuescan \
   && chown -R vpopmail:vchkpw /etc/dovecot/sieve \
   && chmod -R ug+w /etc/dovecot/sieve/* \
   && cd /etc/dovecot/sieve/ && /usr/bin/sievec . \
+  && chown -R clamav:clamav /etc/clamav \
 # Templates
   && cp -a /var/qmail/queue /opt/templates/ \
   && mv /var/qmail/control/ /opt/templates/ \

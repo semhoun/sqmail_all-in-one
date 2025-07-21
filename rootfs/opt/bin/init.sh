@@ -197,6 +197,12 @@ ln -s .qmail-postmaster .qmail-root
 chown alias:sqmail .qmail*
 chmod 644 .qmail*
  
+# SRS
+SRS_SECRET=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 13; echo)
+cat > /var/qmail/control/srsdomains << EOF
+*:${SRS_SECRET}|-|srs.
+EOF
+ 
 # Dovecot
 cat /opt/templates/dovecot-local.conf | envsubst \
     '$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $DEFAULT_DOMAIN' \

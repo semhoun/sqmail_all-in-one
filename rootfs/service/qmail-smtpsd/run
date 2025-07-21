@@ -1,9 +1,9 @@
 #!/usr/bin/sh
-QMAILDUID=`id -u vpopmail`
-QMAILDGID=`id -g vpopmail`
-HOSTNAME=`cat /var/qmail/control/me`
-CONCURRENCY=`cat /var/qmail/control/concurrencyincoming`
-RLSBSERVER=`cat /var/qmail/control/rslbserver`
+QMAILDUID=$(id -u vpopmail)
+QMAILDGID=$(id -g vpopmail)
+HOSTNAME=$(cat /var/qmail/control/me)
+CONCURRENCY=$(cat /var/qmail/control/concurrencyincoming)
+RLSBSERVER=$(cat /var/qmail/control/rslbserver)
 export SMTPAUTH=""
 . /var/qmail/ssl_env
 exec env PATH="/var/qmail/bin:$PATH" \

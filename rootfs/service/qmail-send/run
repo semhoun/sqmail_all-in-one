@@ -1,5 +1,5 @@
 #!/usr/bin/sh
 exec env - \
   PATH="/var/qmail/bin:$PATH" \
-  qmail-start "`cat /var/qmail/control/defaultdelivery`" \
+  qmail-start "$(cat /var/qmail/control/defaultdelivery)" \
   2>&1
