@@ -171,7 +171,7 @@ docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
 * [qmailadmin]( https://github.com/sagredo-dev/qmailadmin) 1.2.24
 * [qmail-autoresponder](https://untroubled.org/qmail-autoresponder) 2.0
 * [Roundcube](https://roundcube.net/) 1.6.11
-* [SpamAssassin](https://spamassassin.apache.org/) 4.0.1
+* [SpamAssassin](https://spamassassin.apache.org/) 4.0.2
 * [s6](https://github.com/skarnet/s6) 2.13.2.0
 * [SQMail](https://www.fehcom.de/sqmail/sqmail.html) 4.3.20
 * [VPopMail](https://github.com/semhoun/vpopmail) 5.6.8
