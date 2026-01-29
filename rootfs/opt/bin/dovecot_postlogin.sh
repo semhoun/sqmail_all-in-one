@@ -52,6 +52,6 @@ d=$(echo $USER | cut -d'@' -f2)
 
 # Run the query
 export MYSQL_PWD="$PWD"
-echo "INSERT INTO lastauth (user, domain, remote_ip, timestamp) VALUES ('$u', '$d', '$IP', UNIX_TIMESTAMP(now())) ON DUPLICATE KEY UPDATE timestamp=UNIX_TIMESTAMP(now()), remote_ip='$IP';" | mysql -P$PORT -h$HOST -u$USR $DB
+echo "INSERT INTO lastauth (user, domain, remote_ip, timestamp) VALUES ('$u', '$d', '$IP', UNIX_TIMESTAMP(now())) ON DUPLICATE KEY UPDATE timestamp=UNIX_TIMESTAMP(now()), remote_ip='$IP';" | mysql --skip-ssl-verify-server-cert -P$PORT -h$HOST -u$USR $DB
 
 exec "$@"
