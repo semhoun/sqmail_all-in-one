@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 LABEL maintainer="nathanael@semhoun.net"
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -6,31 +6,31 @@ ENV TERM=linux
 
 ENV SQMAIL_AIO_VERSION="1.7"
 
-ARG SQMAIL_TAG=4.3.20
-ARG FEHQLIBS_TAG=27
-ARG MESS822X_TAG=1.23
-ARG UCSPISSL_TAG=0.13.03
-ARG UCSPITCP6_TAG=1.13.02
+ARG SQMAIL_TAG=4.3.25
+ARG FEHQLIBS_TAG=29
+ARG MESS822X_TAG=1.26
+ARG UCSPISSL_TAG=0.13.07
+ARG UCSPITCP6_TAG=1.13.07
 
-ARG VPOPMAIL_TAG=5.6.8
+ARG VPOPMAIL_TAG=5.6.11
 
-ARG EXECLINE_TAG=2.9.7.0
-ARG SKALIB_TAG=2.14.4.0
-ARG S6_TAG=2.13.2.0
+ARG EXECLINE_TAG=2.9.8.0
+ARG SKALIB_TAG=2.14.5.0
+ARG S6_TAG=2.14.0.0
 
-ARG ACMESH_TAG=3.1.0
+ARG ACMESH_TAG=3.1.2
 ARG FCRON_TAG=3.4.0
-ARG CLAMAV_TAG=1.4.2
+ARG CLAMAV_TAG=1.5.1
 
-ARG DOVECOT_TAG=2.4.1-4
+ARG DOVECOT_TAG=2.4.2
 
 ARG SPAMASSASSIN_TAG=4.0.2
 
-ARG QMAILADMIN_TAG=1.2.24
-ARG VQADMIN_TAG=2.4.3
+ARG QMAILADMIN_TAG=1.2.27
+ARG VQADMIN_TAG=2.4.4
 
-ARG ROUNDCUBEMAIL_TAG=1.6.11
-ARG QMAILFORWARD_TAG=1.0.3
+ARG ROUNDCUBEMAIL_TAG=1.6.12
+ARG QMAILFORWARD_TAG=1.0.4
 
 ARG DMARCSRG_TAG=2.3
 
@@ -93,15 +93,16 @@ RUN apt-get -y install bsd-mailx \
     mariadb-client \
     socat inetutils-ping \
     swaks expect telnet \
-    lighttpd php8.2-fpm \
-	libev-dev automake1.11 automake \
-	fetchmail liblockfile-simple-perl \
+    lighttpd php8.4-fpm \
+    libev-dev automake \
+    fetchmail liblockfile-simple-perl  \
+    libbg-dev \
 # For dovecot
   &&  apt-get -y install libxapian-dev \
-	# libldap2 must be removed in future
-	libldap2-dev \ 
+    # libldap2 must be removed in future
+    libldap2-dev \ 
 # For roundcube
-  && apt-get install -y php8.2-zip php8.2-pspell php8.2-mysql php8.2-gd php8.2-imap php8.2-xml php8.2-mbstring php8.2-intl php-imagick aspell-fr php8.2-intl php8.2-curl \
+  && apt-get install -y php8.4-zip php8.4-pspell php8.4-mysql php8.4-gd php8.4-xml php8.4-mbstring php8.4-intl php-imagick aspell-fr php8.4-intl php8.4-curl \
   && cpan -i IP::Country::DB_File MaxMind::DB::Reader Geo::IP IP::Country::Fast Digest::SHA1 Net::LibIDN2 Email::Address::XS \ 
   && rm -rf /root/.local \
 # Cleaning
@@ -278,25 +279,16 @@ RUN groupadd -g 2110 dovecot \
     --sysconfdir=/etc \
     --localstatedir=/var \
     --with-dovecot=/usr/lib/dovecot \
-	--with-ldap=no \
+    --with-ldap=no \
   && make \
   && make install \
 # cleaning
   && rm -rf /opt/src/*
-  
+
 ########################
 # qmail-autoresponder
 ########################
-RUN wget http://untroubled.org/bglibs/bglibs-2.04.tar.gz \
-  && tar xzf bglibs-2.04.tar.gz \
-  && cd bglibs-2.04 \
-  && sed -i 's/69,5,1,51/45,63,65,23/' net/resolve_ipv4addr.c \
-  && sed -i 's/69.5.1.51 => .*/45.63.65.23 => vx0.untroubled.org/' net/resolve_ipv4addr.c \
-  && make \
-  && make install \
-  && ldconfig \
-  && cd /opt/src \
-  && wget https://untroubled.org/qmail-autoresponder/qmail-autoresponder-2.0.tar.gz \
+RUN wget https://untroubled.org/qmail-autoresponder/qmail-autoresponder-2.0.tar.gz \
   && tar xzf qmail-autoresponder-2.0.tar.gz \
   && cd qmail-autoresponder-2.0 \
   && make \
@@ -307,9 +299,9 @@ RUN wget http://untroubled.org/bglibs/bglibs-2.04.tar.gz \
 ########################
 # ezmlm-idx
 ########################
-RUN wget http://notes.sagredo.eu/files/qmail/tar/ezmlm-idx-7.2.2.tar.gz \
-  && tar xzf ezmlm-idx-7.2.2.tar.gz \
-  && cd ezmlm-idx-7.2.2 \
+RUN git clone https://github.com/sagredo-dev/ezmlm-idx.git \
+  && cd ezmlm-idx \
+  && tools/makemake \
   && make \
   && make man \
   && make install \
@@ -465,7 +457,7 @@ RUN wget -O acmesh-${ACMESH_TAG}.tar.gz https://github.com/acmesh-official/acme.
 ###########################
 RUN mkdir -p /run/php \
 # Admin patches
-  && cp /usr/bin/php8.2 /usr/bin/qmailq-php \ 
+  && cp /usr/bin/php8.4 /usr/bin/qmailq-php \ 
   && chmod 4755 /usr/bin/qmailq-php
   
 ###########################
@@ -492,7 +484,8 @@ RUN cd /var/www/html \
       johndoh/sauserprefs \
       johndoh/contextmenu \
       johndoh/swipe \
-	  elm/identity_smtp \
+      elm/identity_smtp \
+      hercegdoo/aicomposeplugin \
   && composer \
     --working-dir=/var/www/html/ \
     --no-interaction \

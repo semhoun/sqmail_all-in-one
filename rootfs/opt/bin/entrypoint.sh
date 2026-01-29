@@ -32,27 +32,27 @@ fi
 if [ ! -d "/etc/fcrontab" ]; then
 	echo "[fcron] Initializing user's fcrontab ..."
 
-    mkdir -p /etc/fcrontab
-    echo '!stdout(yes),mail(no)' > /etc/fcrontab/root
-    cat /opt/templates/fcrontab-root >> /etc/fcrontab/root
-    echo '!stdout(yes),mail(no)' > /etc/fcrontab/vpopmail
-    cat /opt/templates/fcrontab-vpopmail >> /etc/fcrontab/vpopmail
-    if [ -e "/var/qmail/control/aio-conf/dmarc.conf" ]; then
-        echo '!stdout(yes),mail(no)' > /etc/fcrontab/www-data
-        cat /opt/templates/fcrontab-dmarc >> /etc/fcrontab/www-data
-    fi
+  mkdir -p /etc/fcrontab
+  echo '!stdout(yes),mail(no)' > /etc/fcrontab/root
+  cat /opt/templates/fcrontab-root >> /etc/fcrontab/root
+  echo '!stdout(yes),mail(no)' > /etc/fcrontab/vpopmail
+  cat /opt/templates/fcrontab-vpopmail >> /etc/fcrontab/vpopmail
+  if [ -e "/var/qmail/control/aio-conf/dmarc.conf" ]; then
+    echo '!stdout(yes),mail(no)' > /etc/fcrontab/www-data
+    cat /opt/templates/fcrontab-dmarc >> /etc/fcrontab/www-data
+  fi
 
-    rm -rf /var/spool/fcron/*
-    cd /etc/fcrontab/
-    for WHO in *; do
-        /usr/bin/fcrontab -n /etc/fcrontab/${WHO} ${WHO}
-    done
+  rm -rf /var/spool/fcron/*
+  cd /etc/fcrontab/
+  for WHO in *; do
+      /usr/bin/fcrontab -n /etc/fcrontab/${WHO} ${WHO}
+  done
 fi
 
 if [ ! -e "/etc/fetchmail.conf" ]; then
-    echo "[Fetchmail] Setting config file ..."
-    . /var/qmail/control/aio-conf/mysql.conf
-    cat > /etc/fetchmail.conf << EOF
+  echo "[Fetchmail] Setting config file ..."
+  . /var/qmail/control/aio-conf/mysql.conf
+  cat > /etc/fetchmail.conf << EOF
 \$db_host='${MYSQL_HOST}';
 \$db_name='${MYSQL_DB}';
 \$db_username='${MYSQL_USER}';
@@ -61,8 +61,8 @@ EOF
 fi
 
 if [ ! -e "/etc/dovecot/conf.d/10-auth.conf" ]; then
-    echo "[Dovecot] Setting auth file ..."
-    DEFAULT_DOMAIN=$(cat /var/qmail/control/defaultdomain)
+  echo "[Dovecot] Setting auth file ..."
+  DEFAULT_DOMAIN=$(cat /var/qmail/control/defaultdomain)
 	sed "s/auth_default_realm =.*/auth_default_realm = ${DEFAULT_DOMAIN}/" /opt/templates/dovecot-auth.conf > /etc/dovecot/conf.d/10-auth.conf
 fi
 
@@ -72,9 +72,9 @@ if [ ! -s "/var/lib/clamav" ]; then
 fi
 
 if [ ! -e "/etc/mail/spamassassin/sql.cf" ]; then
-	echo "[SpamAssassin] Setting sql confog ..."
-    . /var/qmail/control/aio-conf/mysql.conf
-	cat > /var/qmail/control/spamassassin_sql.cf << EOF
+  echo "[SpamAssassin] Setting sql confog ..."
+  . /var/qmail/control/aio-conf/mysql.conf
+  cat > /var/qmail/control/spamassassin_sql.cf << EOF
 # User prefs
 user_scores_dsn DBI:mysql:${MYSQL_DB}:${MYSQL_HOST}
 user_scores_sql_username ${MYSQL_USER}
@@ -92,14 +92,14 @@ if [ -e "/var/qmail/control/aio-conf/dmarc.conf" ] && [ ! -e "/var/www/admin/dma
 	echo "[DMARC] Setting config file  ..."
 	. /var/qmail/control/aio-conf/mysql.conf
 	. /var/qmail/control/aio-conf/dmarc.conf
-    cat /opt/templates/dmarc.conf | envsubst '$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $DMARC_EMAIL_ADDR $DMARC_EMAIL_PASS' > /var/www/admin/dmarc/config/conf.php
-    chown www-data:www-data /var/www/admin/dmarc/config/conf.php
-    chmod 600 /var/www/admin/dmarc/config/conf.php
+  cat /opt/templates/dmarc.conf | envsubst '$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $DMARC_EMAIL_ADDR $DMARC_EMAIL_PASS' > /var/www/admin/dmarc/config/conf.php
+  chown www-data:www-data /var/www/admin/dmarc/config/conf.php
+  chmod 600 /var/www/admin/dmarc/config/conf.php
 fi
 
 if [ ! -e "/var/www/html/config/config.inc.php" ]; then
-    echo "[Roundcube] Setting main and plugin config files ..."
-   	. /var/qmail/control/aio-conf/mysql.conf
+  echo "[Roundcube] Setting main and plugin config files ..."
+  . /var/qmail/control/aio-conf/mysql.conf
 	. /var/qmail/control/aio-conf/roundcube.conf
 	for OCONF in /var/www/html/config/*.tpl /var/www/html/plugins/*/*.tpl; do
 		DCONF=${OCONF:0:-4}
@@ -108,14 +108,14 @@ if [ ! -e "/var/www/html/config/config.inc.php" ]; then
 fi
 
 if [ ! -e "/etc/mailname" ]; then
-    echo "[system] Setting /etc/mailname file ..."
-    cp /var/qmail/control/me /etc/mailname
+  echo "[system] Setting /etc/mailname file ..."
+  cp /var/qmail/control/me /etc/mailname
 fi
 
 SMTP_SERVER=$(cat /var/qmail/control/me)
 if [ -z $(grep "$SMTP_SERVER" "/etc/hosts") ]; then
-    echo "[system] Fix hosts file"
-    echo "$SMTP_SERVER" >> /etc/hosts
+  echo "[system] Fix hosts file"
+  echo "$SMTP_SERVER" >> /etc/hosts
 fi
 
 echo "[system] Setting file permissions ..."
