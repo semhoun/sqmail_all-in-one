@@ -1,19 +1,25 @@
 # SQMail All-In-One
 
-![License](https://img.shields.io/github/license/semhoun/sqmail_all-in-one) ![OpenIssues](https://img.shields.io/github/issues-raw/semhoun/sqmail_all-in-one) ![Version](https://img.shields.io/github/v/tag/semhoun/sqmail_all-in-one) ![Docker Size](https://img.shields.io/docker/image-size/semhoun/sqmail_all-in-one) ![Docker Pull](https://img.shields.io/docker/pulls/semhoun/sqmail_all-in-one)
+![License](https://img.shields.io/github/license/semhoun/sqmail_all-in-one) ![OpenIssues](https://img.shields.io/github/issues-raw/semhoun/sqmail_all-in-one) ![Version](https://img.shields.io/github/v/tag/semhoun/sqmail_all-in-one) ![Docker Size](https://img.shields.io/docker/image-size/semhoun/sqmail_all-in-one) ![Docker Pull](https://img.shields.io/docker/pulls/semhoun/sqmail_all-in-one) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/semhoun/sqmail_all-in-one)
 
 
-All-in-one S/QMail server with
-  - s/qmail
-  - spam filter
-  - dovecot (imap/pop)
-  - web admin
-  - Roundcube
-  - Fetchmail
+## Introduction
+
+SQMail All-In-One is a comprehensive, Docker-based mail server solution that integrates the following components:
+
+- **S/QMail**: A secure and efficient mail transfer agent.
+- **Spam Filter**: Integrated SpamAssassin for filtering unwanted emails.
+- **Dovecot**: IMAP and POP3 server for email retrieval.
+- **Web Admin**: A web-based interface for managing the mail server.
+- **Roundcube**: A webmail client for accessing emails via a browser.
+- **Fetchmail**: A utility for retrieving emails from remote servers.
 
 ## Usage
 
-#### Docker
+### Docker
+
+To run SQMail All-In-One using Docker, use the following command:
+Refer to the [Ports](#ports) and [Volumes](#volumes) sections for details on the required configurations.
 
 ```shell
 docker run \
@@ -39,7 +45,12 @@ docker run \
   --volume /opt/mail_data/domainkeys:/var/qmail/ssl/domainkeys
   semhoun/sqmail_all-in-one
 ```
-#### Docker Compose
+
+### Docker Compose
+
+To run SQMail All-In-One using Docker Compose, use the following configuration:
+Refer to the [Ports](#ports) and [Volumes](#volumes) sections for details on the required configurations.
+
 ```yaml
 version: '3.8'
 
@@ -71,7 +82,12 @@ services:
 ```
 
 ## Initialization
+
 ### Docker
+
+To initialize the environment and certificates, run the following commands:
+Refer to the [Volumes](#volumes) section for details on the required configurations.
+
 ```shell
 docker run \
   --rm -it \
@@ -86,7 +102,9 @@ docker run \
   --volume /opt/mail_data/qalias:/var/qmail/alias \
   --volume /opt/mail_data/domainkeys:/var/qmail/ssl/domainkeys
   semhoun/sqmail_all-in-one /opt/bin/init.sh
-  
+```
+
+```shell
 docker run \
   --rm -it \
   --env SKIP_INIT_ENV=1 \
@@ -94,44 +112,57 @@ docker run \
   --publish 80:80 \
   semhoun/sqmail_all-in-one /opt/bin/init-certs.sh
 ```
+
 ### Docker Compose
+
+To initialize the environment and certificates using Docker Compose, run the following commands:
+Refer to the [Volumes](#volumes) section for details on the required configurations.
+
 ```shell
 docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init.sh
 docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
 ```
 
-## Docker configuration
-### Environment
+## Configuration
 
-* `SKIP_INIT_ENV` - Skip all initialization of docker_entrypoint (like directory, spamassassin, clamav)
-* `DEV_MODE` - Currently remove some clamav databases
+### Environment Variables
+
+| Variable          | Description                                                                                     |
+|-------------------|-------------------------------------------------------------------------------------------------|
+| `SKIP_INIT_ENV`   | Skip all initialization of docker_entrypoint (e.g., directory, spamassassin, clamav).          |
+| `DEV_MODE`        | Remove some ClamAV databases for development purposes.                                         |
+| `DEFAULT_LANGUAGE`| Set the default language for the web interface. Valid values: `en`, `fr`, `it`. (Required for first launch) |
 
 ### Volumes
 
-* `/ssl` - SSL Certificates
-* `/var/qmail/control`- QMail config files
-* `/var/vpopmail/domains` - Domains (mail) data
-* `/var/vpopmail/etc`- vpopmail config files 
-* `/log` - Log directoy
-* `/var/spamassassin`- SpamAssassin
-* `/var/qmail/tmp`- QMail temporary directory (best if tmpfs)
-* `/var/qmail/users` - QMail user file
-* `/var/qmail/queue` - QMail queue
-* `/var/qmail/alias` - QMail alias (for local users) 
-* `/var/qmail/ssl/domainkeys` - Domain DKIM private and public keys
+| Host Path                     | Container Path                     | Description                                      |
+|-------------------------------|------------------------------------|--------------------------------------------------|
+| `/ssl`                        | `/ssl`                          | SSL Certificates                                  |
+| `/var/qmail/control`          | `/var/qmail/control`            | QMail configuration files                        |
+| `/var/vpopmail/domains`       | `/var/vpopmail/domains`         | Domains and mail data                            |
+| `/var/vpopmail/etc`           | `/var/vpopmail/etc`             | vpopmail configuration files                     |
+| `/log`                        | `/log`                          | Log directory                                     |
+| `/var/spamassassin`           | `/var/spamassassin`             | SpamAssassin data and configuration              |
+| `/var/qmail/tmp`              | `/var/qmail/tmp`                | QMail temporary directory (best if tmpfs)        |
+| `/var/qmail/users`            | `/var/qmail/users`              | QMail user files                                  |
+| `/var/qmail/queue`            | `/var/qmail/queue`              | QMail queue                                       |
+| `/var/qmail/alias`            | `/var/qmail/alias`              | QMail aliases for local users                    |
+| `/var/qmail/ssl/domainkeys`   | `/var/qmail/ssl/domainkeys`     | Domain DKIM private and public keys              |
 
 ## Ports
 
-* `80` - Webmail (roundcube) and SSL Acme certs
-* `88` - HTTP admin (https not provided)
-* `443` - SSL Webmail (roundcube)
-* `25` - SMTP
-* `465` - SMTPs
-* `587` - Submission
-* `110` - POP3
-* `995` - POP3s
-* `143` - IMAP
-* `993` - IMAPs
+| Port  | Service          | Description                                      |
+|-------|------------------|--------------------------------------------------|
+| `80`  | HTTP             | Webmail (Roundcube) and SSL ACME certificates    |
+| `88`  | HTTP Admin       | Admin interface (HTTP only)                      |
+| `443` | HTTPS            | SSL Webmail (Roundcube)                          |
+| `25`  | SMTP             | Mail transfer                                    |
+| `465` | SMTPS            | SMTP over SSL                                    |
+| `587` | Submission       | SMTP for email clients                           |
+| `110` | POP3             | Mail retrieval                                   |
+| `995` | POP3S            | POP3 over SSL                                    |
+| `143` | IMAP             | Mail retrieval                                   |
+| `993` | IMAPS            | IMAP over SSL                                    |
 
 ## Useful File Locations
 * `/ssl`/acme - Letsencrypt SSL data (remove to renew certs installation)
@@ -163,47 +194,99 @@ docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
 
 ## Built With
 
-* [clamav](https://www.clamav.net/) 1.4.2
-* [dovecot](https://www.dovecot.org/) 2.4.1
-* ezmlm-idx 7.2.2
-* [fehQlibs](https://www.fehcom.de/ipnet/qlibs.html) 27
-* [fcron](https://github.com/yo8192/fcron) 3.4.0
-* [qmailadmin]( https://github.com/sagredo-dev/qmailadmin) 1.2.24
-* [qmail-autoresponder](https://untroubled.org/qmail-autoresponder) 2.0
-* [Roundcube](https://roundcube.net/) 1.6.11
-* [SpamAssassin](https://spamassassin.apache.org/) 4.0.2
-* [s6](https://github.com/skarnet/s6) 2.13.2.0
-* [SQMail](https://www.fehcom.de/sqmail/sqmail.html) 4.3.20
-* [VPopMail](https://github.com/semhoun/vpopmail) 5.6.8
-* [vqadmin](https://github.com/sagredo-dev/vqadmin) 2.4.3
-* [acme.sh](https://github.com/acmesh-official/acme.sh) 3.1.0
-* fetchmail
-* [DmarcSrg](https://github.com/liuch/dmarc-srg) 2.3
+| Component               | Version | Description                                                                                     |
+|------------------------|---------|-------------------------------------------------------------------------------------------------|
+| [ClamAV](https://www.clamav.net/)               | 1.5.1   | Antivirus engine for detecting threats.                                                        |
+| [Dovecot](https://www.dovecot.org/)             | 2.4.2   | IMAP and POP3 server.                                                                          |
+| ezmlm-idx               | 7.2.2   | Mailing list management tools.                                                                 |
+| [fehQlibs](https://www.fehcom.de/ipnet/qlibs.html) | 29      | Libraries for QMail.                                                                           |
+| [fcron](https://github.com/yo8192/fcron)         | 3.4.0   | Task scheduler.                                                                                |
+| [qmailadmin](https://github.com/sagredo-dev/qmailadmin) | 1.2.27  | Web interface for managing QMail.                                                              |
+| [qmail-autoresponder](https://untroubled.org/qmail-autoresponder) | 2.0     | Autoresponder for QMail.                                                                       |
+| [Roundcube](https://roundcube.net/)             | 1.6.12  | Webmail client.                                                                                |
+| [SpamAssassin](https://spamassassin.apache.org/) | 4.0.2   | Spam filter for email.                                                                         |
+| [s6](https://github.com/skarnet/s6)             | 2.14.0.0| Process supervision suite.                                                                     |
+| [SQMail](https://www.fehcom.de/)               | 4.3.25  | Secure and efficient mail transfer agent.                                                      |
+| [VPopMail](https://github.com/semhoun/vpopmail) | 5.6.11  | Virtual domain management for QMail.                                                          |
+| [vqadmin](https://github.com/sagredo-dev/vqadmin) | 2.4.4   | Web-based administration tool for VPopMail.                                                    |
+| [acme.sh](https://github.com/acmesh-official/acme.sh) | 3.1.2   | ACME protocol client for SSL certificates.                                                     |
+| fetchmail                | -       | Utility for retrieving emails from remote servers.                                             |
+| [DmarcSrg](https://github.com/liuch/dmarc-srg)   | 2.3     | DMARC report generation tool.                                                                  |
 
 ## Testing
-### Manual SMTP
-You can test the SMTP part with [Swaks](https://github.com/jetmore/swaks) 
-A simpe test mail could be done with this:
+
+### Manual Testing
+
+You can test the SMTP functionality using [Swaks](https://github.com/jetmore/swaks), a feature-rich SMTP test tool. Here’s an example command to send a test email:
+
 ```shell
-swaks --to <to mail> --from <from email> --server <qmail aio host name>
+swaks --to <recipient email> --from <sender email> --server <qmail-aio-hostname>
 ```
-### Auto
-You can check IMAP POP SMTP Clamav and SpamAssasin configuration inside the docker with tester.sh script. A valid mail account must used (a temporay is also created for testing).
-Docker must be running during the tests.
+
+### Automated Testing
+
+You can verify the IMAP, POP3, SMTP, ClamAV, and SpamAssassin configurations using the `tester.sh` script. A valid mail account must be used (a temporary account is created for testing). Ensure Docker is running during the tests.
+
 #### Docker
+
 ```shell
-docker exec -it sqmail-aio /opt/bin/tester.sh <receipient email> -doit
+docker exec -it sqmail-aio /opt/bin/tester.sh <recipient_email> -doit
 ```
-#### Docker compose
+
+#### Docker Compose
+
 ```shell
-docker compose exec sqmail-aio /opt/bin/tester.sh <receipient email> -doit
+docker compose exec sqmail-aio /opt/bin/tester.sh <recipient_email> -doit
 ```
 
 ## Upgrade
+
 ### 1.6 to 1.7
-You must add DEFAULT_LANGUAGE environment variable at first launch (and only at first launch). Valid value are en, fr and it. After 
 
+When upgrading from version 1.6 to 1.7, you must add the `DEFAULT_LANGUAGE` environment variable at the first launch (and only at the first launch). Valid values are:
+- `en` (English)
+- `fr` (French)
+- `it` (Italian)
 
+Example:
+```shell
+docker run -e DEFAULT_LANGUAGE=en ...
+```
+
+## Troubleshooting
+
+Here are some common issues and their solutions:
+
+### 1. Port Conflicts
+- **Issue**: Ports `80`, `443`, `25`, `465`, `587`, `110`, `995`, `143`, or `993` are already in use.
+- **Solution**: Stop the service using the conflicting port or change the published ports in your Docker command. Refer to the [Ports](#ports) section for details.
+
+### 2. SSL Certificate Issues
+- **Issue**: SSL certificates are not being generated or renewed.
+- **Solution**: Ensure port `80` is accessible and remove the `/ssl/acme` directory to force certificate regeneration.
+
+### 3. Permission Issues
+- **Issue**: Permission denied errors when accessing volumes.
+- **Solution**: Ensure the host directories mounted as volumes have the correct permissions. Use `chmod` or `chown` to adjust permissions as needed. Refer to the [Volumes](#volumes) section for details.
+
+### 4. Initialization Failures
+- **Issue**: The initialization script (`init.sh`) fails to run.
+- **Solution**: Ensure all required volumes are mounted and the `SKIP_INIT_ENV` variable is set correctly. Refer to the [Volumes](#volumes) section for details.
+
+### 5. Mail Delivery Issues
+- **Issue**: Emails are not being delivered.
+- **Solution**: Check the logs in the `/log` directory for errors. Ensure DNS records (SPF, DKIM, DMARC) are correctly configured for your domain.
+
+## Contributing
+
+Contributions are welcome! To contribute to SQMail All-In-One:
+
+1. Fork the repository on [GitHub](https://github.com/semhoun/sqmail_all-in-one).
+2. Create a new branch for your feature or bugfix.
+3. Commit your changes and push them to your fork.
+4. Open a pull request with a clear description of your changes.
+
+For major changes, please open an issue first to discuss your ideas.
 ## Find Me
 
 * [GitHub](https://github.com/semhoun/)
