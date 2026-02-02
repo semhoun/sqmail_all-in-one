@@ -22,7 +22,7 @@ ARG ACMESH_TAG=3.1.2
 ARG FCRON_TAG=3.4.0
 ARG CLAMAV_TAG=1.5.1
 
-ARG DOVECOT_TAG=2.4.2
+ARG DOVECOT_TAG=2.4.1-4
 
 ARG SPAMASSASSIN_TAG=4.0.2
 
@@ -41,7 +41,7 @@ WORKDIR "/opt/src"
 ########################
 RUN mkdir -p /opt/src /opt/templates \
   && apt-get update \
-  && apt-get -y install build-essential libtool-bin equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg \
+  && apt-get -y install build-essential libtool-bin equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg gpg \
   && apt-get clean \
 ## Add docker group for logs
   && groupadd -g 998 docker \

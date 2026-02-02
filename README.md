@@ -197,7 +197,7 @@ docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
 | Component               | Version | Description                                                                                     |
 |------------------------|---------|-------------------------------------------------------------------------------------------------|
 | [ClamAV](https://www.clamav.net/)               | 1.5.1   | Antivirus engine for detecting threats.                                                        |
-| [Dovecot](https://www.dovecot.org/)             | 2.4.2   | IMAP and POP3 server.                                                                          |
+| [Dovecot](https://www.dovecot.org/)             | 2.4.1-4 | IMAP and POP3 server.                                                                          |
 | ezmlm-idx               | 7.2.2   | Mailing list management tools.                                                                 |
 | [fehQlibs](https://www.fehcom.de/ipnet/qlibs.html) | 29      | Libraries for QMail.                                                                           |
 | [fcron](https://github.com/yo8192/fcron)         | 3.4.0   | Task scheduler.                                                                                |
