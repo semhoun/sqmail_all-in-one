@@ -31,7 +31,7 @@ EOF
 rm -rf /etc/fcrontab
 
 echo "Add an entry TXT _dmarc like this to your domain:"
-echo "  v=DMARC1; p=quarantine; rua=mailto:${DMARC_EMAIL_ADDR}; rua=mailto:${DMARC_EMAIL_ADDR}; fo=1; ri=86400"
+echo "  v=DMARC1; p=quarantine; rua=mailto:${DMARC_EMAIL_ADDR}; ruf =mailto:${DMARC_EMAIL_ADDR}; fo=1; ri=86400"
 
 echo ""
 echo "--------"

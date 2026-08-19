@@ -1,12 +1,14 @@
+# syntax=docker/dockerfile:1.7
+
 FROM debian:trixie-slim
 LABEL maintainer="nathanael@semhoun.net"
 
-ENV DEBIAN_FRONTEND=noninteractive
+ARG DEBIAN_FRONTEND=noninteractive
 ENV TERM=linux
 
 ENV SQMAIL_AIO_VERSION="1.7"
 
-ARG SQMAIL_TAG=4.3.25
+ARG SQMAIL_TAG=4.3.25a
 ARG FEHQLIBS_TAG=29
 ARG MESS822X_TAG=1.26
 ARG UCSPISSL_TAG=0.13.07
@@ -18,9 +20,9 @@ ARG EXECLINE_TAG=2.9.8.0
 ARG SKALIB_TAG=2.14.5.0
 ARG S6_TAG=2.14.0.0
 
-ARG ACMESH_TAG=3.1.2
+ARG ACMESH_TAG=3.1.3
 ARG FCRON_TAG=3.4.0
-ARG CLAMAV_TAG=1.5.1
+ARG CLAMAV_TAG=1.5.2
 
 ARG DOVECOT_TAG=2.4.1-4
 
@@ -29,7 +31,7 @@ ARG SPAMASSASSIN_TAG=4.0.2
 ARG QMAILADMIN_TAG=1.2.27
 ARG VQADMIN_TAG=2.4.4
 
-ARG ROUNDCUBEMAIL_TAG=1.6.12
+ARG ROUNDCUBEMAIL_TAG=1.7.1
 ARG QMAILFORWARD_TAG=1.0.4
 
 ARG DMARCSRG_TAG=2.3
@@ -39,10 +41,11 @@ WORKDIR "/opt/src"
 ########################  
 # Base install
 ########################
-RUN mkdir -p /opt/src /opt/templates \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+  mkdir -p /opt/src /opt/templates \
   && apt-get update \
-  && apt-get -y install build-essential libtool-bin equivs bash dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg gpg \
-  && apt-get clean \
+  && apt-get install -y --no-install-recommends build-essential libtool-bin equivs bash ca-certificates dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg gpg \
 ## Add docker group for logs
   && groupadd -g 998 docker \
 ## Add MTA Local (equivs is needed)
@@ -65,8 +68,10 @@ Description: A local MTA package \n\
 ########################  
 # Encoding fix
 ########################
-RUN apt-get -y install locales \
-  && apt-get clean \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+  apt-get update \
+  && apt-get install -y --no-install-recommends locales \
   && sed \
       -e 's/# fr_FR.UTF-8 UTF-8/fr_FR.UTF-8 UTF-8/' \
       -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' \
@@ -86,10 +91,13 @@ RUN curl -o /usr/share/ca-certificates/ZeroSSL_RSA_Domain_Secure_Site_CA.crt htt
 ########################  
 # Additionnals packages
 ########################
-RUN apt-get -y install bsd-mailx \
-    libperl-dev libmariadb-dev libmariadb-dev-compat csh bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libnet-patricia-perl libencode-detect-perl libperl-dev libssl-dev libcurl4-gnutls-dev \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+  apt-get update \
+  && apt-get install -y --no-install-recommends bsd-mailx \
+    libperl-dev libmariadb-dev libmariadb-dev-compat csh bzip2 razor pyzor ksh libclass-dbi-mysql-perl libnet-dns-perl libio-socket-inet6-perl libdigest-sha-perl libnetaddr-ip-perl libmail-spf-perl libgeo-ip-perl libnet-cidr-lite-perl libnet-patricia-perl libencode-detect-perl libssl-dev libcurl4-gnutls-dev \
     check libbz2-dev libxml2-dev libpcre2-dev libjson-c-dev libncurses-dev pkg-config \
-    libhtml-parser-perl re2c libdigest-sha-perl libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev libidn2-dev \
+    libhtml-parser-perl re2c libdbi-perl libgeoip2-perl libio-string-perl libbsd-resource-perl libmilter-dev libidn2-dev \
     mariadb-client \
     socat inetutils-ping \
     swaks expect telnet \
@@ -98,15 +106,14 @@ RUN apt-get -y install bsd-mailx \
     fetchmail liblockfile-simple-perl  \
     libbg-dev \
 # For dovecot
-  &&  apt-get -y install libxapian-dev \
+  && apt-get install -y --no-install-recommends libxapian-dev \
     # libldap2 must be removed in future
-    libldap2-dev \ 
+    libldap2-dev \
 # For roundcube
-  && apt-get install -y php8.4-zip php8.4-pspell php8.4-mysql php8.4-gd php8.4-xml php8.4-mbstring php8.4-intl php-imagick aspell-fr php8.4-intl php8.4-curl \
-  && cpan -i IP::Country::DB_File MaxMind::DB::Reader Geo::IP IP::Country::Fast Digest::SHA1 Net::LibIDN2 Email::Address::XS \ 
-  && rm -rf /root/.local \
-# Cleaning
-  && apt-get clean
+  && apt-get install -y --no-install-recommends php8.4-zip php8.4-pspell php8.4-mysql php8.4-gd php8.4-xml php8.4-mbstring php8.4-intl php-imagick aspell-fr php8.4-curl \
+  && cpan -i IP::Country::DB_File MaxMind::DB::Reader Geo::IP IP::Country::Fast Digest::SHA1 Net::LibIDN2 Email::Address::XS \
+# Cleaning in the same layer keeps CPAN's build cache out of the image.
+  && rm -rf /root/.cpan /root/.local
 
 ########################
 # Skarnet S6
@@ -173,7 +180,8 @@ RUN mkdir -p /package \
   && cd /opt/src \
   && wget https://www.fehcom.de/sqmail/sqmail-${SQMAIL_TAG}.tgz \
   && cd /package \
-  && tar xzf /opt/src/sqmail-${SQMAIL_TAG}.tgz \
+  && mkdir -p mail/sqmail/sqmail-${SQMAIL_TAG} \
+  && tar xzf /opt/src/sqmail-${SQMAIL_TAG}.tgz --strip-components=2 -C mail/sqmail/sqmail-${SQMAIL_TAG} \
   && cd mail/sqmail/sqmail-${SQMAIL_TAG} \
   && sed -i 's/ -lsocket//g' conf-ld \
   && package/dir \
@@ -375,7 +383,7 @@ RUN groupadd -g 5010 clamav \
   && cmake --build . \
   && cmake --build . --target install \
 # cleaning
-  && rm -rf /opt/src/*
+  && rm -rf /opt/src/* /root/.cargo /root/.rustup
 
 ########################
 # DCC
@@ -411,7 +419,10 @@ RUN wget https://dlcdn.apache.org/spamassassin/source/Mail-SpamAssassin-${SPAMAS
 # FCRON
 ###########################
 #http://fcron.free.fr/download.php
-RUN apt-get install -y docbook docbook-xsl docbook-xml docbook-utils manpages-dev \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+  apt-get update \
+  && apt-get install -y --no-install-recommends docbook docbook-xsl docbook-xml docbook-utils manpages-dev \
   && wget -O fcron-${FCRON_TAG}.tar.gz https://github.com/yo8192/fcron/archive/refs/tags/ver$(echo $FCRON_TAG | sed 's/\./_/g').tar.gz \
   && mkdir fcron \
   && cd fcron \
@@ -425,13 +436,17 @@ RUN apt-get install -y docbook docbook-xsl docbook-xml docbook-utils manpages-de
     --with-answer-all \
     --with-sendmail=/var/qmail/bin/sendmail \
     --with-boot-install=no \
-    --with-systemdsystemunitdir=no \  
+    --with-systemdsystemunitdir=no \
   && make \
   && make install \
 # cleaning
   && rm -rf /opt/src/* \
-  && apt-get purge -y manpages-dev \
-  && apt-get clean
+  && apt-get purge -y --auto-remove \
+    docbook \
+    docbook-xsl \
+    docbook-xml \
+    docbook-utils \
+    manpages-dev
 
 ###########################
 # ACME.SH
@@ -457,20 +472,24 @@ RUN wget -O acmesh-${ACMESH_TAG}.tar.gz https://github.com/acmesh-official/acme.
 ###########################
 RUN mkdir -p /run/php \
 # Admin patches
-  && cp /usr/bin/php8.4 /usr/bin/qmailq-php \ 
+  && cp /usr/bin/php8.4 /usr/bin/qmailq-php \
   && chmod 4755 /usr/bin/qmailq-php
   
 ###########################
 # Roundcube
 ###########################
-RUN cd /var/www/html \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+  apt-get update \
+  && apt-get install -y --no-install-recommends php8.4-ldap \
+  && cd /var/www/html \
   && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer \
   && wget -O roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz https://github.com/roundcube/roundcubemail/releases/download/${ROUNDCUBEMAIL_TAG}/roundcubemail-${ROUNDCUBEMAIL_TAG}-complete.tar.gz \
   && tar -xzf roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz --strip 1 \
   && rm -f index.lighttpd.html roundcubemail-${ROUNDCUBEMAIL_TAG}.tar.gz \
   && cp config/config.inc.php.sample config/config.inc.php \
-  && echo "$config['db_dsnw'] = 'sqlite:///var/www/html/installer/sqlite.db?mode=0646';" > config/config.inc.php \
-  && cp composer.json-dist composer.json \
+  && echo "\$config['db_dsnw'] = 'sqlite:///var/www/html/installer/sqlite.db?mode=0646';" > config/config.inc.php \
+  && if [ -f composer.json-dist ]; then cp composer.json-dist composer.json; fi \
   && composer \
     --working-dir=/var/www/html/ \
     --no-interaction \
@@ -507,7 +526,7 @@ RUN cd /var/www/html \
 # Remove config file for autoinit
   && rm -f /var/www/html/config/config.inc.php \
 # Cleaning
-  && rm -rf installer
+  && rm -rf installer /root/.composer/cache
 
 ###########################
 # DmarcSrg
@@ -519,12 +538,13 @@ RUN mkdir -p /var/www/admin/dmarc \
   && composer install \
   && chown www-data:www-data /var/www/admin/dmarc \
 # Cleaning
-  && rm -rf installer
+  && rm -rf installer /root/.composer/cache \
+  && rm -f /opt/src/dmarcsrg.tgz
 
 ###########################
 # ROOT FS && Co
 ###########################
-COPY rootfs /
+COPY --link rootfs /
 RUN chown qmailq:sqmail /var/qmail/bin/qmail-queuescan \
   && chmod 1755 /var/qmail/bin/qmail-queuescan \
   && chmod 755 /opt/bin/* \

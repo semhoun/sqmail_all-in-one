@@ -110,7 +110,7 @@ docker run \
   --env SKIP_INIT_ENV=1 \
   --volume ./mail_data/ssl:/ssl \
   --publish 80:80 \
-  semhoun/sqmail_all-in-one /opt/bin/init-certs.sh
+  semhoun/sqmail_all-in-one /opt/bin/init_certs.sh
 ```
 
 ### Docker Compose
@@ -120,7 +120,7 @@ Refer to the [Volumes](#volumes) section for details on the required configurati
 
 ```shell
 docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init.sh
-docker compose run -e SKIP_INIT_ENV=1 --rm sqmail-aio /opt/bin/init-certs.sh
+docker compose run -e SKIP_INIT_ENV=1 --service-ports --rm sqmail-aio /opt/bin/init_certs.sh
 ```
 
 ## Configuration

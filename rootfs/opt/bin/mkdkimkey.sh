@@ -117,12 +117,12 @@ echo "Domain's public key in '${DKDIR}/${DOMAIN}' used for TXT DNS record:"
 echo -n "${SELECTOR}._domainkey.${DOMAIN}. IN TXT "
 if [ -f rsa.public_${SELECTOR} ]; then
   key=`grep -v -e '^-' rsa.public_${SELECTOR} | tr -d '\n'`
-  echo "\"v=DKIM1;k=rsa;t=y;p=${key}\""
+  echo "\"v=DKIM1;k=rsa;t=s;p=${key}\""
 elif [ -f ed25519.public_${SELECTOR} ]; then
   key=`grep -v -e '^-' ed25519.public_${SELECTOR} | tr -d '\n'`
   basekey=${key#${ASN1}}
   if [ `echo -n ${basekey} | wc -c | awk '{print $1}'` -eq 44 ]; then
-    echo "\"v=DKIM1;k=ed25519;t=y;p=${basekey}\""
+    echo "\"v=DKIM1;k=ed25519;t=s;p=${basekey}\""
     echo ${basekey} > ed25519.basekey_${SELECTOR}
   else
     (errString="error generating Ed25519 public key" && showError; echo ${key}; echo ${basekey}; exit 1)
