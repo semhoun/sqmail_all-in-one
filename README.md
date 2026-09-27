@@ -225,6 +225,22 @@ full dependency list and build details.
 
 ## Testing
 
+### Dovecot Sieve
+
+From the repository root, run the Sieve tests against a locally built image:
+
+```shell
+docker build -t sqmail-aio:dev .
+docker run --rm --network none --ulimit core=0 --entrypoint python3 \
+  -e SQMAIL_DISPOSABLE_TEST=1 \
+  --mount "type=bind,src=$PWD/tests,dst=/tests,readonly" \
+  sqmail-aio:dev /tests/dovecot-sieve.py
+```
+
+This uses a disposable container without network access. Do not attach mail data
+or production volumes. Tests are mounted read-only, not included in the image.
+Release CI runs them before pushing the tested image.
+
 ### Manual Testing
 
 You can test the SMTP functionality using [Swaks](https://github.com/jetmore/swaks), a feature-rich SMTP test tool. Here’s an example command to send a test email:

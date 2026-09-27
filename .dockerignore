@@ -1,5 +1,6 @@
 data
 sources
+tests/
 compose.yml
 .git
 .kilo
