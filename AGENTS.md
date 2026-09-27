@@ -28,10 +28,10 @@ supervision. It requires an external MySQL/MariaDB database.
 - `rootfs/var/www/` contains admin PHP/assets and Roundcube configuration.
   Roundcube and most third-party application code are downloaded during build.
 - `.github/workflows/docker.yml` builds and publishes on tags matching `*.*.*`.
-  It runs `tests/dovecot-sieve.py` in a disposable container before publishing
-  the same image. Keep automated regression tests outside `rootfs/`: `tests/` is
-  excluded from the build context and mounted read-only for testing, never
-  shipped in the image.
+  It runs `tests/dovecot-sieve.py` and the isolated `tests/mail.py` integration
+  suite before publishing the same image. Keep automated regression tests outside
+  `rootfs/`: `tests/` is excluded from the build context and mounted read-only for
+  testing, never shipped in the image.
 
 ## Local Files and Safety
 

@@ -64,6 +64,10 @@ jobs:
             -e SQMAIL_DISPOSABLE_TEST=1 \
             --mount "type=bind,src=$PWD/tests,dst=/tests,readonly" \
             sqmail-aio:ci /tests/dovecot-sieve.py
+      - name: Test mail delivery and filtering
+        run: |
+          docker pull mariadb:11.4
+          python3 tests/mail.py --image sqmail-aio:ci
       - name: Push tested image
         env:
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}

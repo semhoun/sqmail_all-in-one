@@ -193,8 +193,6 @@ docker compose run -e SKIP_INIT_ENV=1 --service-ports --rm sqmail-aio /opt/bin/i
   Example: `/opt/bin/mksrs.sh -m mail.example.com -i 203.0.113.10 example.com`
   Use your public outgoing IP; repeat `-i` for IPv6 or additional IPs. First use `-p` to publish DNS, then run without it to configure routing.
   Existing secrets are kept. The vpopmail wrapper rewrites external-to-external forwards; local deliveries and bounce senders remain unchanged.
-* `/opt/bin/tester.sh` - Check is IMAP POP SMTP Clamav and SpamAssasin was working
-  * usage `tester.sh <test mail recipient> -doit`
 
 ## Built With
 
@@ -225,45 +223,7 @@ full dependency list and build details.
 
 ## Testing
 
-### Dovecot Sieve
-
-From the repository root, run the Sieve tests against a locally built image:
-
-```shell
-docker build -t sqmail-aio:dev .
-docker run --rm --network none --ulimit core=0 --entrypoint python3 \
-  -e SQMAIL_DISPOSABLE_TEST=1 \
-  --mount "type=bind,src=$PWD/tests,dst=/tests,readonly" \
-  sqmail-aio:dev /tests/dovecot-sieve.py
-```
-
-This uses a disposable container without network access. Do not attach mail data
-or production volumes. Tests are mounted read-only, not included in the image.
-Release CI runs them before pushing the tested image.
-
-### Manual Testing
-
-You can test the SMTP functionality using [Swaks](https://github.com/jetmore/swaks), a feature-rich SMTP test tool. Here’s an example command to send a test email:
-
-```shell
-swaks --to <recipient email> --from <sender email> --server <qmail-aio-hostname>
-```
-
-### Automated Testing
-
-You can verify the IMAP, POP3, SMTP, ClamAV, and SpamAssassin configurations using the `tester.sh` script. A valid mail account must be used (a temporary account is created for testing). Ensure Docker is running during the tests.
-
-#### Docker
-
-```shell
-docker exec -it sqmail-aio /opt/bin/tester.sh <recipient_email> -doit
-```
-
-#### Docker Compose
-
-```shell
-docker compose exec sqmail-aio /opt/bin/tester.sh <recipient_email> -doit
-```
+See [TESTING.md](TESTING.md) for test commands, safety precautions and CI coverage.
 
 ## Upgrade
 

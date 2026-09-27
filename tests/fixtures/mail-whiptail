@@ -1,0 +1,28 @@
+#!/bin/bash
+# Answers only the real initialization wizard, inside a disposable test container.
+set -eu
+[[ -f /.dockerenv && $EUID == 0 && ${SQMAIL_DISPOSABLE_TEST:-} == 1 && ${SQMAIL_MAIL_TEST_RUN:-} =~ ^[a-zA-Z0-9-]{16,64}$ ]] || exit 1
+[[ ! -e /var/qmail/control/aio-conf/mysql.conf ]] || exit 1
+case " $* " in
+    *' --msgbox '*|*' --textbox '*|*' --yesno '*) exit 0 ;;
+    *'MYSQL Host'*) answer=db ;;
+    *'MYSQL Database'*) answer=sqmail_test ;;
+    *'MYSQL Username'*) answer=sqmail_test ;;
+    *'MYSQL Password'*) answer=SyntheticDbOnly927 ;;
+    *'Concurrency incoming'*) answer=10 ;;
+    *'Concurrency remote'*) answer=1 ;;
+    *'Email max size'*) answer=26214400 ;;
+    *'Queue life time'*) answer=3600 ;;
+    *'--menu QMail/SMTP configuration'*) answer=0 ;;
+    *'IP or network to relay'*) answer=127.0.0.1,::1 ;;
+    *'RBL-listed server'*) answer=examples.invalid ;;
+    *'SMTP server hostname'*) answer=mail.examples.invalid ;;
+    *'Default domain'*) answer=examples.invalid ;;
+    *'Postmaster password'*) answer=SyntheticMailOnly927 ;;
+    *'Roundcube support url'*) answer=mailto:postmaster@examples.invalid ;;
+    *'Roundcube name'*) answer=SyntheticMailTest ;;
+    *'Webadmin password'*) answer=SyntheticAdminOnly927 ;;
+    *'Choose default language'*) answer=en ;;
+    *) printf 'Unhandled whiptail prompt: %s\n' "$*" >&2; exit 1 ;;
+esac
+printf '%s' "$answer" >&2
