@@ -173,7 +173,7 @@ if (!empty($GET['action']) && $GET['action'] == 'doqueue') doQueue();
 
 <body>
     <div class="container">
-    <div class="col-xs-12">
+    <div class="col-12">
       <div class="text-center" style="padding-top: 30px; padding-bottom: 30px;">
           <h2>QMail Queue</h2>
       </div>
@@ -184,6 +184,7 @@ if (!empty($GET['action']) && $GET['action'] == 'doqueue') doQueue();
 <?php
     if (!empty($GET['action']) && $GET['action'] == 'view' && !empty($GET['id'])) viewMessage($GET['id']);
 ?>
+    <div class="table-responsive">
     <table class="table table-striped">
     <thead>
         <tr>
@@ -216,18 +217,19 @@ if (!empty($GET['action']) && $GET['action'] == 'doqueue') doQueue();
             <td>'. (!empty($msg['date']) ? $msg['date']->format('Y/m/d H:i:s') : '') . '</td>
             <td>'. $msg['subject'] . '</td>
             <td>'. $size . '</td>
-            <td><a href="/cgi/qmail-queue.php?action=remove&id=' . $msg['ext_id'] . '" data-toggle="tooltip" title="Remove this mail"><i class="las la-trash"></i></a> <a href="/cgi/qmail-queue.php?action=view&id=' . $msg['ext_id'] . '" data-toggle="tooltip" title="View this mail"><i class="las la-eye"></i></a></td>
+            <td><a href="/cgi/qmail-queue.php?action=remove&id=' . $msg['ext_id'] . '" data-bs-toggle="tooltip" title="Remove this mail"><i class="las la-trash"></i></a> <a href="/cgi/qmail-queue.php?action=view&id=' . $msg['ext_id'] . '" data-bs-toggle="tooltip" title="View this mail"><i class="las la-eye"></i></a></td>
         </tr>';
         }
         ?>
     </tbody>
     </table>
+    </div>
 
-    <script src="/js/jquery-3.6.0.slim.min.js"></script>
+    <script src="/js/jquery-4.0.0.slim.min.js"></script>
     <script src="/js/bootstrap.bundle.min.js"></script>
     <script>
-    $(function () {
-      $('[data-toggle="tooltip"]').tooltip()
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (element) {
+      new bootstrap.Tooltip(element)
     })
     </script>
 </body>

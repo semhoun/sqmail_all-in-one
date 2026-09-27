@@ -7,7 +7,7 @@ function delayedProcess {
 }
 
 if [ -n "${SKIP_INIT_ENV}" ]; then
-  exec $@
+  exec "$@"
   exit 0
 fi
 
@@ -43,7 +43,7 @@ if [ ! -d "/etc/fcrontab" ]; then
   fi
 
   rm -rf /var/spool/fcron/*
-  cd /etc/fcrontab/
+  cd /etc/fcrontab/ || exit 1
   for WHO in *; do
       /usr/bin/fcrontab -n /etc/fcrontab/${WHO} ${WHO}
   done
@@ -97,15 +97,8 @@ if [ -e "/var/qmail/control/aio-conf/dmarc.conf" ] && [ ! -e "/var/www/admin/dma
   chmod 600 /var/www/admin/dmarc/config/conf.php
 fi
 
-if [ ! -e "/var/www/html/config/config.inc.php" ]; then
-  echo "[Roundcube] Setting main and plugin config files ..."
-  . /var/qmail/control/aio-conf/mysql.conf
-	. /var/qmail/control/aio-conf/roundcube.conf
-	for OCONF in /var/www/html/config/*.tpl /var/www/html/plugins/*/*.tpl; do
-		DCONF=${OCONF:0:-4}
-		cat $OCONF | envsubst '$MYSQL_USER $MYSQL_PASS $MYSQL_HOST $MYSQL_DB $PRODUCT_NAME $SUPPORT_URL' > $DCONF
-	done
-fi
+# Roundcube main/plugin configuration is prepared atomically by the migration
+# gate above, before its upstream schema updater is allowed to connect.
 
 if [ ! -e "/etc/mailname" ]; then
   echo "[system] Setting /etc/mailname file ..."
@@ -113,7 +106,7 @@ if [ ! -e "/etc/mailname" ]; then
 fi
 
 SMTP_SERVER=$(cat /var/qmail/control/me)
-if [ -z $(grep "$SMTP_SERVER" "/etc/hosts") ]; then
+if [ -z "$(grep -F "$SMTP_SERVER" "/etc/hosts")" ]; then
   echo "[system] Fix hosts file"
   echo "$SMTP_SERVER" >> /etc/hosts
 fi
@@ -133,11 +126,11 @@ rm -f /var/run/dovecot/master.pid
 rm -f /var/run/lighttpd-log.pipe
 
 # Fix for qmailadmin
-> /var/log/qma-auth.log
+: > /var/log/qma-auth.log
 chown vpopmail:vchkpw /var/log/qma-auth.log
 
 delayedProcess &
 
-echo "#> Lauching $@"
-exec $@
+echo "#> Lauching $*"
+exec "$@"
 exit $?

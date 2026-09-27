@@ -4,7 +4,13 @@ QMAIL="/var/qmail"
 alias -x SPAMMER='/usr/local/bin/spamc'
 alias -x 822FIELD='/usr/local/bin/822field'
 #
-SPAMMERARGS="-u $RCPTTO"
+# SQMail exports a space-delimited recipient list with a trailing separator.
+# One queued message cannot use several personal profiles; retain global policy
+# for multi-recipient messages instead of selecting an arbitrary recipient.
+RECIPIENT=${RCPTTO% }
+case "$RECIPIENT" in
+        ''|*[[:space:]]*) RECIPIENT='$GLOBAL' ;;
+esac
 VERBOSE=0
 
 #
@@ -12,6 +18,7 @@ VERBOSE=0
 #
 typeset SPAM
 integer SPAMC=0
+integer RC=0
 integer SPAMTHRESHOLD=-1
 integer SPAMTH
 typeset SPAMDOMAINS
@@ -29,8 +36,13 @@ cat > ${MESSAGE} || exit 53
 #
 ## Check Spamlevel for each domain
 #
-DOMAIN=$(echo ${RCPTTO} | cut -d '@' -f 2)
-SPAMTHRESHOLD=$(echo "SELECT value FROM spam_prefs WHERE (username = '${RCPTTO}' OR username = '$GLOBAL' OR username = '%${DOMAIN}') AND preference = 'refuse_threshold' ORDER BY username DESC LIMIT 1;"  | mysql -N -B -u ${MYSQL_USER} -p${MYSQL_PASS} -h ${MYSQL_HOST} ${MYSQL_DB})
+DOMAIN=${RECIPIENT##*@}
+RECIPIENT_HEX=$(printf '%s' "$RECIPIENT" | od -An -v -tx1 | tr -d ' \n')
+DOMAIN_HEX=$(printf '%%%s' "$DOMAIN" | od -An -v -tx1 | tr -d ' \n')
+if ! SPAMTHRESHOLD=$(printf '%s\n' "SELECT CAST(value AS SIGNED) FROM spam_prefs WHERE (username = CONVERT(0x${RECIPIENT_HEX} USING utf8mb4) OR username = '\$GLOBAL' OR username = CONVERT(0x${DOMAIN_HEX} USING utf8mb4)) AND preference = 'refuse_threshold' ORDER BY CASE username WHEN CONVERT(0x${RECIPIENT_HEX} USING utf8mb4) THEN 0 WHEN CONVERT(0x${DOMAIN_HEX} USING utf8mb4) THEN 1 ELSE 2 END LIMIT 1;" | mysql -N -B -u "${MYSQL_USER}" -p"${MYSQL_PASS}" -h "${MYSQL_HOST}" "${MYSQL_DB}"); then
+        rm -f "$MESSAGE"
+        exit 53
+fi
 
 [[ ${VERBOSE} -gt 0 ]] && print -u2 "User ${RCPTTO} / Domain ${DOMAIN} -- Threshold: {$SPAMTHRESHOLD}"
 
@@ -38,7 +50,10 @@ if [[ ${SPAMTHRESHOLD} -ge 0 ]]; then
 #
 ## Spam recognition -- the following codes is only useful for SpamAssassins spamc version 3.x
 #
-        SPAM=$(SPAMMER ${SPAMMERARGS} < ${MESSAGE} > ${MESSAGE}_$$ && mv ${MESSAGE}_$$ ${MESSAGE} || exit 53)
+        SPAMMER -x -u "$RECIPIENT" < "$MESSAGE" > "${MESSAGE}_$$" && mv "${MESSAGE}_$$" "$MESSAGE" || {
+                rm -f "$MESSAGE" "${MESSAGE}_$$"
+                exit 53
+        }
         SPAM=$(822FIELD "X-Spam-Level" < ${MESSAGE} | head -1)
         SPAM=${SPAM# }
 
@@ -57,7 +72,10 @@ if [[ ${SPAMTHRESHOLD} -ge 0 ]]; then
         fi
 fi
 
-[[ ${RC} -eq 0 ]] && ${QMAIL}/bin/qmail-queue < ${MESSAGE}
+if [[ ${RC} -eq 0 ]]; then
+        ${QMAIL}/bin/qmail-queue < ${MESSAGE}
+        RC=$?
+fi
 
 rm ${MESSAGE}
 exit ${RC}

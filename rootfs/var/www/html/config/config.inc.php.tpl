@@ -48,6 +48,6 @@ $config['swipe_actions'] = [
   'contactlist' => [ 
     'left'  => 'compose', 
     'right' => 'compose', 
-    'down'  => 'vcard_attachments' 
+    'down'  => 'none'
   ] 
 ];

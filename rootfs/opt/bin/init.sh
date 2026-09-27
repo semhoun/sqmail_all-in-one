@@ -1,6 +1,12 @@
 #!/usr/bin/bash
+# The wizard is for a new installation (documented SKIP_INIT_ENV=1 path),
+# never a repair command for an existing or partially initialized installation.
+if [ -e /var/qmail/control/aio-conf/mysql.conf ] || [ -e /var/qmail/control/roundcube.conf ]; then
+  echo "Existing configuration found; use the startup migration, not the initialization wizard." >&2
+  exit 1
+fi
 RESUME=$(mktemp /tmp/sqmail.XXXXXX)
-> ${RESUME}
+: > "${RESUME}"
 
 #########################
 # Gui for params
@@ -89,7 +95,7 @@ Roundcube Webmail configuration will be:
   
 EOF
 
-WEBADMIN_USER=admin
+WEBADMIN_USER='admin'
 WEBADMIN_PASSWORD=$(whiptail --inputbox "Webadmin password (user is ${WEBADMIN_USER})" 8 39 "" --title "Webadmin" 3>&1 1>&2 2>&3)
 if [ $? != 0 ]; then echo "You canceled the script"; exit 0; fi
 cat >> "${RESUME}" << EOF
@@ -110,7 +116,7 @@ EOF
 whiptail --textbox "${RESUME}" 40 78
 rm "${RESUME}"
 
-if !(whiptail --title "Set configuration" --yesno "Apply the configuration." 8 78); then
+if ! whiptail --title "Set configuration" --yesno "Apply the configuration." 8 78; then
   echo "You canceled the script"
   exit 0
 fi
@@ -120,6 +126,15 @@ fi
 #########################
 # Create config
 #########################
+set -Eeuo pipefail
+trap 'echo "Initialization failed; no completion marker was written. Preserve and inspect the partial installation before retrying." >&2' ERR
+. /opt/bin/upgrade/common.sh
+[ "${SQMAIL_AIO_VERSION:-}" = 1.8 ]
+exec 9>/var/qmail/control/.aio-migration.lock
+flock -n 9 || { echo "Another initialization/migration is running" >&2; exit 1; }
+[ ! -e /var/qmail/control/aio-conf/mysql.conf ]
+TABLES=$(mysql -N -B -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" -e 'SHOW TABLES')
+[ -z "$TABLES" ] || { echo "Initialization requires an empty database; nothing was imported." >&2; exit 1; }
 mkdir -p /var/qmail/control/aio-conf
 chmod 755 /var/qmail/control/aio-conf
 
@@ -139,27 +154,11 @@ echo '|/var/qmail/bin/preline -f /usr/libexec/dovecot/deliver -d $EXT@$USER' > /
 openssl dhparam -out /ssl/qmail-dhparam 2048
 
 # Creation configuration
-cat > /var/qmail/control/mysql.conf << EOF
-MYSQL_USER=${MYSQL_USER}
-MYSQL_PASS=${MYSQL_PASS}
-MYSQL_DB=${MYSQL_DB}
-MYSQL_HOST=${MYSQL_HOST}
-EOF
-cat > /var/qmail/control/aio-conf/mysql.conf << EOF
-export MYSQL_USER=${MYSQL_USER}
-export MYSQL_PASS=${MYSQL_PASS}
-export MYSQL_DB=${MYSQL_DB}
-export MYSQL_HOST=${MYSQL_HOST}
-EOF
-cat > /var/qmail/control/aio-conf/mysql.php << EOF
-<?php
-\$MYSQL_CONF = [
-    'MYSQL_USER' => "${MYSQL_USER}",
-    'MYSQL_PASS' => "${MYSQL_PASS}",
-    'MYSQL_DB' => '${MYSQL_DB}',
-    'MYSQL_HOST' => "${MYSQL_HOST}",
-];
-EOF
+printf '%s=%q\n' MYSQL_USER "$MYSQL_USER" MYSQL_PASS "$MYSQL_PASS" MYSQL_DB "$MYSQL_DB" MYSQL_HOST "$MYSQL_HOST" |
+  atomic_write /var/qmail/control/mysql.conf
+printf 'export %s=%q\n' MYSQL_USER "$MYSQL_USER" MYSQL_PASS "$MYSQL_PASS" MYSQL_DB "$MYSQL_DB" MYSQL_HOST "$MYSQL_HOST" |
+  atomic_write /var/qmail/control/aio-conf/mysql.conf
+write_mysql_php
 
 cat > /var/qmail/control/spamassassin_sql.cf << EOF
 # User prefs
@@ -198,7 +197,7 @@ chown alias:sqmail .qmail*
 chmod 644 .qmail*
  
 # SRS
-SRS_SECRET=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 13; echo)
+SRS_SECRET=$(openssl rand -hex 32)
 cat > /var/qmail/control/srsdomains << EOF
 *:${SRS_SECRET}|-|srs.
 EOF
@@ -214,7 +213,16 @@ chmod 600 /var/qmail/control/dovecot-local.conf
 # Creation directory and setting permissions
 chown qmailq:sqmail /var/qmail/queue
 chown -R qmaild:sqmail /var/qmail/control
-chmod 644 /var/qmail/control/*
+for CONTROL_FILE in /var/qmail/control/*; do
+  [ ! -f "$CONTROL_FILE" ] || chmod 644 "$CONTROL_FILE"
+done
+chown root:root /var/qmail/control/dovecot-local.conf
+chmod 600 /var/qmail/control/dovecot-local.conf /var/qmail/control/aio-conf/mysql.conf
+# qmail-queuescan runs as vpopmail and sources this legacy credential file.
+chown root:vchkpw /var/qmail/control/mysql.conf
+chmod 640 /var/qmail/control/mysql.conf
+chown root:www-data /var/qmail/control/aio-conf/mysql.php
+chmod 640 /var/qmail/control/aio-conf/mysql.php
 mkdir -p /var/qmail/ssl/domainkeys
 chmod 755 /var/qmail/ssl/domainkeys
 chown qmailq:sqmail /var/qmail/ssl/domainkeys
@@ -222,24 +230,28 @@ mkdir -p /var/spamassassin/bayes
 mkdir -p /var/spamassassin/razor
 echo "razorhome = /etc/mail/spamassassin/.razor/" > /var/spamassassin/razor/razor-agent.conf
 chown -R vpopmail:vchkpw /var/spamassassin
-chown 644 /var/vpopmail/etc/*
+for VPOPMAIL_FILE in /var/vpopmail/etc/*; do
+  [ ! -f "$VPOPMAIL_FILE" ] || chmod 644 "$VPOPMAIL_FILE"
+done
+chown vpopmail:vchkpw /var/vpopmail/etc/vpopmail.mysql
+chmod 640 /var/vpopmail/etc/vpopmail.mysql
 chown -R vpopmail:vchkpw /var/vpopmail/domains
 
 # Add domain in vpopmail
-/var/vpopmail/bin/vadddomain ${DEFAULT_DOMAIN} "${POSTMASTER_PWD}"
+/var/vpopmail/bin/vadddomain "${DEFAULT_DOMAIN}" "${POSTMASTER_PWD}"
 
 # SpamAssassin DB
-cat /opt/sql/spamassassin.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" < /opt/sql/spamassassin.sql
 
 # DMARC DB
-cat /opt/sql/dmarc.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+php /opt/bin/upgrade/historical-schema.php dmarc
 
 # Rules cdb
 cat > /var/qmail/control/rules.smtpsub << EOF
 :allow,RELAYCLIENT=''
 EOF
-> /var/qmail/control/rules.smtpd
-> /var/qmail/control/rules.smtpsd
+: > /var/qmail/control/rules.smtpd
+: > /var/qmail/control/rules.smtpsd
 IPS=$(echo $RELAY_IPS | tr "," "\n")
 for ip in ${IPS}; do
   echo "${ip}:allow,RELAYCLIENT=''" >> /var/qmail/control/rules.smtpd
@@ -250,17 +262,16 @@ echo ":allow,QHPSI='clamdscan',QHPSIARG1='--no-summary',MFDNSCHECK='',BADMIMETYP
 /opt/bin/qmailctl cdb
 
 # Generate roundcube config
-cat > /var/qmail/control/aio-conf/roundcube.conf << EOF
-export DES_KEY=`apg -MSNCL -m 24 -x 24 -n 1`
-export SUPPORT_URL="${ROUNDCUBE_SUPPORT}"
-export PRODUCT_NAME="${ROUNDCUBE_NAME}"
-EOF
+printf 'export %s=%q\n' SUPPORT_URL "$ROUNDCUBE_SUPPORT" PRODUCT_NAME "$ROUNDCUBE_NAME" |
+  atomic_write /var/qmail/control/aio-conf/roundcube.conf
 
 # Roundcube DB
-cat /opt/sql/roundcube.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" < /opt/sql/roundcube.sql
+roundcube_config
+php /opt/bin/upgrade/roundcube-schema.php
 
 # Fetchmail DB
-cat /opt/sql/fetchmail.sql | mysql -h ${MYSQL_HOST} -u ${MYSQL_USER} -p"${MYSQL_PASS}" ${MYSQL_DB}
+mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" < /opt/sql/fetchmail.sql
 
 # lighttpd Password
 /opt/bin/lighttpd_admin.sh "${WEBADMIN_USER}" "${WEBADMIN_PASSWORD}"
@@ -270,7 +281,7 @@ cat > /var/qmail/control/aio-conf/i8n.conf << EOF
 export DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE}
 EOF
 
-echo -n "${SQMAIL_AIO_VERSION}" > /var/qmail/control/aio-conf/sqmail_aio_version
+printf '%s\n' "$SQMAIL_AIO_VERSION" | atomic_write /var/qmail/control/aio-conf/sqmail_aio_version
 
 echo "============================"
 echo " QMail AllInOne initialized"

@@ -1,1 +1,7 @@
 data
+sources
+compose.yml
+.git
+.kilo
+.env
+.env.*

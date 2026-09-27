@@ -189,29 +189,39 @@ docker compose run -e SKIP_INIT_ENV=1 --service-ports --rm sqmail-aio /opt/bin/i
 *  `/var/qmail/control/dkimdomains` - DKIM domains
   * Sending domains other than the default domain and with they own key must be added in this file
   * For more information see https://www.fehcom.de/sqmail/man/qmail-dksign.html
+* `/opt/bin/mksrs.sh` - Configure SRS for vpopmail forwards and print the MX/SPF records to publish.
+  Example: `/opt/bin/mksrs.sh -m mail.example.com -i 203.0.113.10 example.com`
+  Use your public outgoing IP; repeat `-i` for IPv6 or additional IPs. First use `-p` to publish DNS, then run without it to configure routing.
+  Existing secrets are kept. The vpopmail wrapper rewrites external-to-external forwards; local deliveries and bounce senders remain unchanged.
 * `/opt/bin/tester.sh` - Check is IMAP POP SMTP Clamav and SpamAssasin was working
   * usage `tester.sh <test mail recipient> -doit`
 
 ## Built With
 
-| Component               | Version | Description                                                                                     |
-|------------------------|---------|-------------------------------------------------------------------------------------------------|
-| [ClamAV](https://www.clamav.net/)               | 1.5.1   | Antivirus engine for detecting threats.                                                        |
-| [Dovecot](https://www.dovecot.org/)             | 2.4.1-4 | IMAP and POP3 server.                                                                          |
-| ezmlm-idx               | 7.2.2   | Mailing list management tools.                                                                 |
-| [fehQlibs](https://www.fehcom.de/ipnet/qlibs.html) | 29      | Libraries for QMail.                                                                           |
-| [fcron](https://github.com/yo8192/fcron)         | 3.4.0   | Task scheduler.                                                                                |
-| [qmailadmin](https://github.com/sagredo-dev/qmailadmin) | 1.2.27  | Web interface for managing QMail.                                                              |
-| [qmail-autoresponder](https://untroubled.org/qmail-autoresponder) | 2.0     | Autoresponder for QMail.                                                                       |
-| [Roundcube](https://roundcube.net/)             | 1.6.12  | Webmail client.                                                                                |
-| [SpamAssassin](https://spamassassin.apache.org/) | 4.0.2   | Spam filter for email.                                                                         |
-| [s6](https://github.com/skarnet/s6)             | 2.14.0.0| Process supervision suite.                                                                     |
-| [SQMail](https://www.fehcom.de/)               | 4.3.25  | Secure and efficient mail transfer agent.                                                      |
-| [VPopMail](https://github.com/semhoun/vpopmail) | 5.6.11  | Virtual domain management for QMail.                                                          |
-| [vqadmin](https://github.com/sagredo-dev/vqadmin) | 2.4.4   | Web-based administration tool for VPopMail.                                                    |
-| [acme.sh](https://github.com/acmesh-official/acme.sh) | 3.1.2   | ACME protocol client for SSL certificates.                                                     |
-| fetchmail                | -       | Utility for retrieving emails from remote servers.                                             |
-| [DmarcSrg](https://github.com/liuch/dmarc-srg)   | 2.3     | DMARC report generation tool.                                                                  |
+The image runs on Debian 13 with PHP 8.5 from [Sury](https://packages.sury.org/php/).
+An external MySQL/MariaDB database is required.
+
+| Component | Version | Description |
+|-----------|---------|-------------|
+| [S/QMail](https://www.fehcom.de/sqmail/sqmail.html) | 4.4.14 beta | Mail transfer agent. |
+| [Dovecot / Pigeonhole](https://www.dovecot.org/) | 2.4.5 | IMAP, POP3 and Sieve filtering. |
+| [vpopmail](https://github.com/sagredo-dev/vpopmail) | 5.6.14 | Virtual domains and mail accounts. |
+| [Roundcube](https://roundcube.net/) | 1.7.4 | Webmail client. |
+| [SpamAssassin](https://spamassassin.apache.org/) | 4.0.2 | Spam filtering. |
+| [ClamAV](https://www.clamav.net/) | 1.5.4 | Antivirus scanning. |
+| [QmailAdmin](https://github.com/sagredo-dev/qmailadmin) | 1.2.28 | Web administration for mail accounts. |
+| [vqadmin](https://github.com/sagredo-dev/vqadmin) | 2.4.7 | Web administration for domains. |
+| [ezmlm-idx](https://github.com/sagredo-dev/ezmlm-idx) | Fork | Mailing lists. |
+| [qmail-autoresponder](https://untroubled.org/qmail-autoresponder) | 2.0 | Automatic replies. |
+| Fetchmail | Debian package | Mail retrieval from remote servers. |
+| [DmarcSrg](https://github.com/liuch/dmarc-srg) | 2.3 | DMARC reports. |
+| [s6](https://github.com/skarnet/s6) | 2.15.1.0 | Service supervision. |
+| [fcron](https://github.com/yo8192/fcron) | 3.4.1 | Scheduled tasks. |
+| [acme.sh](https://github.com/acmesh-official/acme.sh) | 3.1.6 | TLS certificate management. |
+
+S/QMail 4.4.14 is a beta release. This image temporarily uses the SRS modules from
+4.3.25a and includes a fix for SMTP recipient handling. See the [Dockerfile](Dockerfile) for the
+full dependency list and build details.
 
 ## Testing
 
@@ -240,6 +250,14 @@ docker compose exec sqmail-aio /opt/bin/tester.sh <recipient_email> -doit
 ```
 
 ## Upgrade
+
+### 1.7 to 1.8
+
+Back up your database and mail volumes before upgrading, and keep the previous image.
+
+The Roundcube database is updated automatically at startup. You do not need to run `init.sh` again. If a migration fails, startup stops: check the logs, fix the cause and restart the container.
+
+Dovecot also updates its thread index format for a security fix. Test the upgrade on a copy of your installation first. If you need to roll back, restore compatible data and configuration along with the old image.
 
 ### 1.6 to 1.7
 

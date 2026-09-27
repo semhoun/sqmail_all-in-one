@@ -219,7 +219,7 @@ CREATE TABLE `rcb_searches` (
 
 CREATE TABLE `rcb_session` (
   `sess_id` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `changed` datetime NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `expires_at` datetime NOT NULL DEFAULT '1000-01-01 00:00:00',
   `ip` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
   `vars` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
@@ -239,8 +239,7 @@ CREATE TABLE `rcb_system` (
 -- Déchargement des données de la table `rcb_system`
 --
 
-INSERT INTO `rcb_system` (`name`, `value`) VALUES
-('roundcube-version', '2020122900');
+-- The schema version is recorded only after all structural statements below.
 
 -- --------------------------------------------------------
 
@@ -361,7 +360,7 @@ ALTER TABLE `rcb_searches`
 --
 ALTER TABLE `rcb_session`
   ADD PRIMARY KEY (`sess_id`),
-  ADD KEY `rcb_changed_index` (`changed`);
+  ADD KEY `rcb_expires_at_index` (`expires_at`);
 
 --
 -- Index pour la table `rcb_system`
@@ -504,6 +503,33 @@ ALTER TABLE `rcb_identities`
 --
 ALTER TABLE `rcb_searches`
   ADD CONSTRAINT `rcb_user_id_fk_searches` FOREIGN KEY (`user_id`) REFERENCES `rcb_users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Roundcube 1.7.4 SQL/mysql/{2021081000,2022100100}.sql, with rcb_ prefix.
+CREATE TABLE `rcb_responses` (
+ `response_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+ `user_id` int(10) UNSIGNED NOT NULL,
+ `name` varchar(255) NOT NULL,
+ `data` longtext NOT NULL,
+ `is_html` tinyint(1) NOT NULL DEFAULT '0',
+ `changed` datetime NOT NULL DEFAULT '1000-01-01 00:00:00',
+ `del` tinyint(1) NOT NULL DEFAULT '0',
+ PRIMARY KEY (`response_id`),
+ CONSTRAINT `rcb_user_id_fk_responses` FOREIGN KEY (`user_id`)
+   REFERENCES `rcb_users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+ INDEX `rcb_user_responses_index` (`user_id`, `del`)
+) ROW_FORMAT=DYNAMIC ENGINE=INNODB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE `rcb_uploads` (
+ `upload_id` varchar(64) NOT NULL,
+ `session_id` varchar(128) NOT NULL,
+ `group` varchar(128) NOT NULL,
+ `metadata` mediumtext NOT NULL,
+ `created` datetime NOT NULL DEFAULT '1000-01-01 00:00:00',
+ PRIMARY KEY (`upload_id`),
+ INDEX `rcb_uploads_session_group_index` (`session_id`, `group`, `created`)
+) ROW_FORMAT=DYNAMIC ENGINE=INNODB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+INSERT INTO `rcb_system` (`name`, `value`) VALUES ('roundcube-version', '2025092300');
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
