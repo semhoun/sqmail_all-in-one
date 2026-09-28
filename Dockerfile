@@ -408,7 +408,7 @@ RUN groupadd -g 5010 clamav \
   && RUSTUP_ARCH=$(RUSTUP_INIT_SH_PRINT=arch sh rustup-init.sh) \
   && curl -fLsS -o rustup-init https://static.rust-lang.org/rustup/archive/${RUSTUP_TAG}/${RUSTUP_ARCH}/rustup-init \
   && chmod +x rustup-init \
-  && ./rustup-init -y --profile minimal --default-toolchain ${RUST_TAG} \
+  && ./rustup-init -y --no-modify-path --profile minimal --default-toolchain ${RUST_TAG} \
   && . /root/.cargo/env \
   && mkdir -p /usr/local/share/sqmail-aio \
   && { rustc --version; cargo --version; } > /usr/local/share/sqmail-aio/rust-version.txt \
