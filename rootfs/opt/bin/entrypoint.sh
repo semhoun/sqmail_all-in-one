@@ -113,6 +113,10 @@ fi
 
 echo "[system] Setting file permissions ..."
 
+if ! /opt/libexec/delivery-admin-init; then
+  echo "[Delivery admin] Private storage unavailable; mutations remain disabled." >&2
+fi
+
 # Fix qmail tmp permissions
 chown vpopmail:sqmail -R /var/qmail/tmp
 chmod 777 /var/qmail/tmp

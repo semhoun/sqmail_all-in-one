@@ -634,6 +634,12 @@ RUN chown qmailq:sqmail /var/qmail/bin/qmail-queuescan \
   && chmod 1755 /var/qmail/bin/qmail-queuescan \
   && chmod 755 /opt/bin/* \
   && chown -R www-data:www-data /var/www/html /var/www/admin/html \
+  && chown -R root:root /opt/libexec /var/www/admin/lib \
+  && chmod 755 /opt /opt/libexec /opt/libexec/delivery-admin /opt/libexec/delivery-admin-init /var/www/admin/lib \
+  && chmod 644 /var/www/admin/lib/delivery.php \
+  && chown root:root /etc/sudoers.d/delivery-admin \
+  && chmod 440 /etc/sudoers.d/delivery-admin \
+  && /usr/sbin/visudo -cf /etc/sudoers.d/delivery-admin \
   && chown -R qmailq /service/qmail-send \
   && chown -R vpopmail:vchkpw /etc/dovecot/sieve \
   && chmod -R ug+w /etc/dovecot/sieve/* \

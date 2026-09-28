@@ -54,6 +54,9 @@ def inside(source_overlay):
     cgi = Path('/var/www/admin/cgi/auth-identity.cgi')
     cgi.write_text('#!/bin/sh\nprintf "Content-Type: text/plain\\r\\n\\r\\n%s|%s" "$REMOTE_USER" "$AUTH_TYPE"\n')
     cgi.chmod(0o755)
+    php = Path('/var/www/admin/html/auth-identity.php')
+    php.write_text("<?php header('Content-Type: text/plain'); "
+                   "echo ($_SERVER['REMOTE_USER'] ?? ''), '|', ($_SERVER['AUTH_TYPE'] ?? '');")
     config = Path('/etc/lighttpd/lighttpd.conf').read_text()
     # TLS terminates at the proxy; omit only the unrelated public TLS listener.
     config = re.sub(r'\$SERVER\["socket"\] == ":443" \{.*?\}', '', config, flags=re.S)
@@ -111,6 +114,7 @@ def inside(source_overlay):
         assert cookies['__Host-sqmail-login'] != old, 'PHP session was not rotated'
         assert re.fullmatch('[a-f0-9]{64}', cookies['__Host-sqmail-admin'])
         assert request('/cgi/auth-identity.cgi', cookies)[2] == f'{user}|Session'
+        assert request('/auth-identity.php', cookies)[2] == f'{user}|Session'
         return cookies
 
     def passed(label):
@@ -126,10 +130,11 @@ def inside(source_overlay):
             time.sleep(.1)
         else:
             raise AssertionError('lighttpd/PHP did not become ready')
-        routes = ['/', '/index.php', '/logout.php', '/info.php', '/cgi/qmail-queue.php',
+        routes = ['/', '/index.php', '/logout.php', '/info.php', '/auth-identity.php', '/cgi/qmail-queue.php',
                   '/cgi/vqadmin/vqadmin.cgi', '/cgi/qmailadmin', '/cgi/auth-identity.cgi',
                   '/assets/', '/assets/absent.css', '/dmarc/', '/dmarc/index.php',
                   '/js/bootstrap.bundle.min.js', '/css/line-awesome.min.css', '/missing',
+                  '/delivery/', '/delivery/index.php', '/delivery/style.css',
                   '/login.php/extra', '/cgi%2fvqadmin/vqadmin.cgi']
         for path in routes:
             denied(path)
@@ -162,6 +167,10 @@ def inside(source_overlay):
         assert status == 200 and 'Sign out' in body
         assert request('/info.php', jar)[0] == 200
         assert request('/cgi/auth-identity.cgi', jar, headers={'REMOTE_USER': 'forged', 'Remote-User': 'forged'})[2] == 'admin|Session'
+        assert request('/auth-identity.php', jar, headers={
+            'REMOTE_USER': 'forged', 'Remote-User': 'forged',
+            'AUTH_TYPE': 'Basic', 'Auth-Type': 'Basic',
+            'X-Remote-User': 'forged', 'X-Forwarded-User': 'forged'})[2] == 'admin|Session'
         assert (auth / ('token-' + jar['__Host-sqmail-admin'])).stat().st_mode & 0o777 == 0o600
         passed('existing SHA256 htdigest login; admin PHP and native CGI identity; private token mode')
         copied = dict(jar)
@@ -188,6 +197,7 @@ def inside(source_overlay):
         passed('credential removal and password digest changes immediately revoke sessions')
         operator = login('operator')
         assert request('/cgi/auth-identity.cgi', operator, headers={'REMOTE_USER': 'admin'})[2] == 'operator|Session'
+        assert request('/auth-identity.php', operator, headers={'REMOTE_USER': 'admin'})[2] == 'operator|Session'
         native = '/var/www/admin/cgi/vqadmin/vqadmin.cgi'
         env = dict(os.environ, REQUEST_METHOD='GET', QUERY_STRING='', SERVER_PROTOCOL='HTTP/1.1',
                    GATEWAY_INTERFACE='CGI/1.1', SCRIPT_NAME='/cgi/vqadmin/vqadmin.cgi')

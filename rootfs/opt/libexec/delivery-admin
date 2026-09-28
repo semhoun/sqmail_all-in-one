@@ -1,0 +1,1041 @@
+#!/usr/bin/python3 -I
+"""One-request delivery administration. Root never opens mailbox storage.
+
+Helper locks serialize only this application. uid 89 is shared with other mail
+applications: rereads detect observable conflicts, not atomic cross-app CAS.
+"""
+import ctypes
+import difflib
+import fcntl
+import hashlib
+import hmac
+import json
+import os
+import pwd
+import re
+import resource
+import selectors
+import signal
+import stat
+import subprocess
+import sys
+import time
+
+UID = GID = 89
+REQUEST_LIMIT = 256 * 1024
+SCRIPT_LIMIT = 128 * 1024
+OUTPUT_LIMIT = 1024 * 1024
+NATIVE_LIMIT = 512 * 1024
+BACKUPS = '/var/qmail/control/delivery-admin-backups'
+LOCKS = '/run/sqmail-delivery-admin'
+VP = '/var/vpopmail/bin/'
+LDA = '|/var/qmail/bin/preline -f /usr/libexec/dovecot/deliver -d $EXT@$USER'
+LDA_NO_SIEVE = '|/var/qmail/bin/preline -f /usr/libexec/dovecot/deliver -o mail_plugins/sieve=no -d $EXT@$USER'
+DISCARD = '# SQMail AIO: discard messages for this mailbox'
+RECURSIVE_VDELIVERMAIL_LINES = {prefix + " '' " + argument
+                              for prefix in ('| ~vpopmail/bin/vdelivermail', '|/var/vpopmail/bin/vdelivermail',
+                                             '| /var/vpopmail/bin/vdelivermail')
+                              for argument in ('delete', 'bounce-no-mailbox')}
+ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C.UTF-8',
+       'LC_ALL': 'C.UTF-8', 'HOME': '/var/vpopmail'}
+OPERATIONS = {'domains', 'mailboxes', 'inspect', 'qmail_preview', 'qmail_save',
+              'qmail_restore_preview', 'qmail_restore', 'sieve_save',
+              'sieve_activate', 'sieve_deactivate', 'sieve_delete',
+              'sieve_restore_preview', 'sieve_restore'}
+
+
+class Error(Exception):
+    def __init__(self, code, message):
+        self.code, self.message = code, message
+        super().__init__(message)
+
+
+def fail(code, message):
+    raise Error(code, message)
+
+
+def encoded(value):
+    return json.dumps(value, ensure_ascii=True, sort_keys=True,
+                      separators=(',', ':')).encode('ascii')
+
+
+def fingerprint(value):
+    return hashlib.sha256(encoded(value)).hexdigest()
+
+
+def text(value, limit=256):
+    if not isinstance(value, str) or len(value.encode('utf-8')) > limit or '\0' in value:
+        fail('invalid_request', 'Invalid or oversized text parameter.')
+    return value
+
+
+def domain(value):
+    value = text(value, 253).lower()
+    if not re.fullmatch(r'[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?', value):
+        fail('invalid_request', 'Invalid domain.')
+    if any(not label or len(label) > 63 or label.startswith('-') or label.endswith('-')
+           for label in value.split('.')):
+        fail('invalid_request', 'Invalid domain.')
+    return value
+
+
+def address(value):
+    value = text(value, 254)
+    if value.count('@') != 1:
+        fail('invalid_request', 'An exact mailbox address is required.')
+    local, host = value.split('@')
+    if not re.fullmatch(r'[a-z0-9_][a-z0-9_.+-]{0,63}', local) or '..' in local or local.endswith('.'):
+        fail('invalid_request', 'Unsupported mailbox address; use a lowercase local part without special quoting.')
+    return local + '@' + domain(host)
+
+
+def script_name(value, writable=False):
+    value = text(value, 128)
+    if '/' in value or '\\' in value or any(ord(c) < 32 or ord(c) == 127 for c in value):
+        fail('invalid_request', 'Invalid script name.')
+    if value in ('.', '..'):
+        fail('invalid_request', 'Invalid script name.')
+    if writable and not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}', value):
+        fail('readonly', 'This script name is readable but not editable here.')
+    return value
+
+
+def native(argv, data=b'', allowed=(0,)):
+    """Fixed-argv subprocess with bounded streams, deadline, and no shell."""
+    if os.geteuid() != UID or os.getgroups():
+        fail('internal', 'Native operation requires the isolated mailbox identity.')
+    process = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, env=ENV, close_fds=True,
+                               cwd='/')
+    output = {process.stdout.fileno(): bytearray(), process.stderr.fileno(): bytearray()}
+    selector = selectors.DefaultSelector()
+    for stream in (process.stdout, process.stderr):
+        os.set_blocking(stream.fileno(), False)
+        selector.register(stream, selectors.EVENT_READ)
+    if data:
+        os.set_blocking(process.stdin.fileno(), False)
+        selector.register(process.stdin, selectors.EVENT_WRITE)
+    else:
+        process.stdin.close()
+    deadline, offset = time.monotonic() + 8, 0
+    try:
+        while selector.get_map():
+            if time.monotonic() > deadline:
+                fail('timeout', 'Native operation timed out; refresh before retrying.')
+            for key, _ in selector.select(0.1):
+                fd = key.fd
+                if key.events == selectors.EVENT_WRITE:
+                    try:
+                        offset += os.write(fd, data[offset:offset + 16384])
+                    except BrokenPipeError:
+                        offset = len(data)
+                    if offset == len(data):
+                        selector.unregister(key.fileobj)
+                        key.fileobj.close()
+                else:
+                    block = os.read(fd, 16384)
+                    if not block:
+                        selector.unregister(key.fileobj)
+                    else:
+                        output[fd].extend(block)
+                        if sum(map(len, output.values())) > NATIVE_LIMIT:
+                            fail('limit', 'Native response exceeds the safe display limit.')
+        process.wait(timeout=max(0.1, deadline - time.monotonic()))
+        stdout, stderr = (bytes(output[s.fileno()]).decode('utf-8', 'strict')
+                          for s in (process.stdout, process.stderr))
+        if process.returncode not in allowed:
+            # Diagnostics may contain script text. They belong only in the JSON
+            # response, never stderr (which the web process writes to its audit).
+            fail('native_failed', (stderr or stdout or 'Native operation failed.')[:8192])
+        return stdout, process.returncode
+    finally:
+        selector.close()
+        if process.poll() is None:
+            process.kill()
+        process.wait()
+        for stream in (process.stdin, process.stdout, process.stderr):
+            stream.close()
+
+
+def resolve(mailbox):
+    mailbox = address(mailbox)
+    local, host = mailbox.split('@')
+    real = native([VP + 'vdominfo', '-r', host])[0].splitlines()
+    if not real:
+        fail('not_found', 'Domain does not exist.')
+    real = domain(real[0])
+    name = native([VP + 'vuserinfo', '-n', mailbox])[0].strip()
+    canonical = address(name + '@' + real)
+    home = native([VP + 'vuserinfo', '-d', canonical])[0].strip()
+    if not home.startswith('/var/vpopmail/domains/') or any(
+            p in ('', '.', '..') for p in home.split('/')[1:]):
+        fail('readonly', 'Unsupported native mailbox home.')
+    return {'mailbox': canonical, 'home': home}
+
+
+def domain_map():
+    domains = {}
+    for line in native([VP + 'vdominfo', '-n'])[0].splitlines():
+        if not line:
+            continue
+        alias = re.fullmatch(r'(\S+) \(alias of (\S+)\)', line)
+        name, real = alias.groups() if alias else (line, line)
+        name, real = domain(name), domain(real)
+        if name in domains and domains[name] != real:
+            fail('conflict', 'Native domain listing is ambiguous.')
+        domains[name] = real
+    return domains
+
+
+def directory(path):
+    """Traverse every component without following directory symlinks."""
+    fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for component in path.split('/')[1:]:
+            if component in ('', '.', '..'):
+                fail('unsafe_path', 'Unsafe directory path.')
+            child = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                            dir_fd=fd)
+            os.close(fd)
+            fd = child
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def metadata(info):
+    return [info.st_dev, info.st_ino, info.st_uid, info.st_gid,
+            stat.S_IMODE(info.st_mode), info.st_nlink, info.st_size,
+            info.st_mtime_ns, info.st_ctime_ns]
+
+
+def read_file(fd, name, limit, owner=None, private=False):
+    handle = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
+    try:
+        before = os.fstat(handle)
+        mode = stat.S_IMODE(before.st_mode)
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or
+                (owner is not None and before.st_uid != owner) or
+                (private and mode != 0o600) or before.st_size > limit):
+            fail('unsafe_file', 'Unsafe file type, ownership, permissions, or size.')
+        content = bytearray()
+        while len(content) <= limit:
+            part = os.read(handle, min(16384, limit + 1 - len(content)))
+            if not part:
+                break
+            content.extend(part)
+        after = os.fstat(handle)
+        path_info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+        if (len(content) > limit or metadata(before) != metadata(after) or
+                metadata(before) != metadata(path_info)):
+            fail('conflict', 'File changed while being read; refresh.')
+        return content.decode('utf-8', 'strict'), metadata(before)
+    finally:
+        os.close(handle)
+
+
+def qmail_read(home_fd):
+    try:
+        content, meta = read_file(home_fd, '.qmail', SCRIPT_LIMIT, UID)
+        if meta[3] != GID or meta[4] & ~0o664:
+            fail('unsafe_file', 'Unsupported .qmail ownership or permissions.')
+        return {'content': content, 'metadata': meta}
+    except FileNotFoundError:
+        return {'content': None, 'metadata': None}
+
+
+def parse_qmail(content):
+    result = {'content': content, 'editable': True, 'reason': '',
+              'mode': 'inherit', 'destinations': []}
+    if content is None:
+        return result
+    local, discard = [], 0
+    try:
+        if '\r' in content or '\0' in content or not content.endswith('\n'):
+            raise ValueError()
+        for line in content.split('\n')[:-1]:
+            if line == DISCARD:
+                discard += 1
+            elif line.startswith('#'):
+                continue
+            elif line in (LDA, LDA_NO_SIEVE):
+                local.append(line)
+            elif address(line[1:] if line.startswith('&') else line) == (line[1:] if line.startswith('&') else line):
+                result['destinations'].append(line[1:] if line.startswith('&') else line)
+            else:
+                raise ValueError()
+        destinations = result['destinations']
+        if (len(local) > 1 or len(destinations) > 20 or len(set(destinations)) != len(destinations)
+                or discard > 1 or discard and (local or destinations)
+                or not local and not destinations and not discard):
+            raise ValueError()
+        if discard:
+            result['mode'] = 'discard'
+        elif local == [LDA_NO_SIEVE]:
+            result['mode'] = 'copy_no_sieve' if destinations else 'local_no_sieve'
+        else:
+            result['mode'] = 'copy' if local and destinations else 'local' if local else 'forward'
+    except (ValueError, Error):
+        result.update(editable=False, reason='Empty, ambiguous, or unknown delivery instructions.',
+                      mode='unknown', destinations=[])
+        if any(line in RECURSIVE_VDELIVERMAIL_LINES for line in content.split('\n')):
+            result['reason'] = 'vdelivermail in an individual .qmail can recurse; these instructions are read-only.'
+    return result
+
+
+def render_qmail(current, mode, destinations):
+    parsed = parse_qmail(current)
+    if not parsed['editable']:
+        fail('readonly', parsed['reason'])
+    if mode not in ('inherit', 'local', 'forward', 'copy', 'local_no_sieve', 'copy_no_sieve', 'discard'):
+        fail('invalid_request', 'Invalid delivery mode.')
+    if not isinstance(destinations, list) or len(destinations) > 20:
+        fail('invalid_request', 'At most 20 destinations are permitted.')
+    destinations = [address(item) for item in destinations]
+    if len(set(destinations)) != len(destinations):
+        fail('invalid_request', 'Duplicate destinations are not permitted.')
+    if bool(destinations) != (mode in ('forward', 'copy', 'copy_no_sieve')):
+        fail('invalid_request', 'Destinations do not match the selected mode.')
+    if mode == 'inherit':
+        return None, destinations
+    wanted = ([LDA] if mode in ('local', 'copy') else []) + ['&' + d for d in destinations]
+    if mode in ('local_no_sieve', 'copy_no_sieve'):
+        wanted.insert(0, LDA_NO_SIEVE)
+    elif mode == 'discard':
+        wanted.append(DISCARD)
+    lines = []
+    # Preserve comments and the relative order/spelling of unchanged actions.
+    for action in (current or '').split('\n')[:-1]:
+        line = action + '\n'
+        if action == DISCARD:
+            if action in wanted:
+                lines.append(line)
+                wanted.remove(action)
+        elif action.startswith('#'):
+            lines.append(line)
+        elif action in wanted:
+            lines.append(line)
+            wanted.remove(action)
+        elif '&' + action in wanted:
+            lines.append(line)
+            wanted.remove('&' + action)
+    return text(''.join(lines) + ''.join(line + '\n' for line in wanted), SCRIPT_LIMIT), destinations
+
+
+def global_file(path):
+    fd = directory(os.path.dirname(path))
+    try:
+        return read_file(fd, os.path.basename(path), SCRIPT_LIMIT)[0]
+    finally:
+        os.close(fd)
+
+
+def sieve(action, mailbox, name=None, content=None):
+    argv = ['/usr/bin/doveadm', '-f', 'json', 'sieve', action, '-u', mailbox]
+    if name is not None:
+        argv += ['--', script_name(name)]
+    output = native(argv, b'' if content is None else content.encode('utf-8'))[0]
+    if action in ('list', 'get'):
+        return json.loads(output)
+    return None
+
+
+def sieve_get(mailbox, name):
+    document = sieve('get', mailbox, name)
+    if (not isinstance(document, list) or len(document) != 1 or
+            set(document[0]) != {'sieve script'}):
+        fail('readonly', 'Unsupported native Sieve response.')
+    return text(document[0]['sieve script'], SCRIPT_LIMIT)
+
+
+def sieve_storage(home, names):
+    """Metadata only; script content and all Sieve mutations remain native."""
+    home_fd = directory(home)
+    fd = None
+    try:
+        try:
+            fd = os.open('.sieve', os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=home_fd)
+        except FileNotFoundError:
+            return {}, None
+        info = os.fstat(fd)
+        if info.st_uid != UID or info.st_gid != GID or stat.S_IMODE(info.st_mode) & 0o022:
+            fail('readonly', 'Unsupported personal Sieve storage permissions.')
+        files = {}
+        for name in names:
+            script_name(name)
+            try:
+                info = os.stat(name + '.sieve', dir_fd=fd, follow_symlinks=False)
+            except FileNotFoundError:
+                if name != 'default':
+                    fail('conflict', 'Native Sieve listing and storage differ; refresh.')
+                continue
+            if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
+                    info.st_uid != UID or info.st_gid != GID or
+                    stat.S_IMODE(info.st_mode) & ~0o664):
+                fail('readonly', 'Unsafe personal Sieve script metadata.')
+            files[name] = metadata(info)
+        try:
+            link = os.stat('dovecot.sieve', dir_fd=fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return files, None
+        if not stat.S_ISLNK(link.st_mode) or link.st_uid != UID:
+            fail('readonly', 'Unsupported active Sieve link.')
+        target = os.readlink('dovecot.sieve', dir_fd=fd)
+        if not target.endswith('.sieve') or target[:-6] not in files:
+            fail('readonly', 'Unsupported active Sieve target.')
+        return files, target[:-6]
+    finally:
+        if fd is not None:
+            os.close(fd)
+        os.close(home_fd)
+
+
+def sieve_state(mailbox, home, selected):
+    state = {'available': False, 'reason': '',
+            'scripts': [], 'selected': {'name': selected, 'content': '', 'exists': False,
+                                       'supported': False, 'active': False},
+            'default_content': ''}
+    try:
+        config = native(['/usr/bin/doveconf', '-n', 'sieve_script'])[0]
+        blocks = re.findall(r'^sieve_script ([a-zA-Z0-9_-]+) \{\n([^{}]*)^\}', config, re.M)
+        if (len(blocks) != 2 or len(re.findall(r'\bsieve_script\s+\S+\s*\{', config)) != 2 or
+                set(name for name, _ in blocks) != {'personal', 'default'}):
+            fail('readonly', 'Effective Sieve storage configuration is not supported.')
+        parsed = {}
+        for name, block in blocks:
+            parsed[name] = dict(line.strip().split(' = ', 1) for line in block.splitlines() if line.strip())
+        personal, fallback = parsed['personal'], parsed['default']
+        if (personal.get('path') != '~/.sieve' or personal.get('active_path') != '~/.sieve/dovecot.sieve' or
+                personal.get('driver', 'file') != 'file' or personal.get('type', 'personal') != 'personal' or
+                fallback.get('path') != '/etc/dovecot/sieve/default.sieve' or
+                fallback.get('driver', 'file') != 'file' or fallback.get('type') != 'default' or
+                fallback.get('name') != 'default'):
+            fail('readonly', 'Effective Sieve storage configuration is not supported.')
+        state['default_content'] = global_file('/etc/dovecot/sieve/default.sieve')
+        rows = json.loads(native(['/usr/bin/doveadm', '-f', 'json', 'user', mailbox])[0])
+        if not isinstance(rows, list) or any(set(row) != {'field', 'value'} for row in rows):
+            fail('readonly', 'Unsupported native userdb response.')
+        user = {row['field']: row['value'] for row in rows}
+        if (len(user) != len(rows) or user.get('home') != home or any('sieve' in key for key in user)):
+            fail('readonly', 'Per-user Dovecot storage differs from the supported configuration.')
+        try:
+            storage_fd = directory(home + '/.sieve')
+        except FileNotFoundError:
+            pass
+        else:
+            try:
+                info = os.fstat(storage_fd)
+                if info.st_uid != UID or info.st_gid != GID or stat.S_IMODE(info.st_mode) & 0o022:
+                    fail('readonly', 'Unsafe personal Sieve storage.')
+            finally:
+                os.close(storage_fd)
+        listing = sieve('list', mailbox)
+        if not isinstance(listing, list) or len(listing) > 1000:
+            fail('limit', 'Too many personal Sieve scripts.')
+        names = []
+        for item in listing:
+            if set(item) != {'script', 'active'} or item['active'] not in ('', 'ACTIVE'):
+                fail('readonly', 'Unsupported native Sieve listing.')
+            name = script_name(item['script'])
+            if name in names:
+                fail('readonly', 'Ambiguous native Sieve listing.')
+            names.append(name)
+        files, active = sieve_storage(home, names)
+        state['scripts'] = [{'name': item['script'], 'active': item['active'] == 'ACTIVE'}
+                            for item in listing if item['script'] in files]
+        if [item['name'] for item in state['scripts'] if item['active']] != ([] if active is None else [active]):
+            fail('conflict', 'Native Sieve active state changed; refresh.')
+        supported = bool(re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}', selected))
+        state['selected'] = {'name': selected, 'exists': selected in files,
+                             'supported': supported, 'active': selected == active,
+                             'content': sieve_get(mailbox, selected) if selected in files else ''}
+        state['_active'] = {'name': active, 'content': sieve_get(mailbox, active) if active else None}
+        state['_metadata'] = files
+        state['_config'] = fingerprint([parsed, user])
+        # Ensure native get did not straddle an observable external edit.
+        if sieve_storage(home, names) != (files, active) or sieve('list', mailbox) != listing:
+            fail('conflict', 'Sieve state changed while being read; refresh.')
+        state.update(available=True, reason='')
+    except (Error, OSError, ValueError, TypeError, KeyError) as error:
+        if isinstance(error, Error) and error.code == 'conflict':
+            raise
+        state['reason'] = 'Native Sieve configuration or storage is unavailable or incompatible; read-only.'
+    return state
+
+
+def inspect_worker(request):
+    account = resolve(request['mailbox'])
+    selected = script_name(request.get('script', ''))
+    state = dict(account)
+    home_fd = None
+    home_safe = False
+    try:
+        home_fd = directory(account['home'])
+        info = os.fstat(home_fd)
+        if info.st_uid != UID or info.st_gid != GID or stat.S_IMODE(info.st_mode) & 0o022:
+            fail('readonly', 'Unsupported mailbox home permissions.')
+        state['_home'] = metadata(info)[:5]
+        home_safe = True
+        try:
+            qmail = qmail_read(home_fd)
+        except (Error, OSError, UnicodeError):
+            try:
+                meta = metadata(os.stat('.qmail', dir_fd=home_fd, follow_symlinks=False))
+            except OSError:
+                meta = None
+            qmail = {'content': None, 'metadata': meta,
+                     'unsafe': 'Unsafe or unreadable .qmail; file was not followed.'}
+    except (Error, OSError):
+        qmail = {'content': None, 'metadata': None,
+                 'unsafe': 'Mailbox home is linked, unsafe, or inaccessible.'}
+    finally:
+        if home_fd is not None:
+            os.close(home_fd)
+    state['_qmail'] = qmail
+    state['qmail'] = parse_qmail(qmail['content'])
+    if 'unsafe' in qmail:
+        state['qmail'].update(editable=False, reason=qmail['unsafe'], mode='unknown')
+    state['defaultdelivery'] = global_file('/var/qmail/control/defaultdelivery')
+    # The exact native valias contract is supplied by the image contract tests.
+    try:
+        lines = native([VP + 'valias', account['mailbox']])[0].splitlines()
+    except Error as error:
+        if error.code != 'native_failed' or error.message.strip() != 'No aliases ' + account['mailbox'] + ' found':
+            raise
+        lines = []
+    state['valias'] = {'lines': lines, 'fingerprint': fingerprint(lines)}
+    if home_safe:
+        state['sieve'] = sieve_state(account['mailbox'], account['home'], selected)
+    else:
+        state['sieve'] = {'available': False, 'reason': qmail['unsafe'], 'scripts': [],
+                          'selected': {'name': selected, 'content': '', 'exists': False,
+                                       'supported': False, 'active': False},
+                          'default_content': global_file('/etc/dovecot/sieve/default.sieve')}
+    state['version'] = fingerprint(state)
+    return state
+
+
+def paginate(items, request):
+    query = text(request.get('query', ''), 128).lower()
+    page = request.get('page', 0)
+    if type(page) is not int or not 0 <= page <= 10000:
+        fail('invalid_request', 'Invalid result page.')
+    items = sorted(set(item for item in items if query in item.lower()))
+    start = page * 50
+    return {'items': items[start:start + 50],
+            'next_page': page + 1 if len(items) > start + 50 else None}
+
+
+def proposed_qmail(request, state, restore=None):
+    if not state['qmail']['editable']:
+        fail('readonly', state['qmail']['reason'])
+    if restore is not None:
+        content = restore['qmail']['content']
+        meta = restore['qmail']['metadata']
+        if content is not None and (not isinstance(meta, list) or len(meta) != 9 or
+                meta[2:4] != [UID, GID] or type(meta[4]) is not int or meta[4] & ~0o664):
+            fail('readonly', 'Backup contains unsupported .qmail ownership or permissions.')
+        parsed = parse_qmail(content)
+        if not parsed['editable']:
+            fail('readonly', 'Backup contains unsupported instructions.')
+        destinations = parsed['destinations']
+    else:
+        content, destinations = render_qmail(state['qmail']['content'],
+                                             request.get('mode'), request.get('destinations', []))
+    # Both the pre-backup proposal and the committing child enforce this gate.
+    if (request.get('operation') in ('qmail_save', 'qmail_restore') and
+            parse_qmail(content)['mode'] == 'discard' and request.get('confirm_discard') is not True):
+        fail('confirmation', 'Discarding mailbox messages requires explicit confirmation.')
+    # A successful bounded domain snapshot distinguishes external domains from
+    # native/SQL failures without treating every exit 255 as "not local".
+    domains = domain_map() if destinations else {}
+    host = state['mailbox'].split('@')[1]
+    if destinations and domains.get(host) != host:
+        fail('conflict', 'Canonical mailbox domain is missing from the native domain snapshot.')
+    resolved_destinations = set()
+    for destination in destinations:
+        local, host = destination.split('@')
+        if destination == state['mailbox']:
+            fail('invalid_request', 'Direct self-forwarding is not permitted.')
+        canonical = local + '@' + domains.get(host, host)
+        if canonical == state['mailbox']:
+            fail('invalid_request', 'Self-forwarding through a domain alias is not permitted.')
+        if canonical in resolved_destinations:
+            fail('invalid_request', 'Duplicate destinations through domain aliases are not permitted.')
+        resolved_destinations.add(canonical)
+    return content
+
+
+def check_confirmation(request, state):
+    if request.get('version') != state['version']:
+        fail('conflict', 'Mailbox state changed; refresh and preview again.')
+    if state['valias']['lines'] and (request.get('confirm_valias') is not True or
+            request.get('valias_fingerprint') != state['valias']['fingerprint']):
+        fail('confirmation', 'Current valias rules supersede .qmail; confirmation is required.')
+
+
+def check_sieve(request, state, restore):
+    current = state['sieve']
+    if not current['available']:
+        fail('readonly', current['reason'])
+    operation = request['operation']
+    selected = current['selected']
+    script_name(request.get('script', ''), writable=True)
+    if operation == 'sieve_deactivate' and not selected['active']:
+        fail('confirmation', 'Select the current active personal script before deactivating it.')
+    if operation in ('sieve_save', 'sieve_restore'):
+        if selected['name'] == 'default' and not selected['active'] and (
+                operation == 'sieve_save' or restore['selected']['exists']):
+            fail('readonly', 'Saving default can activate it implicitly. Use another draft name, or explicitly activate an existing default before editing it.')
+        if selected['active'] and request.get('confirm_active') is not True:
+            fail('confirmation', 'Editing an active script requires explicit confirmation.')
+        if operation == 'sieve_save':
+            text(request.get('content'), SCRIPT_LIMIT)
+        elif not restore['selected']['exists'] and selected['active']:
+            fail('confirmation', 'Deactivate the script explicitly before restoring its absence.')
+    if operation in ('sieve_activate', 'sieve_delete') and not selected['exists']:
+        fail('not_found', 'The selected personal script does not exist.')
+    if operation == 'sieve_delete' and selected['active']:
+        fail('confirmation', 'Deactivate the script explicitly before deleting it.')
+
+
+def commit_sieve(request, state, restore):
+    check_sieve(request, state, restore)
+    mailbox, name = state['mailbox'], request.get('script', '')
+    operation = request['operation']
+    selected = state['sieve']['selected']
+    expected_selected = dict(selected)
+    previous_active = state['sieve']['_active']['name']
+    expected_active = previous_active
+    if operation in ('sieve_save', 'sieve_restore'):
+        content = request['content'] if operation == 'sieve_save' else restore['selected']['content']
+        exists = operation == 'sieve_save' or restore['selected']['exists']
+        if exists:
+            sieve('put', mailbox, name, content)
+        elif selected['exists']:
+            sieve('delete', mailbox, name)
+        expected_selected.update(content=content if exists else '', exists=exists)
+    elif operation == 'sieve_activate':
+        sieve('activate', mailbox, name)
+        expected_active = name
+        expected_selected['active'] = True
+    elif operation == 'sieve_deactivate':
+        sieve('deactivate', mailbox)
+        expected_active = None
+        expected_selected['active'] = False
+    elif operation == 'sieve_delete':
+        sieve('delete', mailbox, name)
+        expected_selected.update(exists=False, content='', active=False)
+    after = inspect_worker(request)
+    expected_scripts = {item['name'] for item in state['sieve']['scripts']}
+    if expected_selected['exists']:
+        expected_scripts.add(name)
+    else:
+        expected_scripts.discard(name)
+    if (after['_qmail'] != state['_qmail'] or after.get('_home') != state.get('_home') or after['home'] != state['home'] or
+            after['valias'] != state['valias'] or not after['sieve']['available'] or
+            after['sieve']['selected'] != expected_selected or
+            after['sieve']['_active']['name'] != expected_active or
+            {item['name'] for item in after['sieve']['scripts']} != expected_scripts or
+            after['sieve']['_config'] != state['sieve']['_config']):
+        fail('uncertain_conflict', 'State diverged after the native operation; no rollback was attempted.')
+    for other, meta in state['sieve']['_metadata'].items():
+        if other != name and after['sieve']['_metadata'].get(other) != meta:
+            fail('uncertain_conflict', 'Another script changed during the operation; inspect before retrying.')
+    if expected_active == name and after['sieve']['_active']['content'] != expected_selected['content']:
+        fail('uncertain_conflict', 'Activated script content changed during the operation; inspect before retrying.')
+    if previous_active and previous_active != name and expected_active == previous_active and (
+            after['sieve']['_active'] != state['sieve']['_active']):
+        fail('uncertain_conflict', 'Active script changed during the operation; inspect before retrying.')
+    return after
+
+
+def commit_worker(request, expected, restore):
+    state = inspect_worker(request)
+    if state['version'] != expected['version']:
+        fail('conflict', 'State changed after backup; no write was attempted.')
+    if request['operation'].startswith('sieve_'):
+        return commit_sieve(request, state, restore)
+    check_confirmation(request, state)
+    content = proposed_qmail(request, state, restore)
+    fd = directory(state['home'])
+    temporary = '.delivery-admin-' + os.urandom(16).hex()
+    try:
+        if metadata(os.fstat(fd))[:5] != state['_home']:
+            fail('conflict', 'Mailbox home changed before replacement.')
+        if qmail_read(fd) != state['_qmail']:
+            fail('conflict', 'Delivery instructions changed before replacement.')
+        if content is None:
+            if state['_qmail']['content'] is not None:
+                os.unlink('.qmail', dir_fd=fd)
+        else:
+            snapshot = restore['qmail'] if restore is not None else state['_qmail']
+            mode = snapshot['metadata'][4] if snapshot['metadata'] else 0o600
+            out = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                          mode, dir_fd=fd)
+            try:
+                os.fchmod(out, mode)
+                data = content.encode('utf-8')
+                while data:
+                    data = data[os.write(out, data):]
+                os.fsync(out)
+            finally:
+                os.close(out)
+            if qmail_read(fd) != state['_qmail']:
+                fail('conflict', 'Delivery instructions changed before replacement.')
+            os.replace(temporary, '.qmail', src_dir_fd=fd, dst_dir_fd=fd)
+        os.fsync(fd)
+        if qmail_read(fd)['content'] != content:
+            fail('uncertain_conflict', 'Delivery state diverged after write; inspect before retrying.')
+    finally:
+        try:
+            os.unlink(temporary, dir_fd=fd)
+        except FileNotFoundError:
+            pass
+        os.close(fd)
+    after = inspect_worker(request)
+    if (after.get('_home') != state['_home'] or after['home'] != state['home'] or after['qmail']['content'] != content or
+            after['valias'] != state['valias'] or after['sieve'] != state['sieve']):
+        fail('uncertain_conflict', 'Mailbox state diverged after write; no rollback was attempted.')
+    return after
+
+
+def worker_action(action, request, expected=None, restore=None):
+    if action == 'resolve':
+        return resolve(request['mailbox'])
+    if action == 'domains':
+        return paginate(domain_map(), request)
+    if action == 'mailboxes':
+        host = domain(request.get('domain'))
+        real = domain(native([VP + 'vdominfo', '-r', host])[0].splitlines()[0])
+        names = native([VP + 'vuserinfo', '-n', '-D', real])[0].splitlines()
+        return paginate([address(name + '@' + real) for name in names if name and name != '-' * 42], request)
+    if action == 'inspect':
+        return inspect_worker(request)
+    if action == 'propose':
+        return proposed_qmail(request, expected, restore)
+    if action == 'commit':
+        return commit_worker(request, expected, restore)
+    fail('invalid_request', 'Unknown worker operation.')
+
+
+def worker(action, request, expected=None, restore=None):
+    read_fd, write_fd = os.pipe()
+    pid = os.fork()
+    if pid == 0:
+        try:
+            os.setsid()
+            os.dup2(write_fd, 1)
+            # Do not inherit root backup/lock descriptors or web stdin/stderr.
+            null = os.open('/dev/null', os.O_RDWR)
+            os.dup2(null, 0)
+            os.dup2(null, 2)
+            os.closerange(3, resource.getrlimit(resource.RLIMIT_NOFILE)[0])
+            os.setgroups([])
+            os.setresgid(GID, GID, GID)
+            os.setresuid(UID, UID, UID)
+            # Native programs cannot regain privileges through setuid binaries
+            # or file capabilities after the irreversible identity drop.
+            libc = ctypes.CDLL(None, use_errno=True)
+            if libc.prctl(38, 1, 0, 0, 0) != 0 or libc.prctl(4, 0, 0, 0, 0) != 0:
+                os._exit(1)
+            resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+            os.umask(0o077)
+            os.chdir('/')
+            os.environ.clear()
+            os.environ.update(ENV)
+            try:
+                result = {'ok': True, 'data': worker_action(action, request, expected, restore)}
+            except Error as error:
+                result = {'ok': False, 'error': {'code': error.code, 'message': error.message}}
+            except Exception:
+                result = {'ok': False, 'error': {'code': 'unavailable',
+                          'message': 'Mailbox or native operation is unavailable or unsafe.'}}
+            data = encoded(result)
+            if len(data) > OUTPUT_LIMIT:
+                data = encoded({'ok': False, 'error': {'code': 'limit', 'message': 'Response too large.'}})
+            while data:
+                data = data[os.write(1, data):]
+        finally:
+            os._exit(0)
+    os.close(write_fd)
+    result = bytearray()
+    try:
+        with os.fdopen(read_fd, 'rb') as stream:
+            result = stream.read(OUTPUT_LIMIT + 1)
+        _, status = os.waitpid(pid, 0)
+        if status or len(result) > OUTPUT_LIMIT:
+            fail('unavailable', 'Mailbox worker failed; refresh before retrying.')
+        document = json.loads(result)
+        if not document['ok']:
+            fail(document['error']['code'], document['error']['message'])
+        return document['data']
+    except BaseException:
+        try:
+            os.killpg(pid, signal.SIGKILL)
+            os.waitpid(pid, 0)
+        except (ProcessLookupError, ChildProcessError):
+            pass
+        raise
+
+
+def authenticate(token):
+    if not isinstance(token, str) or not re.fullmatch('[a-f0-9]{64}', token):
+        fail('authentication', 'A current administrator session is required.')
+    fd = directory('/run/sqmail-admin')
+    try:
+        info = os.fstat(fd)
+        if info.st_uid != 33 or stat.S_IMODE(info.st_mode) != 0o700:
+            fail('authentication', 'Unsafe session directory.')
+        record, _ = read_file(fd, 'token-' + token, 4096, 33, private=True)
+    finally:
+        os.close(fd)
+    parts = record.splitlines()
+    if len(parts) != 3:
+        fail('authentication', 'Invalid session record.')
+    actor, expiry, digest = parts
+    if (not actor or len(actor) > 256 or re.search(r'[\x00-\x1f:\x7f]', actor) or
+            not re.fullmatch('[0-9]{1,12}', expiry) or int(expiry) <= time.time() or
+            not re.fullmatch('[a-f0-9]{64}', digest)):
+        fail('authentication', 'Invalid or expired administrator session.')
+    fd = directory('/var/qmail/control')
+    try:
+        credentials, _ = read_file(fd, 'lighttpd-admins.htdigest', SCRIPT_LIMIT)
+    finally:
+        os.close(fd)
+    match = actor + ':SQMail AIO Admin:' + digest
+    if not any(hmac.compare_digest(line.encode('utf-8'), match.encode('utf-8')) for line in credentials.splitlines()):
+        fail('authentication', 'Administrator session has been revoked.')
+    return actor
+
+
+def private_directory(path):
+    fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
+    parts = path.strip('/').split('/')
+    try:
+        for index, part in enumerate(parts):
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            os.close(fd)
+            fd = child
+            info = os.fstat(fd)
+            owners = {0}
+            if '/'.join(parts[:index + 1]) == 'var/qmail/control':
+                owners.add(pwd.getpwnam('qmaild').pw_uid)
+            if info.st_uid not in owners or stat.S_IMODE(info.st_mode) & 0o022:
+                fail('unsafe_storage', 'Unsafe private storage ancestor; administration is disabled.')
+        if info.st_uid != 0 or info.st_gid != 0 or stat.S_IMODE(info.st_mode) != 0o700:
+            fail('unsafe_storage', 'Private delivery administration storage is not initialized safely.')
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def backup_name(mailbox, kind, script):
+    return fingerprint([mailbox, kind, script if kind == 'sieve' else '']) + '.json'
+
+
+def load_backup(fd, name):
+    try:
+        value, _ = read_file(fd, name, OUTPUT_LIMIT, 0, private=True)
+        return json.loads(value)
+    except FileNotFoundError:
+        return None
+
+
+def save_backup(fd, name, record):
+    temporary = '.new-' + os.urandom(16).hex()
+    previous = None
+    replaced = durable = False
+    data = encoded(record)
+    if len(data) > OUTPUT_LIMIT:
+        fail('backup_failed', 'Backup exceeds the storage limit.')
+    try:
+        out = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                      0o600, dir_fd=fd)
+        try:
+            while data:
+                data = data[os.write(out, data):]
+            os.fsync(out)
+        finally:
+            os.close(out)
+        try:
+            old, _ = read_file(fd, name, OUTPUT_LIMIT, os.geteuid(), private=True)
+        except FileNotFoundError:
+            pass
+        else:
+            # A separate inode keeps ordinary records single-linked even if the
+            # process crashes. Never discard the last complete record on fsync
+            # failure after the new name has replaced it.
+            previous = '.previous-' + os.urandom(16).hex()
+            out = os.open(previous, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                          0o600, dir_fd=fd)
+            try:
+                data = old.encode('utf-8')
+                while data:
+                    data = data[os.write(out, data):]
+                os.fsync(out)
+            finally:
+                os.close(out)
+            os.fsync(fd)
+        os.replace(temporary, name, src_dir_fd=fd, dst_dir_fd=fd)
+        replaced = True
+        os.fsync(fd)
+        durable = True
+    except BaseException:
+        if replaced:
+            if previous is not None:
+                os.replace(previous, name, src_dir_fd=fd, dst_dir_fd=fd)
+                previous = None
+            else:
+                os.unlink(name, dir_fd=fd)
+            os.fsync(fd)
+        raise
+    finally:
+        try:
+            os.unlink(temporary, dir_fd=fd)
+        except FileNotFoundError:
+            pass
+        # Cleanup after a durable backup is best effort, not a write failure.
+        # If recovery itself failed, retain the complete private previous file.
+        if previous is not None and (durable or not replaced):
+            try:
+                os.unlink(previous, dir_fd=fd)
+                os.fsync(fd)
+            except OSError:
+                pass
+
+
+def public_state(state, backup_fd, script):
+    result = {key: value for key, value in state.items() if not key.startswith('_')}
+    result['sieve'] = {key: value for key, value in state['sieve'].items() if not key.startswith('_')}
+    result['backups'] = {kind: load_backup(backup_fd, backup_name(state['mailbox'], kind, script)) is not None
+                         for kind in ('qmail', 'sieve')}
+    return result
+
+
+def dispatch(request):
+    operation = request['operation']
+    if operation in ('domains', 'mailboxes'):
+        return worker(operation, request)
+    account = worker('resolve', request)
+    request['mailbox'] = account['mailbox']
+    script = script_name(request.get('script', ''))
+    lock_fd, backup_fd = private_directory(LOCKS), private_directory(BACKUPS)
+    lock = None
+    try:
+        name = fingerprint(account['mailbox'])
+        lock = os.open(name, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600, dir_fd=lock_fd)
+        info = os.fstat(lock)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid != 0 or stat.S_IMODE(info.st_mode) != 0o600:
+            fail('unsafe_storage', 'Unsafe mailbox lock.')
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            fail('busy', 'Another delivery administration operation is running.')
+        state = worker('inspect', request)
+        if state['mailbox'] != account['mailbox'] or state['home'] != account['home']:
+            fail('conflict', 'Native account resolution changed while acquiring the lock.')
+        kind = 'sieve' if operation.startswith('sieve_') else 'qmail'
+        name = backup_name(state['mailbox'], kind, script)
+        restore = load_backup(backup_fd, name) if 'restore' in operation else None
+        if 'restore' in operation and restore is None:
+            fail('not_found', 'No previous backup exists for this object.')
+        backup_version = fingerprint(restore) if restore is not None else None
+        if operation in ('qmail_restore', 'sieve_restore') and request.get('backup_version') != backup_version:
+            fail('conflict', 'Backup changed since preview; preview the current backup again.')
+        if operation == 'inspect':
+            return public_state(state, backup_fd, script)
+        if kind == 'sieve':
+            if not state['sieve']['available']:
+                fail('readonly', state['sieve']['reason'])
+            if operation == 'sieve_restore_preview':
+                return {'state': public_state(state, backup_fd, script),
+                        'content': restore['selected']['content'], 'exists': restore['selected']['exists'],
+                        'previous_active': restore['previous_active'],
+                        'previous_active_snapshot': restore.get('previous_active_snapshot'),
+                        'backup_version': backup_version}
+            if request.get('version') != state['version']:
+                fail('conflict', 'Sieve state changed; refresh before retrying.')
+            check_sieve(request, state, restore)
+            save_backup(backup_fd, name, {'mailbox': state['mailbox'],
+                        'selected': state['sieve']['selected'],
+                        'previous_active': state['sieve']['_active']['name'],
+                        'previous_active_snapshot': state['sieve']['_active'], 'version': state['version']})
+            return public_state(worker('commit', request, state, restore), backup_fd, script)
+        content = worker('propose', request, state, restore)
+        if operation in ('qmail_preview', 'qmail_restore_preview'):
+            diff = ''.join(difflib.unified_diff([line + '\n' for line in (state['qmail']['content'] or '').split('\n')[:-1]],
+                                               [line + '\n' for line in (content or '').split('\n')[:-1]],
+                                               fromfile='current .qmail', tofile='proposed .qmail'))
+            parsed = parse_qmail(content)
+            return {'state': public_state(state, backup_fd, script), 'diff': diff,
+                    'mode': parsed['mode'], 'destinations': parsed['destinations'],
+                    'backup_version': backup_version}
+        check_confirmation(request, state)
+        save_backup(backup_fd, name, {'mailbox': state['mailbox'], 'qmail': state['_qmail'],
+                                     'version': state['version']})
+        after = worker('commit', request, state, restore)
+        return public_state(after, backup_fd, script)
+    finally:
+        if lock is not None:
+            os.close(lock)
+        os.close(lock_fd)
+        os.close(backup_fd)
+
+
+def main():
+    actor, request, result = None, {}, None
+    try:
+        if os.geteuid() != 0 or len(sys.argv) != 1:
+            fail('permission', 'This helper requires root and accepts no arguments.')
+        os.umask(0o077)
+        def timeout(signum, frame):
+            fail('timeout', 'Operation deadline exceeded; inspect before retrying.')
+        signal.signal(signal.SIGALRM, timeout)
+        signal.alarm(50)
+        raw = sys.stdin.buffer.read(REQUEST_LIMIT + 1)
+        if len(raw) > REQUEST_LIMIT:
+            fail('limit', 'Request exceeds 256 KiB.')
+        request = json.loads(raw)
+        if (not isinstance(request, dict) or not isinstance(request.get('operation'), str) or
+                request.get('operation') not in OPERATIONS):
+            fail('invalid_request', 'Unknown delivery administration operation.')
+        actor = authenticate(request.get('token'))
+        # No session material is inherited by the mailbox worker.
+        request.pop('token', None)
+        result = {'ok': True, 'data': dispatch(request)}
+    except Error as error:
+        result = {'ok': False, 'error': {'code': error.code, 'message': error.message}}
+    except (ValueError, TypeError, KeyError, UnicodeError):
+        result = {'ok': False, 'error': {'code': 'invalid_request', 'message': 'Malformed request or native response.'}}
+    except Exception:
+        result = {'ok': False, 'error': {'code': 'unavailable',
+                  'message': 'Operation unavailable or unsafe; refresh before retrying.'}}
+    signal.alarm(0)
+    operation = request.get('operation') if isinstance(request, dict) else None
+    audit = {'actor': actor, 'operation': operation if isinstance(operation, str) and operation in OPERATIONS else None,
+             'mailbox': None, 'result': 'ok' if result['ok'] else result['error']['code']}
+    if actor and isinstance(request.get('mailbox'), str):
+        try:
+            audit['mailbox'] = address(request['mailbox'])
+        except Error:
+            pass
+    if actor and re.fullmatch('[a-f0-9]{64}', str(request.get('version', ''))):
+        audit['before'] = request['version']
+    if result['ok'] and isinstance(result['data'], dict) and 'version' in result['data']:
+        audit['after'] = result['data']['version']
+        audit['mailbox'] = result['data'].get('mailbox')
+    elif result['ok'] and isinstance(result['data'], dict) and 'state' in result['data']:
+        audit['after'] = result['data']['state']['version']
+        audit['mailbox'] = result['data']['state'].get('mailbox')
+    sys.stderr.buffer.write(encoded(audit) + b'\n')
+    output = encoded(result)
+    if len(output) > OUTPUT_LIMIT:
+        output = encoded({'ok': False, 'error': {'code': 'limit', 'message': 'Response exceeds safe limit.'}})
+    sys.stdout.buffer.write(output + b'\n')
+
+
+if __name__ == '__main__':
+    main()

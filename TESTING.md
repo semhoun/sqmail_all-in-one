@@ -61,7 +61,7 @@ python3 tests/admin-auth.py --image sqmail-aio:dev
 This uses real Lighttpd, PHP-FPM and vqadmin in a disposable container, without
 published ports, production mounts or a database. It checks anonymous access to
 every admin route family, forged identity headers, existing credentials, CSRF,
-session rotation, logout, expiry, credential revocation and vqadmin's username
+session rotation, logout, expiry, credential revocation, ordinary PHP identity and vqadmin's username
 and ACL handling. It also checks session-based login throttling without blocking
 the same account in another browser session.
 
@@ -73,6 +73,87 @@ missing. This mode needs network access and does not validate the image build.
 The fixture manually sends Secure cookies over loopback HTTP to simulate the
 proxy-to-container hop. It does not validate browser cookie enforcement, the
 external HTTPS proxy, page rendering or database-backed vqadmin operations.
+
+## Delivery Administration
+
+The native contracts and privileged helper use separate disposable instances
+of the initialized mail fixture, with real SQL-backed vpopmail/Dovecot lookups:
+
+```shell
+python3 -B tests/delivery-helper.py
+python3 -B tests/native-sieve.py --image sqmail-aio:dev
+python3 -B tests/individual-qmail.py --image sqmail-aio:dev
+python3 -B tests/individual-delivery-modes.py --image sqmail-aio:dev
+python3 -B tests/delivery-admin.py --image sqmail-aio:dev
+docker run --rm --network none --entrypoint python3 \
+  -e SQMAIL_DISPOSABLE_TEST=1 \
+  --mount "type=bind,src=$PWD/tests,dst=/tests,readonly" \
+  sqmail-aio:dev /tests/delivery-storage.py
+```
+
+The native Sieve suite checks canonical alias-domain resolution, disabled-account
+lookup, enumeration, lifecycle operations and invalid-script preservation with
+UID/GID 89 and no supplementary groups. Dovecot does not resolve alias domains
+through this userdb: canonicalization must precede every mailbox operation.
+
+The individual-delivery suite sends real SMTP messages through absent, empty,
+comment-only, LDA and forwarding `.qmail` files, with and without `valias`.
+It checks local/external forwarding, retained copies, SRS and reverse bounces,
+delivery context and command failures. The tested precedence is `valias`, then a
+nonempty individual `.qmail`, then `defaultdelivery`. Empty files fall back;
+comment-only files consume mail without delivery. The editor deliberately does
+not turn these ambiguous existing files into templates. Forwarding proof assumes
+the tested domain has SRS configured; it is not a guarantee against duplicates
+after a partially successful delivery is retried.
+
+The individual-delivery-modes suite proves the fixed Dovecot LDA option
+`mail_plugins/sieve=no` bypasses an active personal filter, while normal LDA runs it.
+It checks without-Sieve local copies plus external SRS forwarding and reverse bounces,
+and the explicit discard marker: no local delivery, forwarding or bounce, and no
+replay of discarded messages after re-enabling delivery. Generic comment-only
+files remain read-only. Helper and browser tests additionally require separate
+discard acknowledgment for both save and restore, and reject the removed domain
+management operations and page.
+The native suite verifies that disabling Sieve retains the other configured
+plugins. It first preserves the shipped quota behavior, then enables enforcement
+only in the disposable fixture, flushes the auth cache and recalculates usage.
+Normal and without-Sieve LDA must both refuse an oversized message when that
+fixture is over quota. The original configuration is restored afterward; the
+application itself does not change quota limits or enforcement.
+
+The administration suite exercises the real helper through its sudo rule and
+the real PHP/Lighttpd session boundary, including stale restore previews and
+concurrent native edits. It also sends real SMTP vacation messages to check
+reply suppression for repeated senders, automated messages and null senders,
+while retaining every original message. Backup persistence is checked after
+stopping the mail container, using a fresh image instance with its volumes
+mounted read-only and comparing only hashes and private metadata.
+The private-storage suite refuses an
+initialized mail container and checks directory ownership, symlink refusal and
+idempotent creation without altering existing backup contents. The helper unit
+suite is host-safe: it exercises pure parsing and temporary files, never native
+mail tools or installed runtime configuration.
+
+### Browser Workflow
+
+The optional browser runner requires Python Playwright and its Chromium browser
+(or an installed Chromium supplied with `--chromium /usr/bin/chromium`):
+
+```shell
+python3 -B tests/delivery-browser.py --image sqmail-aio:dev
+```
+
+It provisions its own mail/database fixture and a synthetic HTTPS reverse proxy
+on that fixture's internal Docker network. It publishes no ports and needs host
+access to the fixture container's internal IP, as on a local Linux Docker host.
+It tests real Secure cookies, the operator search/edit workflow, delivery diff
+confirmation, Sieve compilation failures and restoration, vacation-draft quoting,
+mobile layout and keyboard entry. Self-signed certificate verification is
+disabled only for this synthetic browser context. `--artifacts` can point to an
+existing directory for desktop/mobile screenshots containing only synthetic data.
+The proxy and browser runner are test fixtures, never production services.
+Prefer the Chromium build supplied by the installed Playwright version for
+reproducible visual checks.
 
 ## Mail Delivery, Spam and Antivirus
 
@@ -209,7 +290,8 @@ verification. It is not currently part of release CI.
 
 The [Docker workflow](.github/workflows/docker.yml) runs on tags matching `*.*.*`.
 It builds the image once, checks that the test mount/entrypoint paths are absent,
-runs the Sieve, administration authentication and mail integration suites, and
+runs the Sieve, administration authentication, mail integration, native delivery
+contracts and delivery-administration security suites, and
 then pushes the tested image.
 A failed check prevents the publication step. The image is not rebuilt between
 testing and publication.

@@ -1,0 +1,34 @@
+.delivery-shell { max-width: 1120px; }
+.delivery-nav, .delivery-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.delivery-panel { margin: 24px 0; padding: 28px; background: #fff; border: 1px solid #dce8e5; border-radius: 20px; box-shadow: 0 16px 36px -24px #183d4340; }
+.delivery-panel h2 { margin: 0 0 20px; font-size: 22px; }
+.delivery-panel h3 { margin: 24px 0 12px; font-size: 17px; }
+.delivery-panel p, .delivery-help { line-height: 1.65; }
+.delivery-notice { padding: 16px 20px; border-left: 4px solid var(--login-accent); background: #e8f3f0; border-radius: 0 10px 10px 0; }
+.delivery-warning { border-left-color: #986416; background: #fff6df; color: #62430f; }
+.delivery-error { border-left-color: #963b34; background: #fff1ee; color: #852e29; white-space: pre-wrap; overflow-wrap: anywhere; }
+.delivery-form { display: grid; gap: 12px; margin: 20px 0; }
+.delivery-form > * { min-width: 0; }
+.delivery-form label { font-weight: 600; }
+.delivery-form input:not([type=hidden]):not([type=checkbox]), .delivery-form select, .delivery-form textarea { width: 100%; padding: 11px 12px; border: 1px solid #aabfbb; border-radius: 8px; color: var(--login-ink); background: #fff; }
+.delivery-form input[type=checkbox] { margin-right: 8px; width: 18px; height: 18px; vertical-align: middle; }
+.delivery-form .queue-button { justify-self: start; white-space: normal; }
+.delivery-form textarea, .delivery-panel pre { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 13px; line-height: 1.6; }
+.delivery-form textarea { resize: vertical; min-height: 100px; }
+.delivery-form .delivery-editor { min-height: 360px; }
+.delivery-panel pre { background: #f4f8f7; border: 1px solid #dce8e5; border-radius: 8px; padding: 16px; max-height: 440px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.delivery-list { list-style: none; padding: 0; }
+.delivery-list li { border-bottom: 1px solid #e7efed; padding: 12px 0; overflow-wrap: anywhere; }
+.delivery-list a { display: inline-block; padding: 5px 0; }
+.delivery-shell a { color: var(--login-accent); text-underline-offset: 4px; }
+.delivery-shell :focus-visible { outline: 3px solid var(--login-accent); outline-offset: 3px; }
+.delivery-shell h1, .delivery-shell dd { overflow-wrap: anywhere; }
+.delivery-shell dt { margin-top: 12px; }
+.delivery-shell dd { margin-left: 0; }
+.delivery-skip { position: absolute; left: -10000px; }
+.delivery-skip:focus { position: static; }
+@media (max-width: 600px) {
+    .delivery-panel { padding: 20px 16px; }
+    .delivery-shell .admin-header { flex-wrap: wrap; }
+    .delivery-form .queue-button { width: 100%; }
+}

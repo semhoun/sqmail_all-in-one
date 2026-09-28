@@ -1,0 +1,2 @@
+# The empty argument string permits this executable ONLY without arguments.
+www-data ALL=(root) NOPASSWD: /opt/libexec/delivery-admin ""

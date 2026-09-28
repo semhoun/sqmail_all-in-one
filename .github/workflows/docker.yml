@@ -70,6 +70,17 @@ jobs:
         run: |
           docker pull mariadb:11.4
           python3 tests/mail.py --image sqmail-aio:ci
+      - name: Test delivery administration contracts and security
+        run: |
+          python3 -B tests/delivery-helper.py
+          docker run --rm --network none --entrypoint python3 \
+            -e SQMAIL_DISPOSABLE_TEST=1 \
+            --mount "type=bind,src=$PWD/tests,dst=/tests,readonly" \
+            sqmail-aio:ci /tests/delivery-storage.py
+          python3 -B tests/native-sieve.py --image sqmail-aio:ci
+          python3 -B tests/individual-qmail.py --image sqmail-aio:ci
+          python3 -B tests/individual-delivery-modes.py --image sqmail-aio:ci
+          python3 -B tests/delivery-admin.py --image sqmail-aio:ci
       - name: Push tested image
         env:
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}

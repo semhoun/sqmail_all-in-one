@@ -1,0 +1,49 @@
+#!/usr/bin/python3 -I
+"""Initialize private administration storage, never mailbox contents."""
+
+import os
+import pwd
+import stat
+import sys
+
+
+def prepare(path):
+    directory = os.open('/', os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    parts = path.strip('/').split('/')
+    try:
+        for index, part in enumerate(parts):
+            final = index == len(parts) - 1
+            if final:
+                try:
+                    os.mkdir(part, 0o700, dir_fd=directory)
+                    os.fsync(directory)
+                except FileExistsError:
+                    pass
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                            dir_fd=directory)
+            os.close(directory)
+            directory = child
+            info = os.fstat(directory)
+            owners = {0}
+            if '/'.join(parts[:index + 1]) == 'var/qmail/control':
+                owners.add(pwd.getpwnam('qmaild').pw_uid)
+            if info.st_uid not in owners or info.st_mode & 0o022:
+                raise PermissionError('Unsafe private storage directory')
+            if final:
+                if info.st_gid != 0:
+                    raise PermissionError('Unsafe private storage group')
+                os.fchmod(directory, stat.S_IRWXU)
+                os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
+if __name__ == '__main__':
+    if os.geteuid() != 0 or len(sys.argv) != 1:
+        sys.exit('Delivery administration storage initialization requires root and no arguments')
+    os.umask(0o077)
+    try:
+        prepare('/run/sqmail-delivery-admin')
+        prepare('/var/qmail/control/delivery-admin-backups')
+    except (OSError, KeyError):
+        sys.exit('Delivery administration private storage unavailable; refusing unsafe directories')

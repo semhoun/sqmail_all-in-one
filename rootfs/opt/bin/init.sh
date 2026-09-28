@@ -212,7 +212,9 @@ chmod 600 /var/qmail/control/dovecot-local.conf
 
 # Creation directory and setting permissions
 chown qmailq:sqmail /var/qmail/queue
-chown -R qmaild:sqmail /var/qmail/control
+# Administration backups must remain private, including their existing contents.
+find /var/qmail/control -path /var/qmail/control/delivery-admin-backups -prune -o \
+  -exec chown -h qmaild:sqmail {} +
 for CONTROL_FILE in /var/qmail/control/*; do
   [ ! -f "$CONTROL_FILE" ] || chmod 644 "$CONTROL_FILE"
 done
@@ -223,6 +225,9 @@ chown root:vchkpw /var/qmail/control/mysql.conf
 chmod 640 /var/qmail/control/mysql.conf
 chown root:www-data /var/qmail/control/aio-conf/mysql.php
 chmod 640 /var/qmail/control/aio-conf/mysql.php
+if ! /opt/libexec/delivery-admin-init; then
+  echo "[Delivery admin] Private storage unavailable; mutations remain disabled." >&2
+fi
 mkdir -p /var/qmail/ssl/domainkeys
 chmod 755 /var/qmail/ssl/domainkeys
 chown qmailq:sqmail /var/qmail/ssl/domainkeys

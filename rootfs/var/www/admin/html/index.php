@@ -72,6 +72,16 @@ $_SESSION['csrf'] ??= bin2hex(random_bytes(32));
                 <p>Inspect queued messages and manage pending delivery.</p>
                 <span class="admin-tool-link">QMail Queue <span aria-hidden="true">&rarr;</span></span>
             </a>
+            <a class="admin-tool" href="/delivery/">
+                <span class="admin-tool-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M4 6h16M4 12h10M4 18h6m7-5 4 4-4 4m-5-4h9" />
+                    </svg>
+                </span>
+                <h2>Delivery &amp; Sieve</h2>
+                <p>Inspect delivery routes, manage filters and prepare vacation replies.</p>
+                <span class="admin-tool-link">All mailboxes <span aria-hidden="true">&rarr;</span></span>
+            </a>
         </nav>
 
         <section class="admin-diagnostics" aria-labelledby="diagnostics-title">
