@@ -51,7 +51,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
   mkdir -p /opt/src /opt/templates \
   && apt-get update \
-  && apt-get install -y --no-install-recommends build-essential libtool-bin equivs bash ca-certificates dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg gpg gpgv openssh-client groff-base \
+  && apt-get install -y --no-install-recommends build-essential libtool-bin equivs bash ca-certificates dnsutils unzip git curl wget sudo ksh vim whiptail cmake apg gpg gpg-agent gpgv openssh-client groff-base \
 ## Add docker group for logs
   && groupadd -g 998 docker \
 ## Add MTA Local (equivs is needed)
