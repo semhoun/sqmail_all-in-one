@@ -127,7 +127,11 @@ chown vpopmail:sqmail /var/run/fetchmail
 
 # Some fixes
 rm -f /var/run/dovecot/master.pid
-rm -f /var/run/lighttpd-log.pipe
+
+# Prepare the log FIFO before s6 starts lighttpd and its logger in parallel.
+rm -f /var/run/lighttpd-log.pipe || exit 1
+mkfifo -m0640 /var/run/lighttpd-log.pipe || exit 1
+chown www-data:www-data /var/run/lighttpd-log.pipe || exit 1
 
 # Fix for qmailadmin
 : > /var/log/qma-auth.log
