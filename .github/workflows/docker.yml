@@ -64,6 +64,8 @@ jobs:
             -e SQMAIL_DISPOSABLE_TEST=1 \
             --mount "type=bind,src=$PWD/tests,dst=/tests,readonly" \
             sqmail-aio:ci /tests/dovecot-sieve.py
+      - name: Test administration authentication
+        run: python3 tests/admin-auth.py --image sqmail-aio:ci
       - name: Test mail delivery and filtering
         run: |
           docker pull mariadb:11.4

@@ -52,6 +52,28 @@ and direct PREAUTH IMAP. It checks actual delivery, subprocess status and panic
 logs, not just successful compilation. It does not test SQL authentication, TLS,
 postlogin hooks or the complete generated server configuration.
 
+## Administration Authentication
+
+```shell
+python3 tests/admin-auth.py --image sqmail-aio:dev
+```
+
+This uses real Lighttpd, PHP-FPM and vqadmin in a disposable container, without
+published ports, production mounts or a database. It checks anonymous access to
+every admin route family, forged identity headers, existing credentials, CSRF,
+session rotation, logout, expiry, credential revocation and vqadmin's username
+and ACL handling. It also checks session-based login throttling without blocking
+the same account in another browser session.
+
+The default command tests the installed image without network access. For a
+focused development check against an older image, add `--source-overlay` to
+copy the working-tree authentication files and install the magnet module if
+missing. This mode needs network access and does not validate the image build.
+
+The fixture manually sends Secure cookies over loopback HTTP to simulate the
+proxy-to-container hop. It does not validate browser cookie enforcement, the
+external HTTPS proxy, page rendering or database-backed vqadmin operations.
+
 ## Mail Delivery, Spam and Antivirus
 
 ```shell
@@ -187,7 +209,8 @@ verification. It is not currently part of release CI.
 
 The [Docker workflow](.github/workflows/docker.yml) runs on tags matching `*.*.*`.
 It builds the image once, checks that the test mount/entrypoint paths are absent,
-runs the Sieve and mail integration suites, and then pushes the tested image.
+runs the Sieve, administration authentication and mail integration suites, and
+then pushes the tested image.
 A failed check prevents the publication step. The image is not rebuilt between
 testing and publication.
 

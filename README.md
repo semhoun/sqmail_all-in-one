@@ -25,7 +25,7 @@ Refer to the [Ports](#ports) and [Volumes](#volumes) sections for details on the
 docker run \
   --name sqmail-aio \
   --publish 80:80 \
-  --publish 88:88 \
+  --publish 127.0.0.1:88:88 \
   --publish 25:25 \
   --publish 465:465 \
   --publish 587:587 \
@@ -70,7 +70,7 @@ services:
       - ./data/domainkeys:/var/qmail/ssl/domainkeys
     ports:
       - 80:80
-      - 88:88
+      - 127.0.0.1:88:88
       - 443:443
       - 25:25
       - 465:465
@@ -154,7 +154,7 @@ docker compose run -e SKIP_INIT_ENV=1 --service-ports --rm sqmail-aio /opt/bin/i
 | Port  | Service          | Description                                      |
 |-------|------------------|--------------------------------------------------|
 | `80`  | HTTP             | Webmail (Roundcube) and SSL ACME certificates    |
-| `88`  | HTTP Admin       | Admin interface (HTTP only)                      |
+| `88`  | HTTP Admin       | Internal admin backend; requires an HTTPS proxy |
 | `443` | HTTPS            | SSL Webmail (Roundcube)                          |
 | `25`  | SMTP             | Mail transfer                                    |
 | `465` | SMTPS            | SMTP over SSL                                    |
@@ -163,6 +163,35 @@ docker compose run -e SKIP_INIT_ENV=1 --service-ports --rm sqmail-aio /opt/bin/i
 | `995` | POP3S            | POP3 over SSL                                    |
 | `143` | IMAP             | Mail retrieval                                   |
 | `993` | IMAPS            | IMAP over SSL                                    |
+
+### Administration Login
+
+Serve the administration interface through an HTTPS reverse proxy on a dedicated
+hostname, forwarding to container port `88`. Do not expose this backend port to
+the Internet. The examples bind it to host loopback for a host-based proxy;
+for a container-based proxy, use a private Docker network instead. Preserve the
+Host header and forward the whole site at `/`, including `/cgi/` and `/dmarc/`.
+Disable proxy caching for the administration site. Port `443` in this image
+continues to serve webmail, not administration.
+
+The login form replaces the browser's HTTP authentication dialog. Existing
+usernames and passwords in `/var/qmail/control/lighttpd-admins.htdigest` continue
+to work without a reset. Cookies always use `Secure`, `HttpOnly`, and
+`SameSite=Strict`; plain HTTP browser access is not supported. No forwarded
+identity or HTTPS headers are trusted to authenticate a request.
+
+Lighttpd checks the session before dispatching any protected admin request and
+passes the authenticated username to vqadmin as `REMOTE_USER`. vqadmin still
+enforces its own ACL: the default administrator is `admin`, not every user who
+can sign in. Sessions expire one hour after login, and **Sign out** immediately
+revokes the current session. Removing or replacing the corresponding credential
+record also revokes its sessions. Runtime session files live in
+`/run/sqmail-admin`, outside the document root; do not persist this directory.
+Login attempts are limited to ten per login session per five-minute window,
+without allowing strangers to lock out an account. This can be bypassed by
+starting a new session: configure IP-based login rate limiting at the HTTPS
+proxy for brute-force protection. The application deliberately does not trust
+client-supplied `X-Forwarded-For` headers.
 
 ## Useful File Locations
 * `/ssl`/acme - Letsencrypt SSL data (remove to renew certs installation)

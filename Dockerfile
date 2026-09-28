@@ -112,7 +112,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     mariadb-client \
     socat inetutils-ping \
     swaks expect telnet \
-    lighttpd lighttpd-mod-openssl php8.5-fpm php8.5-cli \
+    lighttpd lighttpd-mod-openssl lighttpd-mod-magnet php8.5-fpm php8.5-cli \
     libev-dev automake \
     fetchmail liblockfile-simple-perl  \
     libbg-dev \

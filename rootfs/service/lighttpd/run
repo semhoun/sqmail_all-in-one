@@ -1,4 +1,5 @@
 #!/usr/bin/sh
+install -d -m 0700 -o www-data -g www-data /run/sqmail-admin || exit 1
 LOG_PIPE="/var/run/lighttpd-log.pipe"
 if [ ! -p $LOG_PIPE ]; then
 	mkfifo -m0640 "$LOG_PIPE"
