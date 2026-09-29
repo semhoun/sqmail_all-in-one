@@ -9,7 +9,7 @@ function checkedQuery(string $sql, ...$params)
     $db = rcmail_utils::db();
     $result = $db->query($sql, ...$params);
     if ($result === false || $db->is_error()) {
-        throw new RuntimeException('Roundcube schema query failed');
+        throw new RuntimeException('Roundcube schema query failed: ' . ($db->is_error() ?: 'unknown database error'));
     }
     return $result;
 }
@@ -79,7 +79,7 @@ try {
         }
     }
     if (!rcmail_utils::db_update($temporary, 'roundcube')) {
-        throw new RuntimeException('Upstream Roundcube update failed');
+        throw new RuntimeException('Upstream Roundcube update failed: ' . ($db->is_error() ?: 'unknown database error'));
     }
     // MariaDB DDL commits implicitly. Repeat only missing structural operations;
     // commit the data conversion together with its application version afterwards.
