@@ -1,0 +1,8 @@
+#!/usr/bin/python3
+"""Fixed scheduler entry point; never invoked by HTTP handlers."""
+import sys
+
+sys.path.insert(0, "/opt/lib")
+from mail_stats.collector import main
+
+sys.exit(main())

@@ -1,0 +1,3 @@
+#!/usr/bin/sh
+exec 2>&1
+exec /usr/bin/python3 -I /opt/libexec/mail-stats-routing receive

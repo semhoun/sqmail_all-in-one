@@ -355,11 +355,13 @@ RUN git clone https://github.com/sagredo-dev/ezmlm-idx.git \
   
 ########################
 # QmailAdmin
+COPY --link rootfs/opt/patches/qmailadmin-log-timezone.patch /opt/patches/qmailadmin-log-timezone.patch
 RUN wget -O qmailadmin-${QMAILADMIN_TAG}.tar.gz https://github.com/sagredo-dev/qmailadmin/archive/refs/tags/v${QMAILADMIN_TAG}.tar.gz  \
 ########################
   && mkdir qmailadmin \
   && cd qmailadmin \
   && tar xzf ../qmailadmin-${QMAILADMIN_TAG}.tar.gz --strip 1 \
+  && patch --batch --fuzz=0 -p1 < /opt/patches/qmailadmin-log-timezone.patch \
   && ./configure \
     --enable-cgibindir=/var/www/admin/cgi \
     --enable-htmldir=/var/www/admin/html/ \
@@ -577,6 +579,25 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   && rm -f /var/www/html/config/config.inc.php /var/www/html/plugins/sauserprefs/config.inc.php \
 # Cleaning
   && rm -rf /var/www/html/installer /var/www/html/public_html/installer.php /root/.composer/cache /root/.cache/composer
+
+###########################
+# Mail statistics database and PDF dependencies (outside the webroot)
+###########################
+COPY --link rootfs/opt/mail-stats-pdf/composer.json rootfs/opt/mail-stats-pdf/composer.lock /opt/mail-stats-pdf/
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+  apt-get update \
+  && apt-get install -y --no-install-recommends python3-pymysql python3-cryptography \
+  && cd /opt/mail-stats-pdf \
+  && export COMPOSER_ALLOW_SUPERUSER=1 \
+  && php8.5 /usr/bin/composer --no-interaction --no-plugins --no-scripts validate --strict --no-check-all \
+  && php8.5 /usr/bin/composer --no-interaction --no-plugins --no-scripts install --no-dev --prefer-dist --optimize-autoloader \
+  && php8.5 /usr/bin/composer --no-plugins --no-scripts check-platform-reqs --no-dev \
+  && php8.5 /usr/bin/composer --no-plugins --no-scripts audit --locked --no-dev \
+  && php8.5 /usr/bin/composer --no-plugins --no-scripts licenses --no-dev \
+  && chown -R root:root /opt/mail-stats-pdf \
+  && chmod -R u=rwX,go=rX /opt/mail-stats-pdf \
+  && rm -rf /root/.composer/cache /root/.cache/composer
 
 ###########################
 # DmarcSrg

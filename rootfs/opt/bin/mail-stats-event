@@ -1,0 +1,2 @@
+#!/usr/bin/sh
+exec /usr/bin/python3 -I /opt/libexec/mail-stats-routing "$@"

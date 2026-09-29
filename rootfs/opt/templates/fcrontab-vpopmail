@@ -1,2 +1,2 @@
-%nightly,random(yes) * 1-4 /var/qmail/bin/learnSpam
-*/5 * * * * /opt/bin/fetchmail.pl
+%nightly,random(yes) * 1-4 /opt/bin/mail-stats-event run learn-spam -- /var/qmail/bin/learnSpam
+*/5 * * * * /opt/bin/mail-stats-event run fetchmail -- /opt/bin/fetchmail.pl

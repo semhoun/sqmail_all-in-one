@@ -151,6 +151,15 @@ TXT
   print $file_handler $text;
   close $file_handler;
   $ret=`/usr/bin/fetchmail -f $filename --pidfile $run_dir/fetchmail.pid`;
+  my $fetch_status = $?;
+  # Emit only the outcome, never the account, command, password or returned text.
+  my $fetch_code = $fetch_status == -1 ? 127 :
+      ($fetch_status & 127) ? 128 + ($fetch_status & 127) : $fetch_status >> 8;
+  # Fetchmail status 1 means that there was no mail to retrieve, not a failure.
+  my $fetch_outcome = $fetch_code == 0 ? 'success' : $fetch_code == 1 ? 'skipped' : 'failure';
+  system('/opt/bin/mail-stats-event', 'emit', 'fetchmail_result', 'fetchmail',
+      $fetch_outcome, $fetch_code);
+  $? = $fetch_status;
 
   unlink $filename;
 

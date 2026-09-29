@@ -1,5 +1,11 @@
-%nightly,random(yes) * 1-4 /usr/bin/freshclam
-%nightly,random(yes) * 1-4 /var/dcc/libexec/cron-dccd
-%nightly,random(yes) * 1-4 /usr/local/bin/sa-update
-%nightly,random(yes) * 1-4 /opt/bin/acme_cron.sh
-%hourly,random(yes) * /usr/lib/php/sessionclean
+%nightly,random(yes) * 1-4 /opt/bin/mail-stats-event run freshclam -- /usr/bin/freshclam
+%nightly,random(yes) * 1-4 /opt/bin/mail-stats-event run dcc -- /var/dcc/libexec/cron-dccd
+%nightly,random(yes) * 1-4 /opt/bin/mail-stats-event run sa-update -- /usr/local/bin/sa-update
+%nightly,random(yes) * 1-4 /opt/bin/mail-stats-event run acme -- /opt/bin/acme_cron.sh
+%hourly,random(yes) * /opt/bin/mail-stats-event run sessionclean -- /usr/lib/php/sessionclean
+# BEGIN SQMAIL LOG ROUTING
+17 * * * * /usr/bin/python3 -I /opt/libexec/mail-stats-routing rotate
+# END SQMAIL LOG ROUTING
+# BEGIN SQMAIL MAIL STATS
+* * * * * /usr/bin/python3 -I /opt/libexec/mail-stats-collect
+# END SQMAIL MAIL STATS

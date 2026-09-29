@@ -1,0 +1,154 @@
+#!/usr/bin/python3 -I
+"""Fail-closed statistics setup, independent of the mail migration gate."""
+
+import fcntl
+import json
+import os
+from pathlib import Path
+import pwd
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+
+sys.path.insert(0, '/opt/lib')
+from mail_stats.config import (RUNTIME, atomic_json, cron_text, instance_identity,
+                               private_directory, reject_symlinks, settings)
+
+
+def reconcile_cron(enabled):
+    path = Path('/etc/fcrontab/root')
+    reject_symlinks(path)
+    original = path.read_text() if path.exists() else '!stdout(yes),mail(no)\n'
+    updated = cron_text(original, enabled)
+    if updated != original or not path.exists():
+        fd, temporary = tempfile.mkstemp(prefix='.mail-stats-', dir=path.parent)
+        try:
+            with os.fdopen(fd, 'w') as stream:
+                os.fchmod(stream.fileno(), 0o600)
+                stream.write(updated)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+    # Retry spool installation even when a previous run already wrote the block.
+    subprocess.run(['/usr/bin/fcrontab', '-n', str(path), 'root'], check=True,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+
+
+def credentials():
+    path = Path('/var/qmail/control/aio-conf/mysql.php')
+    reject_symlinks(path)
+    info = path.stat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+        raise ValueError('Unsafe SQL configuration')
+    # The existing installer uses var_export, so all password characters survive.
+    code = ('require "/var/qmail/control/aio-conf/mysql.php"; '
+            'echo json_encode($MYSQL_CONF, JSON_THROW_ON_ERROR);')
+    result = subprocess.run(['/usr/bin/php', '-r', code], check=True, capture_output=True,
+                            timeout=10, env={'PATH': '/usr/bin:/bin'})
+    values = json.loads(result.stdout)
+    mapping = {'host': 'MYSQL_HOST', 'user': 'MYSQL_USER',
+               'password': 'MYSQL_PASS', 'database': 'MYSQL_DB'}
+    if any(not isinstance(values.get(key), str) for key in mapping.values()):
+        raise ValueError('Invalid SQL configuration')
+    return {key: values[value] for key, value in mapping.items()}
+
+
+def prepare_pdf():
+    account = pwd.getpwnam('www-data')
+    base = Path('/run/mail-stats-pdf')
+    private_directory(base, 0, 0o755)
+    lock_fd = os.open(base / 'render.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o660)
+    with os.fdopen(lock_fd, 'r+') as lock:
+        info = os.fstat(lock.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_nlink != 1:
+            raise ValueError('Unsafe PDF lock')
+        os.fchown(lock.fileno(), 0, account.pw_gid)
+        os.fchmod(lock.fileno(), 0o660)
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        work = base / 'work'
+        reject_symlinks(work)
+        work.mkdir(mode=0o700, exist_ok=True)
+        info = work.stat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid not in (0, account.pw_uid):
+            raise ValueError('Unsafe PDF working directory')
+        os.chown(work, account.pw_uid, account.pw_gid)
+        os.chmod(work, 0o700)
+        # Python's fd-based rmtree never follows a replaced child symlink.
+        if not shutil.rmtree.avoids_symlink_attacks:
+            raise ValueError('Safe PDF cleanup unavailable')
+        for child in work.iterdir():
+            if re.fullmatch(r'render-[a-f0-9]{32}', child.name) and not child.is_symlink() and child.is_dir():
+                shutil.rmtree(child)
+
+
+def main():
+    if os.geteuid() != 0:
+        return 1
+    os.umask(0o077)
+    gid = pwd.getpwnam('www-data').pw_gid
+    public = {'enabled': False, 'reason': 'Statistics installation incomplete'}
+    lock = None
+    try:
+        private_directory(RUNTIME, gid, 0o750)
+        lock = os.fdopen(os.open(RUNTIME / 'setup.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600), 'w')
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return 1
+        atomic_json(RUNTIME / 'web.json', public, gid, 0o640)
+        atomic_json(RUNTIME / 'config.json', {'enabled': False})
+        try:
+            enabled, months = settings(os.environ)
+        except ValueError as error:
+            public['reason'] = str(error)
+            print('[Mail stats] ' + str(error) + '; statistics disabled.', file=sys.stderr)
+            raise
+        public.update(history_months=months)
+        try:
+            prepare_pdf()
+        except Exception:
+            print('[Mail stats] PDF temporary storage unavailable; other statistics remain independent.', file=sys.stderr)
+        if not enabled:
+            reconcile_cron(False)
+            public['reason'] = 'Statistics disabled; collection and retention purge are stopped'
+            atomic_json(RUNTIME / 'web.json', public, gid, 0o640)
+            return 0
+        instance = instance_identity()
+        config = {'enabled': True, 'history_months': months,
+                  'instance_id': instance, 'database': credentials()}
+        from mail_stats import db
+        connection = db.connect(config['database'])
+        try:
+            with db.instance_lock(connection, instance.encode('ascii')):
+                db.install_schema(connection)
+        finally:
+            connection.close()
+        # Activation is last: a failed spool install leaves both readers disabled.
+        reconcile_cron(True)
+        atomic_json(RUNTIME / 'config.json', config)
+        public.update(enabled=True, instance_id=instance, reason='')
+        atomic_json(RUNTIME / 'web.json', public, gid, 0o640)
+        return 0
+    except Exception:
+        # Exceptions from SQL, PHP and filesystem operations can contain secrets.
+        print('[Mail stats] Installation failed; statistics disabled, mail is unaffected.', file=sys.stderr)
+        try:
+            atomic_json(RUNTIME / 'config.json', {'enabled': False})
+            atomic_json(RUNTIME / 'web.json', public, gid, 0o640)
+            reconcile_cron(False)
+        except Exception:
+            print('[Mail stats] Schedule reconciliation failed; collector remains fail-closed.', file=sys.stderr)
+        return 1
+    finally:
+        if lock is not None:
+            lock.close()
+
+
+if __name__ == '__main__':
+    sys.exit(main())

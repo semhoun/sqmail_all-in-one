@@ -19,7 +19,7 @@ JUNK_DIR=.Junk.TeachSpam
 HAM_DIR=.Junk.TeachNotSpam
 
 # Set this to 1 if you want to log debug msg
-DEBUG=1
+DEBUG=0
 
 # Set this to 1 if you want the spam be removed after the run
 DELETE_TEACH_DATA=1

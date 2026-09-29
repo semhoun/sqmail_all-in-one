@@ -1,0 +1,4 @@
+#!/usr/bin/sh
+export TZ=UTC0
+exec 2>&1
+exec s6-setuidgid qmaill s6-log t T s2000000 /log/local-syslog

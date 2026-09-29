@@ -127,7 +127,7 @@ fi
 # Create config
 #########################
 set -Eeuo pipefail
-trap 'echo "Initialization failed; no completion marker was written. Preserve and inspect the partial installation before retrying." >&2' ERR
+trap 'status=$?; /opt/bin/mail-stats-event emit lifecycle initialization failure "$status" || true; echo "Initialization failed; no completion marker was written. Preserve and inspect the partial installation before retrying." >&2' ERR
 . /opt/bin/upgrade/common.sh
 [ "${SQMAIL_AIO_VERSION:-}" = 1.8 ]
 exec 9>/var/qmail/control/.aio-migration.lock
@@ -135,6 +135,8 @@ flock -n 9 || { echo "Another initialization/migration is running" >&2; exit 1; 
 [ ! -e /var/qmail/control/aio-conf/mysql.conf ]
 TABLES=$(mysql -N -B -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" -e 'SHOW TABLES')
 [ -z "$TABLES" ] || { echo "Initialization requires an empty database; nothing was imported." >&2; exit 1; }
+/usr/bin/python3 -I /opt/libexec/mail-stats-routing prepare || true
+/opt/bin/mail-stats-event emit lifecycle initialization started || true
 mkdir -p /var/qmail/control/aio-conf
 chmod 755 /var/qmail/control/aio-conf
 
@@ -287,6 +289,7 @@ export DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE}
 EOF
 
 printf '%s\n' "$SQMAIL_AIO_VERSION" | atomic_write /var/qmail/control/aio-conf/sqmail_aio_version
+/opt/bin/mail-stats-event emit lifecycle initialization success || true
 
 echo "============================"
 echo " QMail AllInOne initialized"

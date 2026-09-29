@@ -87,6 +87,10 @@ $_SESSION['csrf'] ??= bin2hex(random_bytes(32));
         <section class="admin-diagnostics" aria-labelledby="diagnostics-title">
             <h2 id="diagnostics-title">Reports &amp; diagnostics</h2>
             <div class="admin-utilities">
+                <a class="admin-utility" href="/stats/">
+                    <span><strong>Statistics &amp; logs</strong><span>Explore delivery history, service events and source coverage.</span></span>
+                    <span class="admin-utility-arrow" aria-hidden="true">&rarr;</span>
+                </a>
                 <?php if (file_exists('/var/qmail/control/aio-conf/dmarc.conf')) { ?>
                 <a class="admin-utility" href="/dmarc/">
                     <span><strong>DMARC reports</strong><span>Review domain authentication reports.</span></span>

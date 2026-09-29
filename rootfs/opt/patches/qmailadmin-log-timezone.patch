@@ -1,0 +1,5 @@
+--- a/qmailadmin.c
++++ b/qmailadmin.c
+@@ -138 +138 @@
+-    strftime(time_buf, sizeof(time_buf) - 2, "%Y/%m/%d %H:%M:%S", &tm);
++    strftime(time_buf, sizeof(time_buf) - 2, "%Y/%m/%d %H:%M:%S %z", &tm);

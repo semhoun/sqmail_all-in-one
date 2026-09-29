@@ -1,4 +1,5 @@
 #!/usr/bin/sh
+printf '%s\n' 'mail-stats: qmail-send generation start'
 exec env - \
   PATH="/var/qmail/bin:$PATH" \
   qmail-start "$(cat /var/qmail/control/defaultdelivery)" \

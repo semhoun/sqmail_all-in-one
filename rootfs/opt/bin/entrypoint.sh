@@ -11,11 +11,18 @@ if [ -n "${SKIP_INIT_ENV}" ]; then
   exit 0
 fi
 
+if ! /usr/bin/python3 -I /opt/libexec/mail-stats-routing prepare; then
+  echo "[Mail stats] Some application log routes are unavailable; continuing mail startup." >&2
+fi
+/opt/bin/mail-stats-event emit lifecycle entrypoint started || true
+/opt/bin/mail-stats-event emit lifecycle migration started || true
 /opt/bin/upgrade/sqmail_aio_upgrade.sh
 upgradeStatus=$?
 if [ ${upgradeStatus} -ne 0 ]; then
+  /opt/bin/mail-stats-event emit lifecycle migration failure "${upgradeStatus}" || true
   exit 1
 fi
+/opt/bin/mail-stats-event emit lifecycle migration success || true
 
 
 if [ -n "${DEV_MODE}" ]; then
@@ -47,6 +54,13 @@ if [ ! -d "/etc/fcrontab" ]; then
   for WHO in *; do
       /usr/bin/fcrontab -n /etc/fcrontab/${WHO} ${WHO}
   done
+fi
+
+if ! /usr/bin/python3 -I /opt/libexec/mail-stats-routing cron; then
+  echo "[Mail stats] Maintenance log scheduling unavailable; continuing mail startup." >&2
+fi
+if ! /usr/bin/python3 -I /opt/libexec/mail-stats-init; then
+  echo "[Mail stats] Statistics unavailable; continuing mail startup." >&2
 fi
 
 if [ ! -e "/etc/fetchmail.conf" ]; then
@@ -133,12 +147,12 @@ rm -f /var/run/lighttpd-log.pipe || exit 1
 mkfifo -m0640 /var/run/lighttpd-log.pipe || exit 1
 chown www-data:www-data /var/run/lighttpd-log.pipe || exit 1
 
-# Fix for qmailadmin
-: > /var/log/qma-auth.log
-chown vpopmail:vchkpw /var/log/qma-auth.log
+# QmailAdmin's compiled authentication path is prepared without truncation by
+# mail-stats-routing; /var/log/qma-auth.log was not its actual destination.
 
 delayedProcess &
 
 echo "#> Lauching $*"
+/opt/bin/mail-stats-event emit lifecycle entrypoint success || true
 exec "$@"
 exit $?

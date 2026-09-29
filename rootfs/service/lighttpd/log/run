@@ -13,4 +13,5 @@ LOG_PIPE="/var/run/lighttpd-log.pipe"
 
 exec 2>&1
 exec <> $LOG_PIPE
-exec s6-setuidgid ${LOG_USER} s6-log s2000000 "${LOG_DIR}"
+export TZ=UTC0
+exec s6-setuidgid ${LOG_USER} s6-log t T s2000000 "${LOG_DIR}"

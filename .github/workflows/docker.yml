@@ -66,10 +66,17 @@ jobs:
             sqmail-aio:ci /tests/dovecot-sieve.py
       - name: Test administration authentication
         run: python3 tests/admin-auth.py --image sqmail-aio:ci
-      - name: Test mail delivery and filtering
+      - name: Test statistics contracts and persistence
         run: |
+          python3 -B tests/mail-stats-config.py
+          python3 -B tests/mail-stats-parsers.py
           docker pull mariadb:11.4
-          python3 tests/mail.py --image sqmail-aio:ci
+          python3 -B tests/mail-stats-db.py --base-image sqmail-aio:ci --database-image mariadb:11.4
+          python3 -B tests/mail-stats-collector.py --base-image sqmail-aio:ci --database-image mariadb:11.4
+          python3 -B tests/mail-stats-rankings.py --image sqmail-aio:ci --database-image mariadb:11.4
+      - name: Test mail delivery, filtering and statistics integration
+        run: |
+          python3 -B tests/mail-stats-e2e.py --image sqmail-aio:ci --database-image mariadb:11.4
       - name: Test delivery administration contracts and security
         run: |
           python3 -B tests/delivery-helper.py

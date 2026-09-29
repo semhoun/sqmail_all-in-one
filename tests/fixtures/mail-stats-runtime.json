@@ -1,0 +1,251 @@
+{
+  "assertions_passed": [
+    "local_delivery",
+    "alias_delivery",
+    "relay_rejected",
+    "submission_rejected",
+    "authenticated_remote_delivery",
+    "spam_delivered_to_junk",
+    "spam_rejected",
+    "attachments_and_virus",
+    "remote_permanent_failure_and_bounce",
+    "remote_deferral_then_retry",
+    "smtp_multiple_recipients_accepted",
+    "implicit_tls_smtp_recipient_accepted",
+    "pop3_login",
+    "https_missing_route",
+    "qmail_send_restart"
+  ],
+  "log_assertions": {
+    "clamd": [
+      "MailTest.Eicar.Synthetic.UNOFFICIAL FOUND"
+    ],
+    "dovecot": [
+      "imap-login:",
+      "pop3-login:",
+      "Disconnected:"
+    ],
+    "lighttpd": [
+      "server started",
+      "HTTP/1.1\" 404"
+    ],
+    "php-fpm": [
+      "ready to handle connections"
+    ],
+    "qmail-send": [
+      "delivery \\d+: success:",
+      "delivery \\d+: failure:",
+      "delivery \\d+: deferral:",
+      "bounce msg ",
+      "exiting"
+    ],
+    "qmail-smtpd": [
+      "Reject::SNDR::Invalid_Relay",
+      "Reject::DATA::Spam_Message",
+      "Reject::DATA::Virus_Infected"
+    ],
+    "qmail-smtpsd": [
+      "Accept::AUTH::"
+    ],
+    "qmail-smtpsub": [
+      "Reject::AUTH::",
+      "Accept::AUTH::"
+    ],
+    "spamd": [
+      "identified spam",
+      "clean message",
+      "result:"
+    ]
+  },
+  "provenance": {
+    "clamav": "synthetic fixture signature, not official feed coverage",
+    "database_image_id": "sha256:8431e30f98d8c6e37655557914320bdc56eabdda0f18501fd31b4cfc9942d7ec",
+    "gaps": [
+      "fcron deliberately disabled; no scheduled maintenance",
+      "SQL traces and mutable states not collected",
+      "no rotation or timezone-offset/DST scenarios; multiple recipient acceptance not individual delivery verification",
+      "no web login, admin audit, Roundcube, Fetchmail or ACME scenarios"
+    ],
+    "generator": "tests/mail-stats-corpus.py",
+    "image_id": "sha256:da45a09a9a66903456633cdf5d22bf2c151cc0791e3634488046213c4f2f4e31",
+    "isolation": "MailEnvironment UUID internal network; tmpfs DB; no ports; ownership-checked cleanup",
+    "normalization": "timestamps, Message-ID, session, long hex, private IP, ephemeral port and PID; one example per numeric line shape; at most 24/source; grammar samples NOT a chronological/correlatable stream"
+  },
+  "runtime_clock": "UTC +0000",
+  "sources": {
+    "clamd": {
+      "archive_names": [],
+      "lines": [
+        "2000-01-01 00:00:00.000000000  instream(127.0.0.1@12345): MailTest.Eicar.Synthetic.UNOFFICIAL FOUND",
+        "2000-01-01 00:00:00.000000000  /var/qmail/queue/mess/10/3540009: MailTest.Eicar.Synthetic.UNOFFICIAL FOUND"
+      ],
+      "observed_lines": 42,
+      "service_up": true,
+      "state": "observed",
+      "timestamp_prefix_shapes": [
+        "DDDD-DD-DD DD:DD:DD.DDDDDDDDD"
+      ]
+    },
+    "dovecot": {
+      "archive_names": [],
+      "lines": [
+        "Jan 01 00:00:00 master: Info: Dovecot v2.4.5 (0cbb641e3e) starting up for imap, pop3, sieve (core dumps disabled)",
+        "Jan 01 00:00:00 imap-login: Info: Logged in: user=<bob@examples.invalid>, method=PLAIN, rip=127.0.0.1, lip=127.0.0.1, mpid=100, TLS, session=<session-redacted>",
+        "Jan 01 00:00:00 imap(bob@examples.invalid)<100><session-redacted>: Info: Disconnected: Logged out in=51 out=670 deleted=0 expunged=0 trashed=0 hdr_count=0 hdr_bytes=0 body_count=0 body_bytes=0",
+        "Jan 01 00:00:00 pop3-login: Info: Logged in: user=<bob@examples.invalid>, method=PLAIN, rip=127.0.0.1, lip=127.0.0.1, mpid=100, TLS, session=<session-redacted>",
+        "Jan 01 00:00:00 pop3(bob@examples.invalid)<100><session-redacted>: Info: Disconnected: Logged out top=0/0, retr=0/0, del=0/0, size=4602"
+      ],
+      "observed_lines": 124,
+      "service_up": true,
+      "state": "observed",
+      "timestamp_prefix_shapes": [
+        "Sep DD DD:DD:DD"
+      ]
+    },
+    "fcron": {
+      "archive_names": [],
+      "lines": [],
+      "observed_lines": 0,
+      "service_up": false,
+      "state": "disabled_by_fixture",
+      "timestamp_prefix_shapes": []
+    },
+    "lighttpd": {
+      "archive_names": [],
+      "lines": [
+        "2000-01-01 00:00:00: (server.c.1974) server started (lighttpd/1.4.79)",
+        "127.0.0.1 127.0.0.1 - [01/Jan/2000:00:00:00 +0000] \"GET /mail-stats-corpus-not-found HTTP/1.1\" 404 158 \"-\" \"-\""
+      ],
+      "observed_lines": 4,
+      "service_up": true,
+      "state": "observed",
+      "timestamp_prefix_shapes": [
+        "DDDD-DD-DD DD:DD:DD"
+      ]
+    },
+    "php-fpm": {
+      "archive_names": [],
+      "lines": [
+        "[01-Jan-2000 00:00:00] NOTICE: fpm is running, pid 100",
+        "[01-Jan-2000 00:00:00] NOTICE: ready to handle connections",
+        "[01-Jan-2000 00:00:00] NOTICE: systemd monitor interval set to 10000ms"
+      ],
+      "observed_lines": 3,
+      "service_up": true,
+      "state": "observed",
+      "timestamp_prefix_shapes": [
+        "[DD-Sep-DDDD DD:DD:DD]"
+      ]
+    },
+    "qmail-send": {
+      "archive_names": [],
+      "lines": [
+        "2000-01-01 00:00:00.000000000  status: local 0/10 remote 0/1",
+        "2000-01-01 00:00:00.000000000  new msg 3587739",
+        "2000-01-01 00:00:00.000000000  info msg 3587739: bytes 953 from <sender@outside.invalid> qp 617 uid 89",
+        "2000-01-01 00:00:00.000000000  starting delivery 1: msg 3587739 to local examples.invalid-bob@examples.invalid",
+        "2000-01-01 00:00:00.000000000  delivery 1: success: Jan_01_00:00:00_lda(bob@examples.invalid)<100><session-redacted>:_Info:_sieve:_msgid=<message-id@examples.invalid>:_stored_mail_into_mailbox_'INBOX'/did_0+0+1/",
+        "2000-01-01 00:00:00.000000000  end msg 3587739",
+        "2000-01-01 00:00:00.000000000  starting delivery 2: msg 3587731 to local examples.invalid-team@examples.invalid",
+        "2000-01-01 00:00:00.000000000  delivery 2: success: vdelivermail:_valiases_processed/did_0+0+1/",
+        "2000-01-01 00:00:00.000000000  info msg 3567218: bytes 786 from <alice@examples.invalid> qp 936 uid 89",
+        "2000-01-01 00:00:00.000000000  starting delivery 4: msg 3567218 to remote recipient@destination.invalid",
+        "2000-01-01 00:00:00.000000000  delivery 4: success: 127.0.0.1_accepted_message./Remote_host_said:_250_collected/",
+        "2000-01-01 00:00:00.000000000  delivery 5: success: Jan_01_00:00:00_lda(bob@examples.invalid)<100><session-redacted>:_Info:_sieve:_msgid=<message-id@examples.invalid>:_fileinto_action:_stored_mail_into_mailbox_'Junk'/did_0+0+1/",
+        "2000-01-01 00:00:00.000000000  starting delivery 7: msg 3540009 to remote failed@destination.invalid",
+        "2000-01-01 00:00:00.000000000  delivery 7: failure: 127.0.0.1_does_not_like_recipient./Remote_host_said:_550_synthetic_permanent_recipient_rejection/Giving_up_on_127.0.0.1./",
+        "2000-01-01 00:00:00.000000000  bounce msg 3540009 qp 1892",
+        "2000-01-01 00:00:00.000000000  info msg 3587771: bytes 1425 from <> qp 1892 uid 7796",
+        "2000-01-01 00:00:00.000000000  starting delivery 8: msg 3587771 to local examples.invalid-alice@examples.invalid",
+        "2000-01-01 00:00:00.000000000  delivery 8: success: Jan_01_00:00:00_lda(alice@examples.invalid)<100><session-redacted>:_Info:_sieve:_msgid=unspecified:_stored_mail_into_mailbox_'INBOX'/did_0+0+1/",
+        "2000-01-01 00:00:00.000000000  starting delivery 9: msg 3540009 to remote retry@destination.invalid",
+        "2000-01-01 00:00:00.000000000  delivery 9: deferral: 127.0.0.1_does_not_like_recipient./Remote_host_said:_451_synthetic_temporary_recipient_rejection/Giving_up_on_127.0.0.1./",
+        "2000-01-01 00:00:00.000000000  delivery 11: success: Jan_01_00:00:00_lda(alice@examples.invalid)<100><session-redacted>:_Info:_sieve:_msgid=<message-id@examples.invalid>:_stored_mail_into_mailbox_'INBOX'/did_0+0+1/",
+        "2000-01-01 00:00:00.000000000  status: qmail-todo stop processing asap",
+        "2000-01-01 00:00:00.000000000  status: qmail-send exiting"
+      ],
+      "observed_lines": 83,
+      "service_up": true,
+      "state": "observed",
+      "timestamp_prefix_shapes": [
+        "DDDD-DD-DD DD:DD:DD.DDDDDDDDD"
+      ]
+    },
+    "qmail-smtpd": {
+      "archive_names": [],
+      "lines": [
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Accept::RCPT::Rcpthosts_Rcptto P:ESMTPS S:127.0.0.2:unknown H:client.examples.invalid F:sender@outside.invalid T:bob@examples.invalid",
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Accept::RCPT::Rcpthosts_Rcptto P:ESMTPS S:127.0.0.2:unknown H:client.examples.invalid F:sender@outside.invalid T:team@examples.invalid",
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Reject::SNDR::Invalid_Relay P:ESMTPS S:127.0.0.2:unknown H:client.examples.invalid F:alice@examples.invalid T:recipient@destination.invalid",
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Reject::DATA::Spam_Message P:ESMTPS S:127.0.0.2:unknown H:client.examples.invalid F:sender@outside.invalid T:bob@examples.invalid 'spam'",
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Reject::DATA::Virus_Infected P:ESMTPS S:127.0.0.2:unknown H:client.examples.invalid F:sender@outside.invalid T:bob@examples.invalid 'clamdscan'"
+      ],
+      "observed_lines": 66,
+      "service_up": true,
+      "state": "observed",
+      "timestamp_prefix_shapes": [
+        "DDDD-DD-DD DD:DD:DD.DDDDDDDDD"
+      ]
+    },
+    "qmail-smtpsd": {
+      "archive_names": [],
+      "lines": [
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Accept::AUTH::plain P:ESMTPSA S:127.0.0.2:unknown H:client.examples.invalid F:alice@examples.invalid T:bob@examples.invalid ?~ 'alice@examples.invalid'"
+      ],
+      "observed_lines": 16,
+      "service_up": true,
+      "state": "observed",
+      "timestamp_prefix_shapes": [
+        "DDDD-DD-DD DD:DD:DD.DDDDDDDDD"
+      ]
+    },
+    "qmail-smtpsub": {
+      "archive_names": [],
+      "lines": [
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Reject::AUTH::Missing P:ESMTPS S:127.0.0.2:unknown H:client.examples.invalid",
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Reject::AUTH::plain P:ESMTPSA S:127.0.0.2:unknown H:client.examples.invalid ?~ 'alice@examples.invalid'",
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Reject::AUTH::login P:ESMTPSA S:127.0.0.2:unknown H:client.examples.invalid ?~ 'alice@examples.invalid'",
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Accept::AUTH::plain P:ESMTPSA S:127.0.0.2:unknown H:client.examples.invalid F:alice@examples.invalid T:recipient@destination.invalid ?~ 'alice@examples.invalid'",
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Accept::AUTH::plain P:ESMTPSA S:127.0.0.2:unknown H:client.examples.invalid F:alice@examples.invalid T:failed@destination.invalid ?~ 'alice@examples.invalid'",
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Accept::AUTH::plain P:ESMTPSA S:127.0.0.2:unknown H:client.examples.invalid F:alice@examples.invalid T:retry@destination.invalid ?~ 'alice@examples.invalid'",
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Accept::AUTH::plain P:ESMTPSA S:127.0.0.2:unknown H:client.examples.invalid F:alice@examples.invalid T:alice@examples.invalid ?~ 'alice@examples.invalid'",
+        "2000-01-01 00:00:00.000000000  qmail-smtpd: pid 100 Accept::AUTH::plain P:ESMTPSA S:127.0.0.2:unknown H:client.examples.invalid F:alice@examples.invalid T:bob@examples.invalid ?~ 'alice@examples.invalid'"
+      ],
+      "observed_lines": 59,
+      "service_up": true,
+      "state": "observed",
+      "timestamp_prefix_shapes": [
+        "DDDD-DD-DD DD:DD:DD.DDDDDDDDD"
+      ]
+    },
+    "spamd": {
+      "archive_names": [],
+      "lines": [
+        "Jan 01 00:00:00.000 [100] info: spamd: server started on IO::Socket::IP [127.0.0.1]:783 (running version 4.0.2)",
+        "Jan 01 00:00:00.000 [100] info: spamd: processing message <message-id@examples.invalid> for bob@examples.invalid:89",
+        "Jan 01 00:00:00.000 [100] info: spamd: identified spam (1000.0/5.0) for bob@examples.invalid:89 in 0.1 seconds, 407 bytes.",
+        "Jan 01 00:00:00.000 [100] info: spamd: result: Y 999 - GTUBE,NO_RECEIVED,NO_RELAYS,TVD_SPACE_RATIO scantime=0.1,size=407,user=bob@examples.invalid,uid=89,required_score=5.0,rhost=localhost,raddr=127.0.0.1,rport=12345,mid=<message-id@examples.invalid>,autolearn=disabled",
+        "Jan 01 00:00:00.000 [100] info: spamd: clean message (-0.5/5.0) for bob@examples.invalid:89 in 0.1 seconds, 672 bytes.",
+        "Jan 01 00:00:00.000 [100] info: spamd: result: .  0 - ALL_TRUSTED,AWL,TVD_SPACE_RATIO scantime=0.1,size=672,user=bob@examples.invalid,uid=89,required_score=5.0,rhost=localhost,raddr=127.0.0.1,rport=12345,mid=<message-id@examples.invalid>,autolearn=disabled",
+        "Jan 01 00:00:00.000 [100] info: spamd: processing message <message-id@examples.invalid> for team@examples.invalid:89",
+        "Jan 01 00:00:00.000 [100] info: spamd: clean message (-0.8/5.0) for team@examples.invalid:89 in 0.0 seconds, 662 bytes.",
+        "Jan 01 00:00:00.000 [100] info: spamd: result: .  0 - ALL_TRUSTED,AWL,TVD_SPACE_RATIO scantime=0.0,size=662,user=team@examples.invalid,uid=89,required_score=5.0,rhost=localhost,raddr=127.0.0.1,rport=12345,mid=<message-id@examples.invalid>,autolearn=disabled",
+        "Jan 01 00:00:00.000 [100] info: spamd: result: Y 999 - ALL_TRUSTED,AWL,GTUBE,TVD_SPACE_RATIO scantime=0.1,size=629,user=bob@examples.invalid,uid=89,required_score=5.0,rhost=localhost,raddr=127.0.0.1,rport=12345,mid=<message-id@examples.invalid>,autolearn=disabled"
+      ],
+      "observed_lines": 41,
+      "service_up": true,
+      "state": "observed",
+      "timestamp_prefix_shapes": [
+        "Sep DD DD:DD:DD.DDD"
+      ]
+    },
+    "vusaged": {
+      "archive_names": [],
+      "lines": [],
+      "observed_lines": 0,
+      "service_up": true,
+      "state": "no_selected_events",
+      "timestamp_prefix_shapes": []
+    }
+  }
+}

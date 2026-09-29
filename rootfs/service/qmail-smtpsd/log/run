@@ -10,4 +10,5 @@ if [ ! -d "${LOG_DIR}" ]; then
 fi
 
 exec 2>&1
-exec s6-setuidgid ${LOG_USER} s6-log T s2000000 "${LOG_DIR}"
+export TZ=UTC0
+exec s6-setuidgid ${LOG_USER} s6-log t T s2000000 "${LOG_DIR}"

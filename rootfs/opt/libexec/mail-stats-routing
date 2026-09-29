@@ -1,0 +1,402 @@
+#!/usr/bin/python3
+"""Local log routing; no network listener or command-output ingestion."""
+
+import datetime
+import fcntl
+import json
+import os
+from pathlib import Path
+import pwd
+import re
+import shutil
+import signal
+import socket
+import stat
+import subprocess
+import sys
+import tempfile
+
+SOCKET = '/dev/log'
+LIMIT = 2_000_000
+ARCHIVES = 10
+LIFECYCLE = {'entrypoint', 'migration', 'initialization', 'mail-stats'}
+MAINTENANCE = {'fetchmail', 'freshclam', 'dcc', 'sa-update', 'acme',
+               'sessionclean', 'learn-spam', 'dmarc'}
+STATUSES = {'started', 'success', 'failure', 'skipped'}
+PREFIX = 'mail-stats: '
+CRON_BEGIN = '# BEGIN SQMAIL LOG ROUTING'
+CRON_END = '# END SQMAIL LOG ROUTING'
+CRON_JOB = '17 * * * * /usr/bin/python3 -I /opt/libexec/mail-stats-routing rotate'
+CRON_COMMANDS = {
+    'root': {'/usr/bin/freshclam': 'freshclam', '/var/dcc/libexec/cron-dccd': 'dcc',
+             '/usr/local/bin/sa-update': 'sa-update', '/opt/bin/acme_cron.sh': 'acme',
+             '/usr/lib/php/sessionclean': 'sessionclean'},
+    'vpopmail': {'/var/qmail/bin/learnSpam': 'learn-spam', '/opt/bin/fetchmail.pl': 'fetchmail'},
+    'www-data': {'/usr/bin/php -q /var/www/admin/dmarc/utils/' + name: 'dmarc' for name in
+                 ('fetch_reports.php', 'mailbox_cleaner.php', 'reportlog_cleaner.ph',
+                  'reportlog_cleaner.php', 'reports_cleaner.php')},
+}
+SYSLOG = re.compile(
+    rb'^<(?:[0-9]|[1-9][0-9]|1[0-8][0-9]|19[01])>'
+    rb'(?:[A-Z][a-z]{2} [ 0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-6][0-9] )?'
+    rb'(?P<tag>vpopmail|DCC|cron-dccd|mail-stats)(?:\[[0-9]+\])?: ?(?P<body>.*)$')
+
+
+def event_record(event, component, status, exit_code=None):
+    allowed = (LIFECYCLE if event == 'lifecycle' else
+               {'fetchmail'} if event == 'fetchmail_result' else
+               MAINTENANCE if event == 'maintenance_run' else set())
+    if component not in allowed or status not in STATUSES:
+        raise ValueError('invalid event')
+    record = {'v': 1, 'event': event, 'component': component,
+              'at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),
+              'status': status}
+    if exit_code is not None:
+        if type(exit_code) is not int or not 0 <= exit_code <= 255:
+            raise ValueError('invalid exit code')
+        record['exit_code'] = exit_code
+    return record
+
+
+def regular_fd(path, flags, mode=0o600):
+    fd = os.open(path, flags | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK, mode)
+    info = os.fstat(fd)
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        os.close(fd)
+        raise ValueError('not a regular file')
+    return fd
+
+
+def rotate_file(path, limit=LIMIT):
+    path = Path(path)
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError('invalid log file')
+    if info.st_size < limit:
+        return
+    # Rename, never copytruncate: an in-flight writer can finish in the archive.
+    for index in range(ARCHIVES, 0, -1):
+        target = Path(str(path) + '.' + str(index))
+        if target.exists() or target.is_symlink():
+            if not stat.S_ISREG(target.lstat().st_mode):
+                raise ValueError('invalid archive')
+            if index == ARCHIVES:
+                target.unlink()
+            else:
+                target.rename(str(path) + '.' + str(index + 1))
+    path.rename(str(path) + '.1')
+    # The append-only producer may already have reopened and created current.
+    fd = regular_fd(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND)
+    try:
+        os.fchmod(fd, stat.S_IMODE(info.st_mode))
+        os.fchown(fd, info.st_uid, info.st_gid)
+    finally:
+        os.close(fd)
+
+
+def locked():
+    fd = regular_fd('/run/mail-stats-routing.lock', os.O_WRONLY | os.O_CREAT)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    return fd
+
+
+def emit(event, component, status, exit_code=None):
+    record = event_record(event, component, status, exit_code)
+    line = PREFIX + json.dumps(record, separators=(',', ':'), sort_keys=True)
+    try:
+        if event == 'lifecycle':
+            # Entrypoint runs before s6 and /dev/log. Keep this route independent.
+            lock = locked()
+            try:
+                path = '/log/lifecycle/current'
+                rotate_file(path)
+                fd = regular_fd(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND)
+                try:
+                    os.write(fd, (line + '\n').encode('ascii'))
+                finally:
+                    os.close(fd)
+            finally:
+                os.close(lock)
+        else:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+                sock.settimeout(0.1)
+                sock.sendto(('<14>' + line).encode('ascii'), SOCKET)
+        return True
+    except (OSError, ValueError):
+        # Routing failure must not replace a mail/maintenance command's result.
+        return False
+
+
+def accepted_datagram(data):
+    if len(data) > 8192:
+        return None
+    data = data.rstrip(b'\0\n')
+    match = SYSLOG.fullmatch(data)
+    if not match or any(byte < 32 or byte == 127 for byte in data):
+        return None
+    tag, body = match['tag'], match['body']
+    if tag == b'vpopmail' and not body.startswith(b'vchkpw-'):
+        return None
+    if tag == b'mail-stats':
+        try:
+            record = json.loads(body)
+            if not isinstance(record, dict) or not set(record) <= {
+                    'v', 'event', 'component', 'at', 'status', 'exit_code'}:
+                return None
+            event_record(record['event'], record['component'], record['status'],
+                         record.get('exit_code'))
+            if type(record['v']) is not int or record['v'] != 1:
+                return None
+            if not re.fullmatch(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00', record['at']):
+                return None
+            datetime.datetime.fromisoformat(record['at'])
+        except (ValueError, KeyError, TypeError):
+            return None
+    return data
+
+
+def receive(path=SOCKET):
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+        try:
+            info = os.lstat(path)
+        except FileNotFoundError:
+            info = None
+        if info is not None:
+            if not stat.S_ISSOCK(info.st_mode):
+                raise ValueError('refusing existing non-socket')
+            # Do not displace a live receiver, including a site-supplied syslogd.
+            with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as probe:
+                try:
+                    probe.connect(path)
+                except ConnectionRefusedError:
+                    os.unlink(path)
+                else:
+                    raise ValueError('syslog socket already active')
+        sock.bind(path)
+        os.chmod(path, 0o666)
+        identity = os.lstat(path)
+        def stop(_signum, _frame):
+            raise SystemExit(0)
+        signal.signal(signal.SIGTERM, stop)
+        signal.signal(signal.SIGINT, stop)
+        try:
+            while True:
+                data = accepted_datagram(sock.recv(8193))
+                if data is not None:
+                    sys.stdout.buffer.write(data + b'\n')
+                    sys.stdout.buffer.flush()
+        finally:
+            try:
+                current = os.lstat(path)
+                if (current.st_dev, current.st_ino) == (identity.st_dev, identity.st_ino):
+                    os.unlink(path)
+            except FileNotFoundError:
+                pass
+
+
+def prepare():
+    for name, user in [('lifecycle', 'root'), ('local-syslog', 'qmaill'),
+                       ('qmailadmin', 'vpopmail')]:
+        directory = Path('/log') / name
+        directory.mkdir(mode=0o700, exist_ok=True)
+        if not stat.S_ISDIR(directory.lstat().st_mode):
+            raise ValueError('invalid log directory')
+        account = pwd.getpwnam(user)
+        os.chown(directory, account.pw_uid, account.pw_gid)
+        os.chmod(directory, 0o700)
+        if name != 'local-syslog':
+            fd = regular_fd(directory / 'current', os.O_WRONLY | os.O_CREAT | os.O_APPEND)
+            os.fchown(fd, account.pw_uid, account.pw_gid)
+            os.fchmod(fd, 0o600)
+            os.close(fd)
+    source = Path('/var/vpopmail/log/qmailadmin-auth.log')
+    target = Path('/log/qmailadmin/current')
+    if not source.parent.exists():
+        source.parent.mkdir(mode=0o750)
+    if not stat.S_ISDIR(source.parent.lstat().st_mode):
+        raise ValueError('invalid producer log directory')
+    account = pwd.getpwnam('vpopmail')
+    os.chown(source.parent, account.pw_uid, account.pw_gid)
+    os.chmod(source.parent, 0o750)
+    if source.is_symlink():
+        if os.readlink(source) != str(target):
+            raise ValueError('unexpected qmailadmin symlink')
+        return
+    if source.exists():
+        # Startup only, before producers. Fixed .0 is an idempotent legacy archive.
+        archive = Path(str(target) + '.0')
+        source_fd = regular_fd(source, os.O_RDONLY)
+        try:
+            if archive.exists():
+                archive_fd = regular_fd(archive, os.O_RDONLY)
+                with os.fdopen(os.dup(source_fd), 'rb') as old, os.fdopen(archive_fd, 'rb') as saved:
+                    while True:
+                        chunk = old.read(65536)
+                        if chunk != saved.read(65536):
+                            raise ValueError('legacy archive differs')
+                        if not chunk:
+                            break
+            else:
+                staging = Path(str(archive) + '.tmp')
+                if staging.exists() or staging.is_symlink():
+                    if not stat.S_ISREG(staging.lstat().st_mode):
+                        raise ValueError('invalid legacy staging file')
+                    staging.unlink()
+                archive_fd = regular_fd(staging, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+                with os.fdopen(os.dup(source_fd), 'rb') as old, os.fdopen(archive_fd, 'wb') as saved:
+                    shutil.copyfileobj(old, saved)
+                    saved.flush()
+                    os.fsync(saved.fileno())
+                staging.rename(archive)
+        finally:
+            os.close(source_fd)
+    temporary = source.with_name('.qmailadmin-auth.routing')
+    if temporary.is_symlink() and os.readlink(temporary) == str(target):
+        temporary.unlink()
+    os.symlink(str(target), temporary)
+    os.replace(temporary, source)
+
+
+def run_command(component, command):
+    if component not in MAINTENANCE or not command:
+        raise ValueError('invalid maintenance command')
+    emit('maintenance_run', component, 'started')
+    child = None
+    def forward(signum, _frame):
+        if child is not None:
+            child.send_signal(signum)
+    previous = {sig: signal.signal(sig, forward) for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)}
+    try:
+        try:
+            child = subprocess.Popen(command)
+            result = child.wait()
+        except FileNotFoundError:
+            result = 127
+        except OSError:
+            result = 126
+        code = result if result >= 0 else 128 - result
+        emit('maintenance_run', component, 'success' if result == 0 else 'failure', code)
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+    if result < 0:
+        if -result not in (signal.SIGKILL, signal.SIGSTOP):
+            signal.signal(-result, signal.SIG_DFL)
+        os.kill(os.getpid(), -result)
+    return code
+
+
+def cron_text(text, user):
+    output = []
+    in_block = False
+    for line in text.splitlines(keepends=True):
+        stripped = line.strip()
+        if user == 'root' and stripped == CRON_BEGIN:
+            if in_block:
+                raise ValueError('nested routing cron block')
+            in_block = True
+            continue
+        if user == 'root' and stripped == CRON_END:
+            if not in_block:
+                raise ValueError('unmatched routing cron block')
+            in_block = False
+            continue
+        if in_block:
+            if stripped not in ('', CRON_JOB):
+                raise ValueError('unexpected routing cron block content')
+            continue
+        if not stripped.startswith(('#', '!')):
+            if stripped.startswith('%nightly'):
+                match = re.fullmatch(r'(\s*\S+[ \t]+\S+[ \t]+\S+[ \t]+)([^\r\n]*)(\r?\n)?', line)
+            elif stripped.startswith('%hourly'):
+                match = re.fullmatch(r'(\s*\S+[ \t]+\S+[ \t]+)([^\r\n]*)(\r?\n)?', line)
+            elif stripped.startswith(('%', '@')):
+                match = None
+            else:
+                match = re.fullmatch(r'(\s*(?:\S+[ \t]+){5})([^\r\n]*)(\r?\n)?', line)
+            if match and match[2] in CRON_COMMANDS[user]:
+                command = match[2]
+                component = CRON_COMMANDS[user][command]
+                if command.endswith('/reportlog_cleaner.ph'):
+                    command += 'p'
+                line = match[1] + '/opt/bin/mail-stats-event run ' + component + ' -- ' + command + (match[3] or '')
+        output.append(line)
+    if in_block:
+        raise ValueError('unterminated routing cron block')
+    result = ''.join(output)
+    if user == 'root':
+        if result and not result.endswith('\n'):
+            result += '\n'
+        result += CRON_BEGIN + '\n' + CRON_JOB + '\n' + CRON_END + '\n'
+    return result
+
+
+def reconcile_cron(directory='/etc/fcrontab'):
+    failed = False
+    for user in CRON_COMMANDS:
+        path = Path(directory) / user
+        if not path.exists():
+            continue
+        fd = regular_fd(path, os.O_RDONLY)
+        info = os.fstat(fd)
+        with os.fdopen(fd, 'r') as source:
+            text = source.read()
+        updated = cron_text(text, user)
+        if updated != text:
+            fd, temporary = tempfile.mkstemp(prefix='.' + user + '.routing-', dir=path.parent)
+            try:
+                with os.fdopen(fd, 'w') as target:
+                    os.fchmod(target.fileno(), stat.S_IMODE(info.st_mode))
+                    os.fchown(target.fileno(), info.st_uid, info.st_gid)
+                    target.write(updated)
+                    target.flush()
+                    os.fsync(target.fileno())
+                os.replace(temporary, path)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+        # Retry installation even when the prior attempt already wrote the text.
+        result = subprocess.run(['/usr/bin/fcrontab', '-n', str(path), user],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        failed = failed or result.returncode != 0
+    if failed:
+        raise ValueError('cron installation failed')
+
+
+def main(args):
+    if args and args[0] == 'emit' and len(args) in (4, 5):
+        emit(*args[1:4], int(args[4]) if len(args) == 5 else None)
+        return 0
+    if len(args) >= 4 and args[0] == 'run' and args[2] == '--':
+        return run_command(args[1], args[3:])
+    if args == ['receive']:
+        receive()
+    elif args == ['prepare']:
+        lock = locked()
+        try:
+            prepare()
+        finally:
+            os.close(lock)
+    elif args == ['rotate']:
+        lock = locked()
+        try:
+            for path in ['/log/lifecycle/current', '/log/qmailadmin/current']:
+                rotate_file(path)
+        finally:
+            os.close(lock)
+    elif args == ['cron']:
+        reconcile_cron()
+    else:
+        raise ValueError('invalid routing operation')
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except (OSError, ValueError):
+        print('mail log routing unavailable', file=sys.stderr)
+        sys.exit(1)

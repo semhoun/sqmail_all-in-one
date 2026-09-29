@@ -63,6 +63,10 @@ def inside(source_overlay):
     config = config.replace('/var/run/lighttpd-log.pipe', '/tmp/admin-auth-lighttpd.log')
     Path('/tmp/admin-auth-lighttpd.conf').write_text(config)
     Path('/run/php').mkdir(exist_ok=True)
+    pdf_pool = Path('/etc/php/8.5/fpm/pool.d/mail-stats-pdf.conf').exists()
+    if pdf_pool:
+        Path('/var/www/admin/html/stats/export.php').write_text(
+            '<?php echo ($_SERVER["REMOTE_USER"] ?? "missing") . "|" . getenv("MAIL_STATS_PDF_POOL", true);')
     run('php-fpm8.5', '-t')
     run('lighttpd', '-tt', '-f', '/tmp/admin-auth-lighttpd.conf')
     processes = [subprocess.Popen(['php-fpm8.5', '-F']),
@@ -115,6 +119,10 @@ def inside(source_overlay):
         assert re.fullmatch('[a-f0-9]{64}', cookies['__Host-sqmail-admin'])
         assert request('/cgi/auth-identity.cgi', cookies)[2] == f'{user}|Session'
         assert request('/auth-identity.php', cookies)[2] == f'{user}|Session'
+        if pdf_pool:
+            status, _, body = request('/stats/export.php', cookies, {'probe': '1'})
+            assert status == 200 and body == f'{user}|1', (status, body,
+                Path('/tmp/admin-auth-lighttpd.log').read_text(errors='replace')[-1200:])
         return cookies
 
     def passed(label):
@@ -134,8 +142,9 @@ def inside(source_overlay):
                   '/cgi/vqadmin/vqadmin.cgi', '/cgi/qmailadmin', '/cgi/auth-identity.cgi',
                   '/assets/', '/assets/absent.css', '/dmarc/', '/dmarc/index.php',
                   '/js/bootstrap.bundle.min.js', '/css/line-awesome.min.css', '/missing',
-                  '/delivery/', '/delivery/index.php', '/delivery/style.css',
-                  '/login.php/extra', '/cgi%2fvqadmin/vqadmin.cgi']
+                   '/delivery/', '/delivery/index.php', '/delivery/style.css',
+                   '/stats/', '/stats/index.php', '/stats/export.php', '/stats/stats.css',
+                   '/login.php/extra', '/cgi%2fvqadmin/vqadmin.cgi']
         for path in routes:
             denied(path)
             denied(path, headers={'Remote-User': 'admin', 'REMOTE_USER': 'admin',
