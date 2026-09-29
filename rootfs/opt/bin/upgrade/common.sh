@@ -22,9 +22,17 @@ write_mysql_php() {
   chmod 640 /var/qmail/control/aio-conf/mysql.php
 }
 
+load_roundcube_settings() {
+  local settings
+  # Legacy installers wrote this unused random key without shell escaping.
+  # Do not evaluate it or change the key in an existing Roundcube PHP config.
+  settings=$(sed '/^export DES_KEY=/d' "$1")
+  . <(printf '%s\n' "$settings")
+}
+
 roundcube_config() {
   . /var/qmail/control/aio-conf/mysql.conf
-  . /var/qmail/control/aio-conf/roundcube.conf
+  load_roundcube_settings /var/qmail/control/aio-conf/roundcube.conf
   export MYSQL_USER MYSQL_PASS MYSQL_HOST MYSQL_DB
   local source destination temporary
   for source in /var/www/html/config/*.tpl /var/www/html/plugins/*/*.tpl; do

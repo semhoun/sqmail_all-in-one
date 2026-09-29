@@ -32,9 +32,9 @@ function up_1.3_to_1.4 {
     if [ -e /var/qmail/control/aio-conf/roundcube.conf ]; then
       cmp /var/qmail/control/roundcube.conf /var/qmail/control/aio-conf/roundcube.conf
     fi
-    . /var/qmail/control/roundcube.conf
+    load_roundcube_settings /var/qmail/control/roundcube.conf
   else
-    . /var/qmail/control/aio-conf/roundcube.conf
+    load_roundcube_settings /var/qmail/control/aio-conf/roundcube.conf
   fi
 	mkdir -p /var/qmail/control/aio-conf
   printf 'export %s=%q\n' MYSQL_USER "$MYSQL_USER" MYSQL_PASS "$MYSQL_PASS" MYSQL_DB "$MYSQL_DB" MYSQL_HOST "$MYSQL_HOST" |
