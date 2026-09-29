@@ -1,10 +1,57 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to SQMail All-In-One are documented here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Historical entries are preserved below.
 
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.8.0] - Unreleased
+
+Planned release covering changes since `1.7.3`. See the [README](README.md) for setup and upgrade instructions.
+
+### Added
+
+- Per-mailbox Delivery & Sieve administration: local delivery with or without Sieve, forwarding with optional local copies, explicit discard, native script validation, vacation drafts and private backup restoration. Changes require previews and confirmation. ([e7c03b4](https://github.com/semhoun/sqmail_all-in-one/commit/e7c03b4))
+- Mail statistics and service diagnostics at `/stats/`, with sender/recipient rankings, paginated address lists, directional domain traffic and delivery-problem summaries. Collection runs every minute into the existing MySQL/MariaDB database. ([1d06f09](https://github.com/semhoun/sqmail_all-in-one/commit/1d06f09))
+- Configurable statistics retention through `MAIL_STATS_HISTORY_MONTHS` (default six calendar months UTC, range 1-120) and an opt-out through `MAIL_STATS_ENABLED=0`. Statistics failures do not block mail startup. ([1d06f09](https://github.com/semhoun/sqmail_all-in-one/commit/1d06f09))
+- Bounded, locally rendered PDF reports using Dompdf 3.1.6, with masked summary identities and explicit opt-in for nominal diagnostic exports. ([1d06f09](https://github.com/semhoun/sqmail_all-in-one/commit/1d06f09))
+- Standalone SRS setup and DNS reporting with `mksrs.sh`, plus vpopmail forwarding integration and reverse-bounce routing that preserve existing SRS secrets. ([aa9f0cd](https://github.com/semhoun/sqmail_all-in-one/commit/aa9f0cd))
+
+### Changed
+
+- Upgrade S/QMail to 4.4.14 beta, vpopmail to 5.6.14, Dovecot/Pigeonhole to 2.4.5, Roundcube to 1.7.4, ClamAV to 1.5.4, QmailAdmin to 1.2.28, vqadmin to 2.4.7, s6 to 2.15.1.0, fcron to 3.4.1 and acme.sh to 3.1.6. PHP moves to 8.5 from Sury on Debian trixie. ([aa9f0cd](https://github.com/semhoun/sqmail_all-in-one/commit/aa9f0cd))
+- Retain the temporary S/QMail SRS implementation from **4.3.25a**, rather than the native 4.4.14 modules; reevaluate this backport on future S/QMail upgrades. ([aa9f0cd](https://github.com/semhoun/sqmail_all-in-one/commit/aa9f0cd))
+- Replace browser HTTP authentication with a session-based administration login and refresh the portal and mail-queue interface. Existing SHA256 administrator credentials remain valid. ([85d7edc](https://github.com/semhoun/sqmail_all-in-one/commit/85d7edc))
+- Harden initialization and migrations with locking, atomic configuration writes, validated checkpoints and failure handling. The 1.7-to-1.8 migration updates historical DMARC and Roundcube schemas automatically. ([aa9f0cd](https://github.com/semhoun/sqmail_all-in-one/commit/aa9f0cd))
+- Route internal service diagnostics for statistics collection, add structured lifecycle and delivery-administration events, and timestamp new s6 log records in UTC. ([1d06f09](https://github.com/semhoun/sqmail_all-in-one/commit/1d06f09))
+
+### Fixed
+
+- Correct SMTP recipient-state handling and queue-scanner exit propagation. Multi-recipient messages use the global spam policy; database or spam-client failures no longer proceed as successful scanning. ([aa9f0cd](https://github.com/semhoun/sqmail_all-in-one/commit/aa9f0cd))
+- Install `gpg-agent` so SpamAssassin can import its rule-signing key. ([bb00e0e](https://github.com/semhoun/sqmail_all-in-one/commit/bb00e0e))
+- Avoid a race between Lighttpd and its logger when creating the log FIFO. ([b5da853](https://github.com/semhoun/sqmail_all-in-one/commit/b5da853))
+- Remove stale shell-profile references after cleaning up Rust build tools. ([9ffe443](https://github.com/semhoun/sqmail_all-in-one/commit/9ffe443))
+
+### Security
+
+- Protect administration with Secure, HttpOnly, SameSite cookies, session expiry, credential revocation and session-based login throttling. Forwarded identity headers cannot authenticate requests; HTTPS termination and IP-based rate limiting belong at the reverse proxy. ([85d7edc](https://github.com/semhoun/sqmail_all-in-one/commit/85d7edc))
+- Escape message content and metadata displayed by the queue viewer. ([85d7edc](https://github.com/semhoun/sqmail_all-in-one/commit/85d7edc))
+- Restrict delivery operations through a privileged helper, validate mailbox storage, and keep backups private to root. Delivery & Sieve access is global for portal administrators, not restricted by vqadmin domain ACLs. ([e7c03b4](https://github.com/semhoun/sqmail_all-in-one/commit/e7c03b4))
+- Protect statistics searches and exports with authenticated POST requests and CSRF checks. Collection excludes message bodies, cookies and session tokens; PDF rendering rejects remote resources and user-supplied HTML. ([1d06f09](https://github.com/semhoun/sqmail_all-in-one/commit/1d06f09))
+
+### Infrastructure
+
+- Optimize Docker build caching and dependency cleanup. ([a1b8f72](https://github.com/semhoun/sqmail_all-in-one/commit/a1b8f72))
+- Add isolated Dovecot/Sieve and SMTP/IMAP, relay, spam and antivirus regression suites using synthetic mail and disposable containers. ([6e62a8b](https://github.com/semhoun/sqmail_all-in-one/commit/6e62a8b), [6a7cd97](https://github.com/semhoun/sqmail_all-in-one/commit/6a7cd97))
+- Extend release CI with administration authentication, native delivery, Sieve, statistics persistence and HTTP/PDF/fcron integration checks. Publish the same tested image with provenance; test fixtures remain outside the image. ([85d7edc](https://github.com/semhoun/sqmail_all-in-one/commit/85d7edc), [e7c03b4](https://github.com/semhoun/sqmail_all-in-one/commit/e7c03b4), [1d06f09](https://github.com/semhoun/sqmail_all-in-one/commit/1d06f09))
+
+### Upgrade Notes
+
+- Back up the external database and persistent volumes together. Never rerun `init.sh` on an existing installation; startup applies migrations. An image rollback alone does not revert database or Dovecot storage changes.
+- Serve administration through a dedicated HTTPS reverse proxy to internal port 88. Container port 443 remains the webmail endpoint.
+- Statistics are enabled by default and may retain addresses, accounts and IPs. Retention does not cover original logs or downloaded PDFs; see [Statistics and Journals](STATISTICS.md).
+- Keep `SQMAIL_AIO_VERSION=1.8` as the internal migration target. The public release version is `1.8.0`; the migration checkpoint is not a patch-version identifier.
 
 ## [1.7.3] - 2026-02-02
 
