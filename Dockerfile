@@ -118,8 +118,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libbg-dev \
 # For dovecot
   && apt-get install -y --no-install-recommends libxapian-dev python3 \
-    # libldap2 must be removed in future
-    libldap2-dev \
 # For roundcube
   && apt-get install -y --no-install-recommends php8.5-zip php8.5-pspell php8.5-mysql php8.5-gd php8.5-xml php8.5-mbstring php8.5-intl php8.5-imagick php8.5-imap aspell-fr php8.5-curl \
   && cpan -i IP::Country::DB_File MaxMind::DB::Reader Geo::IP IP::Country::Fast Digest::SHA1 Net::LibIDN2 Email::Address::XS \
@@ -305,7 +303,7 @@ RUN groupadd -g 2110 dovecot \
     --with-ssl \
     --without-shadow \
     --without-pam \
-    --with-ldap \
+    --without-ldap \
     --without-pgsql \
     --without-sqlite \
 	--with-flatcurve \
