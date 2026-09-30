@@ -40,7 +40,7 @@ ARG VQADMIN_TAG=2.4.7
 ARG ROUNDCUBEMAIL_TAG=1.7.4
 ARG QMAILFORWARD_TAG=1.0.5
 
-ARG DMARCSRG_TAG=2.3
+ARG DMARCSRG_COMMIT=f575001e895c6892de93c1ac3f612ec0fb9e756b
 
 WORKDIR "/opt/src"
 
@@ -603,9 +603,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # DmarcSrg
 ###########################
 RUN mkdir -p /var/www/admin/dmarc \
-  && wget -O /opt/src/dmarcsrg.tgz https://github.com/liuch/dmarc-srg/archive/refs/tags/v${DMARCSRG_TAG}.tar.gz \
+  && wget -O /opt/src/dmarcsrg.tgz https://github.com/liuch/dmarc-srg/archive/${DMARCSRG_COMMIT}.tar.gz \
   && cd /var/www/admin/dmarc \
   && tar -xzf /opt/src/dmarcsrg.tgz --strip 1 \
+# ImapEngine defaults to 993 even without TLS; preserve implicit IMAP/STARTTLS ports.
+  && sed -i 's/$port = 0;/$port = in_array($this->encrypt, ["none", "starttls"], true) ? 143 : 993;/' classes/Mail/ImapEngine/MailBox.php \
   && export COMPOSER_ALLOW_SUPERUSER=1 \
   && composer config minimum-stability stable \
   && composer config prefer-stable true \
@@ -648,7 +650,7 @@ RUN mkdir -p /usr/local/share/sqmail-aio \
     "QmailAdmin=${QMAILADMIN_TAG}" "vqadmin=${VQADMIN_TAG}" "ClamAV=${CLAMAV_TAG}" \
     "DCC=${DCC_TAG}" "SpamAssassin=${SPAMASSASSIN_TAG}" "fcron=${FCRON_TAG}" \
     "acme.sh=${ACMESH_TAG}" "Roundcube=${ROUNDCUBEMAIL_TAG}" "qmailforward=${QMAILFORWARD_TAG}" \
-    "Fetchmail-plugin=${FETCHMAIL_PLUGIN_COMMIT}" "DmarcSrg=${DMARCSRG_TAG}" "Composer=${COMPOSER_VERSION}" \
+    "Fetchmail-plugin=${FETCHMAIL_PLUGIN_COMMIT}" "DmarcSrg=${DMARCSRG_COMMIT}" "Composer=${COMPOSER_VERSION}" \
     > /usr/local/share/sqmail-aio/source-versions.txt
 COPY --link rootfs /
 RUN chown qmailq:sqmail /var/qmail/bin/qmail-queuescan \

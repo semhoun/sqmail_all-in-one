@@ -21,7 +21,7 @@ The [Dockerfile](Dockerfile) is authoritative for versions, build options, users
 | [SpamAssassin](https://spamassassin.apache.org/) / DCC | 4.0.2 / 2.3.169 | Spam filtering |
 | [ClamAV](https://www.clamav.net/) | 1.5.4 | Antivirus scanning |
 | [QmailAdmin](https://github.com/sagredo-dev/qmailadmin) / [vqadmin](https://github.com/sagredo-dev/vqadmin) | 1.2.28 / 2.4.7 | Mailbox and domain administration |
-| [DmarcSrg](https://github.com/liuch/dmarc-srg) | 2.3 | DMARC report viewer |
+| [DmarcSrg](https://github.com/liuch/dmarc-srg) | 3.0-pre2, commit [`f575001`](https://github.com/liuch/dmarc-srg/commit/f575001e895c6892de93c1ac3f612ec0fb9e756b) | DMARC report viewer; includes PHP 8.5 fixes |
 | [ezmlm-idx](https://github.com/sagredo-dev/ezmlm-idx) / [qmail-autoresponder](https://untroubled.org/qmail-autoresponder) | Pinned fork / 2.0 | Mailing lists and automatic replies |
 | Fetchmail / Lighttpd | Debian packages | Remote mail retrieval and HTTP serving |
 | [s6](https://github.com/skarnet/s6) / [fcron](https://github.com/yo8192/fcron) | 2.15.1.0 / 3.4.1 | Supervision and scheduled jobs |
